@@ -575,6 +575,46 @@ int unlzma_main(int argc UNUSED_PARAM, char **argv)
 //config:	help
 //config:	Enable this option if you want commands like "xz -d" to work.
 //config:	IOW: you'll get xz applet, but it will always require -d option.
+//config:
+//config:config FEATURE_UNXZ_BCJ_X86
+//config:	bool "x86 BCJ filter decoder for unxz"
+//config:	default n
+//config:	depends on UNXZ || FEATURE_UNZIP_XZ
+//config:
+//config:config FEATURE_UNXZ_BCJ_POWERPC
+//config:	bool "PowerPC BCJ filter decoder"
+//config:	default n
+//config:	depends on UNXZ || FEATURE_UNZIP_XZ
+//config:
+//config:config FEATURE_UNXZ_BCJ_IA64
+//config:	bool "IA64 BCJ filter decoder for unxz"
+//config:	default n
+//config:	depends on UNXZ || FEATURE_UNZIP_XZ
+//config:
+//config:config FEATURE_UNXZ_BCJ_ARM
+//config:	bool "ARM BCJ filter decoder for unxz"
+//config:	default n
+//config:	depends on UNXZ || FEATURE_UNZIP_XZ
+//config:
+//config:config FEATURE_UNXZ_BCJ_ARMTHUMB
+//config:	bool "ARM-Thumb BCJ filter decoder for unxz"
+//config:	default n
+//config:	depends on UNXZ || FEATURE_UNZIP_XZ
+//config:
+//config:config FEATURE_UNXZ_BCJ_SPARC
+//config:	bool "SPARC BCJ filter decoder for unxz"
+//config:	default n
+//config:	depends on UNXZ || FEATURE_UNZIP_XZ
+//config:
+//config:config FEATURE_UNXZ_BCJ_ARM64
+//config:	bool "ARM64 BCJ filter decoder for unxz"
+//config:	default n
+//config:	depends on UNXZ || FEATURE_UNZIP_XZ
+//config:
+//config:config FEATURE_UNXZ_BCJ_RISCV
+//config:	bool "RISC-V BCJ filter decoder for unxz"
+//config:	default n
+//config:	depends on UNXZ || FEATURE_UNZIP_XZ
 
 //applet:IF_UNXZ(APPLET(unxz, BB_DIR_USR_BIN, BB_SUID_DROP))
 //                APPLET_ODDNAME:name   main  location        suid_type     help

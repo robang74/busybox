@@ -9,15 +9,30 @@
 #ifndef XZ_CONFIG_H
 #define XZ_CONFIG_H
 
-/* Uncomment as needed to enable BCJ filter decoders. */
-/* #define XZ_DEC_X86 */
-/* #define XZ_DEC_POWERPC */
-/* #define XZ_DEC_IA64 */
-/* #define XZ_DEC_ARM */
-/* #define XZ_DEC_ARMTHUMB */
-/* #define XZ_DEC_SPARC */
-/* #define XZ_DEC_ARM64 */
-/* #define XZ_DEC_RISCV */
+#if ENABLE_FEATURE_UNXZ_BCJ_X86
+#define XZ_DEC_X86
+#endif
+#if ENABLE_FEATURE_UNXZ_BCJ_POWERPC
+#define XZ_DEC_POWERPC
+#endif
+#if ENABLE_FEATURE_UNXZ_BCJ_IA64
+#define XZ_DEC_IA64
+#endif
+#if ENABLE_FEATURE_UNXZ_BCJ_ARM
+#define XZ_DEC_ARM
+#endif
+#if ENABLE_FEATURE_UNXZ_BCJ_ARMTHUMB
+#define XZ_DEC_ARMTHUMB
+#endif
+#if ENABLE_FEATURE_UNXZ_BCJ_SPARC
+#define XZ_DEC_SPARC
+#endif
+#if ENABLE_FEATURE_UNXZ_BCJ_ARM64
+#define XZ_DEC_ARM64
+#endif
+#if ENABLE_FEATURE_UNXZ_BCJ_RISCV
+#define XZ_DEC_RISCV
+#endif
 
 #include <stdbool.h>
 #include <stdlib.h>
