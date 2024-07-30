@@ -17,6 +17,8 @@
 /* #define XZ_DEC_ARM */
 /* #define XZ_DEC_ARMTHUMB */
 /* #define XZ_DEC_SPARC */
+/* #define XZ_DEC_ARM64 */
+/* #define XZ_DEC_RISCV */
 
 #include <stdbool.h>
 #include <stdlib.h>
