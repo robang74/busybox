@@ -355,6 +355,7 @@ int bootchartd_main(int argc UNUSED_PARAM, char **argv)
 		CMD_INIT,
 		CMD_PID1, /* used to mark pid 1 case */
 	};
+	char* exec_argv[2];
 
 	INIT_G();
 
@@ -446,10 +447,20 @@ int bootchartd_main(int argc UNUSED_PARAM, char **argv)
 
 	if (cmd == CMD_PID1) {
 		char *bootchart_init = getenv("bootchart_init");
-		if (bootchart_init)
-			execl(bootchart_init, bootchart_init, NULL);
-		execl("/init", "init", NULL);
-		execl("/sbin/init", "init", NULL);
+
+		/* make second arg always NULL */
+		exec_argv[1] = NULL;
+
+		if (bootchart_init) {
+			exec_argv[0] = bootchart_init;
+			BB_EXECVP(bootchart_init, exec_argv);
+		}
+
+		/* fallback, we are calling different init binaries */
+		exec_argv[0] = (char *) "init";
+
+		BB_EXECVP("/init", exec_argv);
+		BB_EXECVP("/sbin/init", exec_argv);
 		bb_perror_msg_and_die("can't execute '%s'", "/sbin/init");
 	}
 
