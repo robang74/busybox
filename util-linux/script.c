@@ -69,6 +69,7 @@ int script_main(int argc UNUSED_PARAM, char **argv)
 		OPT_q = (1 << 3),
 		OPT_t = (1 << 4),
 	};
+	char* shell_argv[4];
 
 #if ENABLE_LONG_OPTS
 	static const char script_longopts[] ALIGN1 =
@@ -235,6 +236,9 @@ int script_main(int argc UNUSED_PARAM, char **argv)
 
 	/* Non-ignored signals revert to SIG_DFL on exec anyway */
 	/*signal(SIGCHLD, SIG_DFL);*/
-	execl(shell, shell, shell_opt, shell_arg, (char *) NULL);
-	bb_simple_perror_msg_and_die(shell);
+	shell_argv[0] = (char *) shell;
+	shell_argv[1] = shell_opt;
+	shell_argv[2] = shell_arg;
+	shell_argv[3] = NULL;
+	BB_EXECVP_or_die(shell_argv);
 }
