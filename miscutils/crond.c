@@ -699,6 +699,8 @@ fork_job(const char *user, int mailFd, CronLine *line, bool run_sendmail)
 	const char *shell, *prog;
 	smallint sv_logmode;
 	pid_t pid;
+	char* shell_argv[4];
+	const char* sendmail_argv[] = {SENDMAIL, SENDMAIL_ARGS, NULL};
 
 	/* prepare things before vfork */
 	pas = getpwnam(user);
@@ -725,10 +727,15 @@ fork_job(const char *user, int mailFd, CronLine *line, bool run_sendmail)
 		}
 		/* crond 3.0pl1-100 puts tasks in separate process groups */
 		bb_setpgrp();
-		if (!run_sendmail)
-			execlp(prog, prog, "-c", line->cl_cmd, (char *) NULL);
-		else
-			execlp(prog, prog, SENDMAIL_ARGS, (char *) NULL);
+		if (!run_sendmail) {
+			shell_argv[0] = (char *) shell;
+			shell_argv[1] = (char *) "-c";
+			shell_argv[2] = line->cl_cmd;
+			shell_argv[3] = NULL;
+			BB_EXECVP(shell_argv[0], shell_argv);
+		} else {
+			BB_EXECVP(sendmail_argv[0], (char **) sendmail_argv);
+		}
 		/*
 		 * I want this error message on stderr too,
 		 * even if other messages go only to syslog:
@@ -845,6 +852,7 @@ static pid_t start_one_job(const char *user, CronLine *line)
 	const char *shell;
 	struct passwd *pas;
 	pid_t pid;
+	char* shell_argv[4];
 
 	pas = getpwnam(user);
 	if (!pas) {
@@ -865,7 +873,11 @@ static pid_t start_one_job(const char *user, CronLine *line)
 		log5("child running %s", shell);
 		/* crond 3.0pl1-100 puts tasks in separate process groups */
 		bb_setpgrp();
-		execl(shell, shell, "-c", line->cl_cmd, (char *) NULL);
+		shell_argv[0] = (char *) shell;
+		shell_argv[1] = (char *) "-c";
+		shell_argv[2] = line->cl_cmd;
+		shell_argv[3] = NULL;
+		BB_EXECVP(shell_argv[0], shell_argv);
 		bb_error_msg_and_die("can't execute '%s' for user %s", shell, user);
 	}
 	if (pid < 0) {
