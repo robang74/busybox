@@ -575,6 +575,7 @@ static void NOINLINE vfork_compressor(int tar_fd, const char *gzip)
 	// On Linux, vfork never unpauses parent early, although standard
 	// allows for that. Do we want to waste bytes checking for it?
 #  define WAIT_FOR_CHILD 0
+	char* gzip_argv[] = { (char *) gzip, (char *) "-f", NULL };
 	volatile int vfork_exec_errno = 0;
 	struct fd_pair data;
 #  if WAIT_FOR_CHILD
@@ -614,11 +615,17 @@ static void NOINLINE vfork_compressor(int tar_fd, const char *gzip)
 		xmove_fd(tfd, 1);
 
 		/* exec gzip/bzip2/... program */
-		//BB_EXECLP(gzip, gzip, "-f", (char *)0); - WRONG for "xz",
+
+# if ENABLE_FEATURE_PREFER_APPLETS
 		// if xz is an enabled applet, it'll be a version which
 		// can only decompress. We do need to execute external
 		// program, not applet.
-		execlp(gzip, gzip, "-f", (char *)0);
+		if (strncmp(gzip, "xz", 2))
+			_exit_FAILURE();
+# endif
+
+		// This works for all other compressions
+		BB_EXECVP(gzip, gzip_argv);
 
 		vfork_exec_errno = errno;
 		_exit_FAILURE();
