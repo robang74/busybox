@@ -78,15 +78,37 @@ int FAST_FUNC executable_exists(const char *name)
 	return ret != NULL;
 }
 
-#if ENABLE_FEATURE_PREFER_APPLETS
-/* just like the real execvp, but try to launch an applet named 'file' first */
+/* just like the real execvp, but we might try to launch an applet named 'file' first */
 int FAST_FUNC BB_EXECVP(const char *file, char *const argv[])
 {
-	if (find_applet_by_name(file) >= 0)
-		execvp(bb_busybox_exec_path, argv);
+#if ENABLE_FEATURE_PREFER_APPLETS
+	int applet = find_applet_by_name(file);
+	if (applet >= 0) {
+		if (ENABLE_FEATURE_FORCE_NOEXEC || APPLET_IS_NOEXEC(applet)) 
+			run_noexec_applet_and_exit(applet, file, (char **) argv);
+		else
+			execvp(bb_busybox_exec_path, argv);
+	}
+# if ENABLE_FEATURE_FORCE_APPLETS
+	else {
+		/* set errno accordingly */
+		errno = ENOENT;
+		return -1;
+	}
+# endif
+#endif
+
 	return execvp(file, argv);
 }
-#endif
+
+int FAST_FUNC BB_EXECVPE(const char *file, char *const argv[], char *const envp[])
+{
+	clearenv();
+	while (*envp)
+		putenv(*envp++);
+	
+	return BB_EXECVP(file, argv);
+}
 
 void FAST_FUNC BB_EXECVP_or_die(char **argv)
 {

@@ -1230,21 +1230,11 @@ int file_is_executable(const char *name) FAST_FUNC;
 char *find_executable(const char *filename, const char **PATHp) FAST_FUNC;
 int executable_exists(const char *filename) FAST_FUNC;
 
-/* BB_EXECxx always execs (it's not doing NOFORK/NOEXEC stuff),
- * but it may exec busybox and call applet instead of searching PATH.
+/* BB_EXECxx are called instead of using execXX directly, to allow
+ * implementation of NOFORK/NOEXEC applet logic if required.
  */
-#if ENABLE_FEATURE_PREFER_APPLETS
 int BB_EXECVP(const char *file, char *const argv[]) FAST_FUNC;
-#define BB_EXECLP(prog,cmd,...) \
-	do { \
-		if (find_applet_by_name(prog) >= 0) \
-			execlp(bb_busybox_exec_path, cmd, __VA_ARGS__); \
-		execlp(prog, cmd, __VA_ARGS__); \
-	} while (0)
-#else
-#define BB_EXECVP(prog,cmd)     execvp(prog,cmd)
-#define BB_EXECLP(prog,cmd,...) execlp(prog,cmd,__VA_ARGS__)
-#endif
+int BB_EXECVPE(const char *file, char *const argv[], char *const envp[]) FAST_FUNC;
 void BB_EXECVP_or_die(char **argv) NORETURN FAST_FUNC;
 
 /* xvfork() can't be a _function_, return after vfork in child mangles stack
