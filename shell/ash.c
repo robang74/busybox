@@ -8271,22 +8271,17 @@ static int builtinloc = -1;     /* index in path of %builtin, or -1 */
 
 
 static void
-tryexec(IF_FEATURE_SH_STANDALONE(int applet_no,) const char *cmd, char **argv, char **envp)
+tryexec(const char *cmd, char **argv, char **envp)
 {
 #if ENABLE_FEATURE_SH_STANDALONE
-	if (applet_no >= 0) {
-		if (APPLET_IS_NOEXEC(applet_no)) {
-			clearenv();
-			while (*envp)
-				putenv(*envp++);
-			popredir(/*drop:*/ 1);
-			run_noexec_applet_and_exit(applet_no, cmd, argv);
-		}
-		/* re-exec ourselves with the new arguments */
-		execve(bb_busybox_exec_path, argv, envp);
-		/* If they called chroot or otherwise made the binary no longer
-		 * executable, fall through */
-	}
+	/* use BB_EXECVP to attempt execution of command */
+	BB_EXECVPE(cmd, argv, envp);
+
+	/* if BB_EXECVP returned ENOENT, don't bother falling through 
+	 * as BB_EXECVP already uses execvp behind the scenes.
+	*/
+	if (errno == ENOENT)
+		return;
 #endif
 
  repeat:
@@ -8338,33 +8333,21 @@ static void shellexec(char *prog, char **argv, const char *path, int idx)
 	int e;
 	char **envp;
 	int exerrno;
-	int applet_no = -1; /* used only by FEATURE_SH_STANDALONE */
 
 	envp = listvars(VEXPORT, VUNSET, /*strlist:*/ NULL, /*end:*/ NULL);
-	if (strchr(prog, '/') != NULL
-#if ENABLE_FEATURE_SH_STANDALONE
-	 || (applet_no = find_applet_by_name(prog)) >= 0
-#endif
-	) {
-		tryexec(IF_FEATURE_SH_STANDALONE(applet_no,) prog, argv, envp);
-		if (applet_no >= 0) {
-			/* We tried execing ourself, but it didn't work.
-			 * Maybe /proc/self/exe doesn't exist?
-			 * Try $PATH search.
-			 */
-			goto try_PATH;
-		}
-		e = errno;
-	} else {
- try_PATH:
-		e = ENOENT;
-		while (padvance(&path, argv[0]) >= 0) {
-			cmdname = stackblock();
-			if (--idx < 0 && pathopt == NULL) {
-				tryexec(IF_FEATURE_SH_STANDALONE(-1,) cmdname, argv, envp);
-				if (errno != ENOENT && errno != ENOTDIR)
-					e = errno;
-			}
+	/* try executing using tryexec, which might execute applets
+	 * using NOEXEC logic, and might execute a matching binary.
+	 */
+	tryexec(prog, argv, envp);
+	e = errno;
+
+	/* fallback to PATH search and try executing using tryexec */
+	while (padvance(&path, argv[0]) >= 0) {
+		cmdname = stackblock();
+		if (--idx < 0 && pathopt == NULL) {
+			tryexec(cmdname, argv, envp);
+			if (errno != ENOENT && errno != ENOTDIR)
+				e = errno;
 		}
 	}
 
