@@ -119,6 +119,7 @@ static void warnx(const char *m1)
 static NOINLINE pid_t runsv(const char *name)
 {
 	pid_t pid;
+	char* runsv_argv[] = { (char *) "runsv", (char *) name, NULL };
 
 	/* If we got signaled, stop spawning children at once! */
 	if (bb_got_signal)
@@ -143,7 +144,7 @@ static NOINLINE pid_t runsv(const char *name)
 			| (1 << SIGTERM)
 			, SIG_DFL);
 #endif
-		execlp("runsv", "runsv", name, (char *) NULL);
+		BB_EXECVP(runsv_argv[0], runsv_argv);
 		fatal2_cannot("start runsv ", name);
 	}
 	return pid;
