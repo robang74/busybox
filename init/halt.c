@@ -170,6 +170,7 @@ int halt_main(int argc UNUSED_PARAM, char **argv)
 		RB_AUTOBOOT
 	};
 	static const smallint signals[] = { SIGUSR1, SIGUSR2, SIGTERM };
+	char* telinit_argv[3];
 
 	int delay = 0;
 	int which, flags, rc;
@@ -230,13 +231,10 @@ int halt_main(int argc UNUSED_PARAM, char **argv)
 				/* runlevels:
 				 * 0 == shutdown
 				 * 6 == reboot */
-				execlp(CONFIG_TELINIT_PATH,
-						CONFIG_TELINIT_PATH,
-						which == 2 ? "6" : "0",
-						(char *)NULL
-				);
-				bb_perror_msg_and_die("can't execute '%s'",
-						CONFIG_TELINIT_PATH);
+				telinit_argv[0] = (char *) CONFIG_TELINIT_PATH;
+				telinit_argv[1] = which == 2 ? (char *) "6" : (char *) "0";
+				telinit_argv[2] = NULL;
+				BB_EXECVP_or_die(telinit_argv);
 			}
 		}
 	} else {
