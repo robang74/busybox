@@ -1146,6 +1146,7 @@ static void set_environ(struct interface_defn_t *iface, const char *mode, const 
 
 static int doit(char *str)
 {
+	char* shell_argv[4] = { G.shell, (char *) "-c", str, NULL};
 	if (option_mask32 & (OPT_no_act|OPT_verbose)) {
 		puts(str);
 	}
@@ -1158,7 +1159,7 @@ static int doit(char *str)
 		if (child < 0) /* failure */
 			return 0;
 		if (child == 0) { /* child */
-			execle(G.shell, G.shell, "-c", str, (char *) NULL, G.my_environ);
+			BB_EXECVPE(shell_argv[0], shell_argv, G.my_environ);
 			_exit(127);
 		}
 		safe_waitpid(child, &status, 0);
