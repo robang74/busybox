@@ -158,8 +158,12 @@ static void passwd_wrapper(const char *login_name) NORETURN;
 
 static void passwd_wrapper(const char *login_name)
 {
-	BB_EXECLP("passwd", "passwd", "--", login_name, NULL);
-	bb_simple_error_msg_and_die("can't execute passwd, you must set password manually");
+	char* passwd_argv[4];
+	passwd_argv[0] = (char *) "passwd";
+	passwd_argv[1] = (char *) "--";
+	passwd_argv[2] = (char *) login_name;
+	passwd_argv[3] = NULL;
+	BB_EXECVP_or_die(passwd_argv);
 }
 
 //FIXME: upstream adduser has no short options! NOT COMPATIBLE!
