@@ -80,7 +80,7 @@ void FAST_FUNC exec_shell(const char *shell, int loginshell, const char **additi
 	if (ENABLE_FEATURE_CLEAN_UP)
 		freecon(current_sid);
 #endif
-	execv(shell, (char **) args);
+	BB_EXECVP(shell, (char **) args);
 	bb_perror_msg_and_die("can't execute '%s'", shell);
 }
 

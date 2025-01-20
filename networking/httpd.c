@@ -1706,7 +1706,7 @@ static void send_cgi_and_exit(
 		/* _NOT_ execvp. We do not search PATH. argv[0] is a filename
 		 * without any dir components and will only match a file
 		 * in the current directory */
-		execv(argv[0], argv);
+		BB_EXECVP(argv[0], argv);
 		if (verbose)
 			bb_perror_msg("can't execute '%s'", argv[0]);
  error_execing_cgi:
