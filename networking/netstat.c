@@ -315,9 +315,12 @@ static int FAST_FUNC dir_act(struct recursive_state *state,
 		return FALSE;
 	cmdline_buf[n] = '\0';
 
+	/* don't write process-controlled argv[0] to the user's terminal as-is */
+	const char *argv0base = printable_string(bb_basename(cmdline_buf));
+
 	/* go through all files in /proc/PID/fd and check whether they are sockets */
 	strcpy(proc_pid_fname + len - (sizeof("cmdline")-1), "fd");
-	pid_slash_progname = concat_path_file(pid, bb_basename(cmdline_buf)); /* "PID/argv0" */
+	pid_slash_progname = concat_path_file(pid, argv0base); /* "PID/argv0" */
 	n = recursive_action(proc_pid_fname,
 			ACTION_RECURSE | ACTION_QUIET,
 			add_to_prg_cache_if_socket,
