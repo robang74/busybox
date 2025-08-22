@@ -279,7 +279,7 @@ shell_builtin_read(struct builtin_read_params *params)
 		}
  put:
 		bufpos++;
-	} while (--nchars);
+	} while (backslash || --nchars);
 
 	if (argv[0]) {
 		/* Remove trailing space $IFS chars */
