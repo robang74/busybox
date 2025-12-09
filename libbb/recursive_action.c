@@ -15,10 +15,8 @@
  * location, and do something (something specified
  * by the fileAction and dirAction function pointers).
  *
- * Unfortunately, while nftw(3) could replace this and reduce
- * code size a bit, nftw() wasn't supported before GNU libc 2.1,
- * and so isn't sufficiently portable to take over since glibc2.1
- * is so stinking huge.
+ * Unfortunately, while nftw(3) works very similar it does not expose
+ * the file descriptors to allow safe usage.
  */
 
 static int FAST_FUNC true_action(struct recursive_state *state UNUSED_PARAM,
@@ -64,11 +62,11 @@ static int FAST_FUNC true_action(struct recursive_state *state UNUSED_PARAM,
  * 1: stat(statbuf). Calls dirAction and optionally recurse on link to dir.
  */
 
-static int recursive_action1(recursive_state_t *state, const char *fileName)
+static int recursive_action1(recursive_state_t *state)
 {
 	struct stat statbuf;
 	unsigned follow;
-	int status;
+	int status, olddirfd = state->dirfd;
 	DIR *dir;
 	struct dirent *next;
 
@@ -76,17 +74,17 @@ static int recursive_action1(recursive_state_t *state, const char *fileName)
 	if (state->depth == 0)
 		follow = ACTION_FOLLOWLINKS | ACTION_FOLLOWLINKS_L0;
 	follow &= state->flags;
-	status = (follow ? stat : lstat)(fileName, &statbuf);
+	status = fstatat(state->dirfd, state->baseName, &statbuf, follow ? 0 : AT_SYMLINK_NOFOLLOW);
 	if (status < 0) {
 #ifdef DEBUG_RECURS_ACTION
 		bb_error_msg("status=%d flags=%x", status, state->flags);
 #endif
 		if ((state->flags & ACTION_DANGLING_OK)
 		 && errno == ENOENT
-		 && lstat(fileName, &statbuf) == 0
+		 && fstatat(state->dirfd, state->baseName, &statbuf, AT_SYMLINK_NOFOLLOW) == 0
 		) {
 			/* Dangling link */
-			return state->fileAction(state, fileName, &statbuf);
+			return state->fileAction(state, state->fileName, &statbuf);
 		}
 		goto done_nak_warn;
 	}
@@ -97,46 +95,63 @@ static int recursive_action1(recursive_state_t *state, const char *fileName)
 	if ( /* (!(state->flags & ACTION_FOLLOWLINKS) && S_ISLNK(statbuf.st_mode)) || */
 	 !S_ISDIR(statbuf.st_mode)
 	) {
-		return state->fileAction(state, fileName, &statbuf);
+		return state->fileAction(state, state->fileName, &statbuf);
 	}
 
 	/* It's a directory (or a link to one, and followLinks is set) */
 
 	if (!(state->flags & ACTION_RECURSE)) {
-		return state->dirAction(state, fileName, &statbuf);
+		return state->dirAction(state, state->fileName, &statbuf);
 	}
 
 	if (!(state->flags & ACTION_DEPTHFIRST)) {
-		status = state->dirAction(state, fileName, &statbuf);
+		status = state->dirAction(state, state->fileName, &statbuf);
 		if (status == FALSE)
 			goto done_nak_warn;
 		if (status == SKIP)
 			return TRUE;
 	}
 
-	dir = opendir(fileName);
+	state->dirfd = openat(olddirfd, state->baseName, O_RDONLY | O_DIRECTORY | (follow ? 0 : O_NOFOLLOW));
+	if (state->dirfd < 0)
+		goto done_nak_warn;
+	dir = fdopendir(state->dirfd);
 	if (!dir) {
 		/* findutils-4.1.20 reports this */
 		/* (i.e. it doesn't silently return with exit code 1) */
 		/* To trigger: "find -exec rm -rf {} \;" */
 		goto done_nak_warn;
 	}
+	state->dirfd = dirfd(dir);
 	status = TRUE;
 	while ((next = readdir(dir)) != NULL) {
-		char *nextFile;
+		size_t n1, n2, n3;
 		int s;
 
-		nextFile = concat_subpath_file(fileName, next->d_name);
-		if (nextFile == NULL)
+		if (DOT_OR_DOTDOT(next->d_name))
 			continue;
+
+		n1 = strlen(state->fileName);
+		n2 = (state->fileName[n1 - 1] != '/'); /* 1: "path has no trailing slash" */
+		n3 = strlen(next->d_name) + 1;
+
+		state->fileName = xrealloc(state->fileName, n1 + n2 + n3);
+		if (n2)
+			state->fileName[n1] = '/';
+		state->baseName = &state->fileName[n1+n2];
+		memcpy(state->baseName, next->d_name, n3);
 
 		/* process every file (NB: ACTION_RECURSE is set in flags) */
 		state->depth++;
-		s = recursive_action1(state, nextFile);
+		s = recursive_action1(state);
 		if (s == FALSE)
 			status = FALSE;
-		free(nextFile);
 		state->depth--;
+
+		state->fileName = xrealloc(state->fileName, n1 + 1);
+		state->fileName[n1] = '\0';
+		state->baseName = strrchr(state->fileName, '/');
+		state->baseName = state->baseName ? state->baseName + 1 : state->fileName;
 
 //#define RECURSE_RESULT_ABORT -1
 //		if (s == RECURSE_RESULT_ABORT) {
@@ -144,10 +159,11 @@ static int recursive_action1(recursive_state_t *state, const char *fileName)
 //			return s;
 //		}
 	}
+	state->dirfd = olddirfd;
 	closedir(dir);
 
 	if (state->flags & ACTION_DEPTHFIRST) {
-		if (!state->dirAction(state, fileName, &statbuf))
+		if (!state->dirAction(state, state->fileName, &statbuf))
 			goto done_nak_warn;
 	}
 
@@ -155,7 +171,9 @@ static int recursive_action1(recursive_state_t *state, const char *fileName)
 
  done_nak_warn:
 	if (!(state->flags & ACTION_QUIET))
-		bb_simple_perror_msg(fileName);
+		bb_simple_perror_msg(state->fileName);
+
+	state->dirfd = olddirfd;
 	return FALSE;
 }
 
@@ -165,6 +183,7 @@ int FAST_FUNC recursive_action(const char *fileName,
 		int FAST_FUNC  (*dirAction)(struct recursive_state *state, const char *fileName, struct stat* statbuf),
 		void *userData)
 {
+	int ret;
 	/* Keeping a part of variables of recusive descent in a "state structure"
 	 * instead of passing ALL of them down as parameters of recursive_action1()
 	 * relieves register pressure, both in recursive_action1()
@@ -174,8 +193,13 @@ int FAST_FUNC recursive_action(const char *fileName,
 	state.flags = flags;
 	state.depth = 0;
 	state.userData = userData;
+	state.fileName = xstrdup(fileName);
+	state.baseName = state.fileName;
+	state.dirfd = xopen(".", O_RDONLY|O_DIRECTORY);
 	state.fileAction = fileAction ? fileAction : true_action;
 	state.dirAction  =  dirAction ?  dirAction : true_action;
 
-	return recursive_action1(&state, fileName);
+	ret = recursive_action1(&state);
+	free(state.fileName);
+	return ret;
 }
