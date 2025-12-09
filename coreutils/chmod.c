@@ -75,7 +75,7 @@ static int FAST_FUNC fileAction(struct recursive_state *state,
 	/* match coreutils behavior */
 	if (state->depth == 0) {
 		/* statbuf holds lstat result, but we need stat (follow link) */
-		if (stat(fileName, statbuf))
+		if (fstatat(state->dirfd, state->baseName, statbuf, 0))
 			goto err;
 	} else { /* depth > 0: skip links */
 		if (S_ISLNK(statbuf->st_mode))
@@ -86,7 +86,7 @@ static int FAST_FUNC fileAction(struct recursive_state *state,
 	if (newmode == (mode_t)-1)
 		bb_error_msg_and_die("invalid mode '%s'", (char *)state->userData);
 
-	if (chmod(fileName, newmode) == 0) {
+	if (fchmodat(state->dirfd, state->baseName, newmode, AT_SYMLINK_NOFOLLOW) == 0) {
 		if (OPT_VERBOSE
 		 || (OPT_CHANGED
 		     && (statbuf->st_mode & 07777) != (newmode & 07777))
