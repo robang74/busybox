@@ -147,7 +147,7 @@ int chown_main(int argc UNUSED_PARAM, char **argv)
 		param.chown_func = lchown;
 	}
 
-	flags = ACTION_DEPTHFIRST; /* match coreutils order */
+	flags = ACTION_DEPTH_POST; /* match coreutils order */
 	if (OPT_RECURSE)
 		flags |= ACTION_RECURSE;
 	if (OPT_TRAVERSE_TOP)

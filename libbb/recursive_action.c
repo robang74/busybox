@@ -48,13 +48,13 @@ static int FAST_FUNC true_action(struct recursive_state *state UNUSED_PARAM,
  * on each file/subdirectory.
  * If any one of these calls returns 0, current recursive_action() returns 0.
  *
- * If !ACTION_DEPTHFIRST, dirAction is called before recurse.
+ * If ACTION_DEPTH_PRE, dirAction is called before recurse.
  * Return value of 0 (FALSE) is an error: prevents recursion,
  * the warning is printed (unless ACTION_QUIET) and recursive_action() returns 0.
  * Return value of 2 (SKIP) prevents recursion, instead recursive_action()
  * returns 1 (TRUE, no error).
  *
- * If ACTION_DEPTHFIRST, dirAction is called after recurse.
+ * If ACTION_DEPTH_POST, dirAction is called after recurse.
  * If it returns 0, the warning is printed and recursive_action() returns 0.
  *
  * ACTION_FOLLOWLINKS mainly controls handling of links to dirs.
@@ -104,7 +104,8 @@ static int recursive_action1(recursive_state_t *state)
 		return state->dirAction(state, state->fileName, &statbuf);
 	}
 
-	if (!(state->flags & ACTION_DEPTHFIRST)) {
+	if (state->flags & ACTION_DEPTH_PRE) {
+		state->state = ACTION_DEPTH_PRE;
 		status = state->dirAction(state, state->fileName, &statbuf);
 		if (status == FALSE)
 			goto done_nak_warn;
@@ -162,7 +163,8 @@ static int recursive_action1(recursive_state_t *state)
 	state->dirfd = olddirfd;
 	closedir(dir);
 
-	if (state->flags & ACTION_DEPTHFIRST) {
+	if (state->flags & ACTION_DEPTH_POST) {
+		state->state = ACTION_DEPTH_POST;
 		if (!state->dirAction(state, state->fileName, &statbuf))
 			goto done_nak_warn;
 	}
@@ -190,12 +192,13 @@ int FAST_FUNC recursive_action(const char *fileName,
 	 * and in every file/dirAction().
 	 */
 	recursive_state_t state;
-	state.flags = flags;
+	state.flags = flags | ((flags & (ACTION_DEPTH_PRE|ACTION_DEPTH_POST)) ? 0 : ACTION_DEPTH_PRE);
 	state.depth = 0;
 	state.userData = userData;
 	state.fileName = xstrdup(fileName);
 	state.baseName = state.fileName;
 	state.dirfd = xopen(".", O_RDONLY|O_DIRECTORY);
+	state.state = 0;
 	state.fileAction = fileAction ? fileAction : true_action;
 	state.dirAction  =  dirAction ?  dirAction : true_action;
 

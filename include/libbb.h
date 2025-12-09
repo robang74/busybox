@@ -532,9 +532,10 @@ enum {
 	ACTION_RECURSE        = (1 << 0),
 	ACTION_FOLLOWLINKS    = (1 << 1),
 	ACTION_FOLLOWLINKS_L0 = (1 << 2),
-	ACTION_DEPTHFIRST     = (1 << 3),
-	ACTION_QUIET          = (1 << 4),
-	ACTION_DANGLING_OK    = (1 << 5),
+	ACTION_DEPTH_PRE      = (1 << 3),
+	ACTION_DEPTH_POST     = (1 << 4),
+	ACTION_QUIET          = (1 << 5),
+	ACTION_DANGLING_OK    = (1 << 6),
 };
 typedef uint8_t recurse_flags_t;
 typedef struct recursive_state {
@@ -542,7 +543,7 @@ typedef struct recursive_state {
 	unsigned depth;
 	void *userData;
 	char *fileName, *baseName;
-	int dirfd;
+	int dirfd, state;
 	int FAST_FUNC (*fileAction)(struct recursive_state *state, const char *fileName, struct stat* statbuf);
 	int FAST_FUNC  (*dirAction)(struct recursive_state *state, const char *fileName, struct stat* statbuf);
 } recursive_state_t;

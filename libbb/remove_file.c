@@ -10,97 +10,52 @@
 
 /* Used from NOFORK applets. Must not allocate anything */
 
-int FAST_FUNC remove_file(const char *path, int flags)
+static int FAST_FUNC fileAction(struct recursive_state *state,
+		const char *fileName,
+		struct stat *statbuf)
 {
-	struct stat path_stat;
+	int flags = *((int*)state->userData);
+	int isdir = S_ISDIR(statbuf->st_mode);
 
-	if (lstat(path, &path_stat) < 0) {
-		if (errno != ENOENT) {
-			bb_perror_msg("can't stat '%s'", path);
-			return -1;
-		}
-		if (!(flags & FILEUTILS_FORCE)) {
-			bb_perror_msg("can't remove '%s'", path);
-			return -1;
-		}
-		return 0;
-	}
-
-	if (S_ISDIR(path_stat.st_mode)) {
-		DIR *dp;
-		struct dirent *d;
-		int status = 0;
-
-		if (!(flags & FILEUTILS_RECUR)) {
-			bb_error_msg("'%s' is a directory", path);
-			return -1;
+	if (!isdir || (state->state & ACTION_DEPTH_PRE)) {
+		if (isdir && !(flags & FILEUTILS_RECUR)) {
+			bb_error_msg("'%s' is a directory", fileName);
+			return FALSE;
 		}
 
-		if ((!(flags & FILEUTILS_FORCE) && access(path, W_OK) < 0 && isatty(0))
+		if ((!(flags & FILEUTILS_FORCE)
+		     && faccessat(state->dirfd, state->baseName, W_OK, 0) < 0
+		     && !S_ISLNK(statbuf->st_mode)
+		     && isatty(0))
 		 || (flags & FILEUTILS_INTERACTIVE)
 		) {
-			fprintf(stderr, "%s: descend into directory '%s'? ",
-					applet_name, path);
+			fprintf(stderr, "%s: %s '%s'? ", isdir ? "remove" : "descend into directory", applet_name, state->fileName);
 			if (!bb_ask_y_confirmation())
-				return 0;
+				return isdir ? SKIP : TRUE;
 		}
 
-		dp = opendir(path);
-		if (dp == NULL) {
-			return -1;
-		}
-
-		while ((d = readdir(dp)) != NULL) {
-			char *new_path;
-
-			new_path = concat_subpath_file(path, d->d_name);
-			if (new_path == NULL)
-				continue;
-			if (remove_file(new_path, flags) < 0)
-				status = -1;
-			free(new_path);
-		}
-		closedir(dp);
-
-		if (flags & FILEUTILS_INTERACTIVE) {
-			fprintf(stderr, "%s: remove directory '%s'? ",
-					applet_name, path);
-			if (!bb_ask_y_confirmation())
-				return status;
-		}
-
-		if (status == 0 && rmdir(path) < 0) {
-			bb_perror_msg("can't remove '%s'", path);
-			return -1;
-		}
-
-		if (flags & FILEUTILS_VERBOSE) {
-			printf("removed directory: '%s'\n", path);
-		}
-
-		return status;
+		if (isdir)
+			return TRUE;
 	}
 
-	/* !ISDIR */
-	if ((!(flags & FILEUTILS_FORCE)
-	     && access(path, W_OK) < 0
-	     && !S_ISLNK(path_stat.st_mode)
-	     && isatty(0))
-	 || (flags & FILEUTILS_INTERACTIVE)
-	) {
-		fprintf(stderr, "%s: remove '%s'? ", applet_name, path);
-		if (!bb_ask_y_confirmation())
-			return 0;
-	}
-
-	if (unlink(path) < 0) {
-		bb_perror_msg("can't remove '%s'", path);
-		return -1;
+	// FIXME isdir && status == 0
+	if (unlinkat(state->dirfd, state->baseName, isdir ? AT_REMOVEDIR : 0) < 0) {
+		bb_perror_msg("can't remove '%s'", fileName);
+		return FALSE;
 	}
 
 	if (flags & FILEUTILS_VERBOSE) {
-		printf("removed '%s'\n", path);
+		printf("removed %s'%s'\n", isdir ? "directory: " : "", fileName);
 	}
 
-	return 0;
+	return TRUE;
+}
+
+int FAST_FUNC remove_file(const char *path, int flags)
+{
+	int ret = recursive_action(path,
+		ACTION_QUIET|ACTION_DEPTH_PRE|ACTION_DEPTH_POST | ((flags & FILEUTILS_RECUR) ? ACTION_RECURSE : 0),
+		fileAction, fileAction, &flags
+	);
+	return ret == FALSE ? -1 : 0;
 }
