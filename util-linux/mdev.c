@@ -845,19 +845,18 @@ static ssize_t readlink2(char *buf, size_t bufsize)
  * We act only on "/sys/.../dev" (pseudo)file
  */
 static int FAST_FUNC fileAction(struct recursive_state *state,
-		const char *fileName,
 		struct stat *statbuf UNUSED_PARAM)
 {
-	size_t len = strlen(fileName) - 4; /* can't underflow */
+	size_t len = strlen(state->fileName) - 4; /* can't underflow */
 	char *path = state->userData;	/* char array[PATH_MAX + SCRATCH_SIZE] */
 	char subsys[PATH_MAX];
 	int res;
 
 	/* Is it a ".../dev" file? (len check is for paranoid reasons) */
-	if (strcmp(fileName + len, "/dev") != 0 || len >= PATH_MAX - 32)
+	if (strcmp(state->fileName + len, "/dev") != 0 || len >= PATH_MAX - 32)
 		return FALSE; /* not .../dev */
 
-	strcpy(path, fileName);
+	strcpy(path, state->fileName);
 	path[len] = '\0';
 
 	/* Read ".../subsystem" symlink in the same directory where ".../dev" is */
@@ -887,7 +886,6 @@ static int FAST_FUNC fileAction(struct recursive_state *state,
 
 /* Directory callback for /sys/ traversal */
 static int FAST_FUNC dirAction(struct recursive_state *state,
-		const char *fileName UNUSED_PARAM,
 		struct stat *statbuf UNUSED_PARAM)
 {
 	return (state->depth >= MAX_SYSFS_DEPTH ? SKIP : TRUE);

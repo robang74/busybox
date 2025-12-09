@@ -465,17 +465,16 @@ static int exclude_file(const llist_t *excluded_files, const char *file)
 # endif
 
 static int FAST_FUNC writeFileToTarball(struct recursive_state *state,
-		const char *fileName,
 		struct stat *statbuf)
 {
 	struct TarBallInfo *tbInfo = (struct TarBallInfo *) state->userData;
 	const char *header_name;
 	int inputFileFd = -1;
 
-	DBG("writeFileToTarball('%s')", fileName);
+	DBG("writeFileToTarball('%s')", state->fileName);
 
 	/* Strip leading '/' and such (must be before memorizing hardlink's name) */
-	header_name = skip_unsafe_prefix(fileName);
+	header_name = skip_unsafe_prefix(state->fileName);
 
 	if (header_name[0] == '\0')
 		return TRUE;
@@ -485,7 +484,7 @@ static int FAST_FUNC writeFileToTarball(struct recursive_state *state,
 
 	/* It is against the rules to archive a socket */
 	if (S_ISSOCK(statbuf->st_mode)) {
-		bb_error_msg("%s: socket ignored", fileName);
+		bb_error_msg("%s: socket ignored", state->fileName);
 		return TRUE;
 	}
 
@@ -512,7 +511,7 @@ static int FAST_FUNC writeFileToTarball(struct recursive_state *state,
 	if (tbInfo->tarFileStatBuf.st_dev == statbuf->st_dev
 	 && tbInfo->tarFileStatBuf.st_ino == statbuf->st_ino
 	) {
-		bb_error_msg("%s: file is the archive; skipping", fileName);
+		bb_error_msg("%s: file is the archive; skipping", state->fileName);
 		return TRUE;
 	}
 
@@ -528,13 +527,13 @@ static int FAST_FUNC writeFileToTarball(struct recursive_state *state,
 		/* open the file we want to archive, and make sure all is well */
 		inputFileFd = openat(state->dirfd, state->baseName, O_RDONLY);
 		if (inputFileFd < 0) {
-			bb_perror_msg("can't open '%s'", fileName);
+			bb_perror_msg("can't open '%s'", state->fileName);
 			return FALSE; /* make recursive_action() return FALSE */
 		}
 	}
 
 	/* Add an entry to the tarball */
-	if (writeTarHeader(tbInfo, header_name, fileName, statbuf) == FALSE) {
+	if (writeTarHeader(tbInfo, header_name, state->fileName, statbuf) == FALSE) {
 		return FALSE; /* make recursive_action() return FALSE */
 	}
 
@@ -551,7 +550,7 @@ static int FAST_FUNC writeFileToTarball(struct recursive_state *state,
 		////off_t readSize;
 		////readSize = bb_copyfd_size(inputFileFd, tbInfo->tarFd, statbuf->st_size);
 		////if (readSize != statbuf->st_size && readSize >= 0) {
-		////	bb_error_msg_and_die("short read from %s, aborting", fileName);
+		////	bb_error_msg_and_die("short read from %s, aborting", state->fileName);
 		////}
 
 		/* Check that file did not grow in between? */

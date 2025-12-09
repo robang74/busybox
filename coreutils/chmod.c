@@ -67,7 +67,6 @@
  */
 
 static int FAST_FUNC fileAction(struct recursive_state *state,
-		const char *fileName,
 		struct stat *statbuf)
 {
 	mode_t newmode;
@@ -92,14 +91,14 @@ static int FAST_FUNC fileAction(struct recursive_state *state,
 		     && (statbuf->st_mode & 07777) != (newmode & 07777))
 		) {
 			char modestr[12];
-			printf("mode of '%s' changed to %04o (%s)\n", fileName,
+			printf("mode of '%s' changed to %04o (%s)\n", state->fileName,
 				newmode & 07777, bb_mode_string(modestr, newmode)+1);
 		}
 		return TRUE;
 	}
  err:
 	if (!OPT_QUIET)
-		bb_simple_perror_msg(fileName);
+		bb_simple_perror_msg(state->fileName);
 	return FALSE;
 }
 

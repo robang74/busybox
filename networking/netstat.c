@@ -274,13 +274,12 @@ static long extract_socket_inode(const char *lname)
 }
 
 static int FAST_FUNC add_to_prg_cache_if_socket(struct recursive_state *state,
-		const char *fileName,
 		struct stat *statbuf UNUSED_PARAM)
 {
 	char *linkname;
 	long inode;
 
-	linkname = xmalloc_readlink(fileName);
+	linkname = xmalloc_readlink(state->fileName);
 	if (linkname != NULL) {
 		inode = extract_socket_inode(linkname);
 		free(linkname);
@@ -293,7 +292,6 @@ static int FAST_FUNC add_to_prg_cache_if_socket(struct recursive_state *state,
 }
 
 static int FAST_FUNC dir_act(struct recursive_state *state,
-		const char *fileName,
 		struct stat *statbuf UNUSED_PARAM)
 {
 	const char *pid;
@@ -305,11 +303,11 @@ static int FAST_FUNC dir_act(struct recursive_state *state,
 	if (state->depth == 0) /* "/proc" itself */
 		return TRUE; /* continue looking one level below /proc */
 
-	pid = fileName + sizeof("/proc/")-1; /* point after "/proc/" */
+	pid = state->fileName + sizeof("/proc/")-1; /* point after "/proc/" */
 	if (!isdigit(pid[0])) /* skip /proc entries which aren't processes */
 		return SKIP;
 
-	len = snprintf(proc_pid_fname, sizeof(proc_pid_fname), "%s/cmdline", fileName);
+	len = snprintf(proc_pid_fname, sizeof(proc_pid_fname), "%s/cmdline", state->fileName);
 	n = open_read_close(proc_pid_fname, cmdline_buf, sizeof(cmdline_buf) - 1);
 	if (n < 0)
 		return FALSE;

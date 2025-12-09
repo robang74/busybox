@@ -33,7 +33,6 @@
  */
 
 static int FAST_FUNC parse_module(struct recursive_state *state,
-		const char *fname,
 		struct stat *sb UNUSED_PARAM)
 {
 	module_db *modules = state->userData;
@@ -43,13 +42,13 @@ static int FAST_FUNC parse_module(struct recursive_state *state,
 	/* Arbitrary. Was sb->st_size, but that breaks .gz etc */
 	size_t len = (64*1024*1024 - 4096);
 
-	if (strrstr(fname, ".ko") == NULL)
+	if (strrstr(state->fileName, ".ko") == NULL)
 		return TRUE;
 
-	image = xmalloc_open_zipped_read_close(fname, &len);
+	image = xmalloc_open_zipped_read_close(state->fileName, &len);
 
-	e = moddb_get_or_create(modules, bb_get_last_path_component_nostrip(fname));
-	e->name = xstrdup(fname + 2); /* skip "./" */
+	e = moddb_get_or_create(modules, bb_get_last_path_component_nostrip(state->fileName));
+	e->name = xstrdup(state->fileName + 2); /* skip "./" */
 
 	for (ptr = image; ptr < image + len - 10; ptr++) {
 		if (is_prefixed_with(ptr, "depends=")) {

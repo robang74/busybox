@@ -42,15 +42,14 @@ static char * FAST_FUNC add_sysfs_prop(const char *dir, const char *suffix,
 	return trim(buf);
 }
 
-static int FAST_FUNC fileAction(struct recursive_state *state UNUSED_PARAM,
-		const char *fileName,
+static int FAST_FUNC fileAction(struct recursive_state *state,
 		struct stat *statbuf UNUSED_PARAM)
 {
 	parser_t *parser;
 	char *tokens[4];
 	char *busnum = NULL, *devnum = NULL;
 	int product_vid = 0, product_did = 0;
-	char *uevent_filename = concat_path_file(fileName, "uevent");
+	char *uevent_filename = concat_path_file(state->fileName, "uevent");
 
 	parser = config_open2(uevent_filename, fopen_for_read);
 	free(uevent_filename);
@@ -81,10 +80,10 @@ static int FAST_FUNC fileAction(struct recursive_state *state UNUSED_PARAM,
 	if (busnum) {
 		char name[256], *p;
 
-		p = add_sysfs_prop(fileName, "/manufacturer", name, sizeof(name) - 1);
+		p = add_sysfs_prop(state->fileName, "/manufacturer", name, sizeof(name) - 1);
 		if (p != name)
 			p = stpcpy(p, " ");
-		add_sysfs_prop(fileName, "/product", p, name + sizeof(name) - p);
+		add_sysfs_prop(state->fileName, "/product", p, name + sizeof(name) - p);
 
 		printf("Bus %s Device %s: ID %04x:%04x %s\n", busnum, devnum,
 		       product_vid, product_did, name);

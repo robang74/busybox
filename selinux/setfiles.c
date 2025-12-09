@@ -463,8 +463,7 @@ static int restore(const char *file)
  * This function is called by recursive_action on each file during
  * the directory traversal.
  */
-static int FAST_FUNC apply_spec(struct recursive_state *state UNUSED_PARAM,
-		const char *file,
+static int FAST_FUNC apply_spec(struct recursive_state *state,
 		struct stat *sb)
 {
 	if (!follow_mounts) {
@@ -473,7 +472,7 @@ static int FAST_FUNC apply_spec(struct recursive_state *state UNUSED_PARAM,
 			return SKIP;
 		}
 	}
-	errors |= restore(file);
+	errors |= restore(state->file);
 	if (abort_on_error && errors)
 		return FALSE;
 	return TRUE;

@@ -236,7 +236,6 @@ static void add_probe(const char *name)
 }
 
 static int FAST_FUNC config_file_action(struct recursive_state *state,
-		const char *filename,
 		struct stat *statbuf UNUSED_PARAM)
 {
 	char *tokens[3];
@@ -246,7 +245,7 @@ static int FAST_FUNC config_file_action(struct recursive_state *state,
 	const char *base;
 
 	/* Skip files that begin with a "." */
-	base = bb_basename(filename);
+	base = bb_basename(state->fileName);
 	if (base[0] == '.')
 		goto error;
 
@@ -268,7 +267,7 @@ static int FAST_FUNC config_file_action(struct recursive_state *state,
 			goto error;
 	}
 
-	p = config_open2(filename, fopen_for_read);
+	p = config_open2(state->fileName, fopen_for_read);
 	if (p == NULL) {
 		rc = FALSE;
 		goto error;

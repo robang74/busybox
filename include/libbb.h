@@ -544,12 +544,12 @@ typedef struct recursive_state {
 	void *userData;
 	char *fileName, *baseName;
 	int dirfd, state;
-	int FAST_FUNC (*fileAction)(struct recursive_state *state, const char *fileName, struct stat* statbuf);
-	int FAST_FUNC  (*dirAction)(struct recursive_state *state, const char *fileName, struct stat* statbuf);
+	int FAST_FUNC (*fileAction)(struct recursive_state *state, struct stat* statbuf);
+	int FAST_FUNC  (*dirAction)(struct recursive_state *state, struct stat* statbuf);
 } recursive_state_t;
 int recursive_action(const char *fileName, unsigned flags,
-	int FAST_FUNC (*fileAction)(struct recursive_state *state, const char *fileName, struct stat* statbuf),
-	int FAST_FUNC  (*dirAction)(struct recursive_state *state, const char *fileName, struct stat* statbuf),
+	int FAST_FUNC (*fileAction)(struct recursive_state *state, struct stat* statbuf),
+	int FAST_FUNC  (*dirAction)(struct recursive_state *state, struct stat* statbuf),
 	void *userData
 ) FAST_FUNC;
 
