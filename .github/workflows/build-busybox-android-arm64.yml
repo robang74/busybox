@@ -16,7 +16,12 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential wget unzip bison flex
+          sudo apt-get install -y \
+            build-essential \
+            bison \
+            flex \
+            wget \
+            unzip
 
       - name: Download Android NDK
         run: |
@@ -30,17 +35,19 @@ jobs:
           echo "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_PATH
 
       - name: Configure BusyBox
-        run: make defconfig
+        run: |
+          make defconfig
+          sed -i 's/# CONFIG_STATIC is not set/CONFIG_STATIC=y/' .config
 
       - name: Build BusyBox
         run: |
           make -j$(nproc) \
-          CC=$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang \
-          CONFIG_STATIC=y
+          ARCH=arm64 \
+          CROSS_COMPILE=$TOOLCHAIN/bin/aarch64-linux-android21-
 
       - name: Strip binary
         run: |
-          $NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip busybox
+          $TOOLCHAIN/bin/llvm-strip busybox
 
       - name: Rename binary
         run: mv busybox busybox-arm64
