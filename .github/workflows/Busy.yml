@@ -13,7 +13,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Set version
         run: echo "BUSYBOX_VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
 
@@ -47,6 +46,7 @@ jobs:
         run: |
           cd busybox-${BUSYBOX_VERSION}
           make defconfig
+          # Enable static binary
           sed -i 's/# CONFIG_STATIC is not set/CONFIG_STATIC=y/' .config
 
       - name: Build BusyBox
