@@ -1,0 +1,47 @@
+name: Build BusyBox ARM64
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v3
+
+      - name: Install NDK
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y android-sdk-ndk
+          # Alternatively, download specific NDK version if needed
+
+      - name: Clone BusyBox
+        run: git clone --depth=1 git://busybox.net/busybox.git
+
+      - name: Build
+        run: |
+          cd busybox
+          # Configure for Android
+          make android_ndk_defconfig
+
+          # Setup NDK Path (Adjust path based on installed NDK location)
+          export NDK=$ANDROID_HOME/ndk-bundle
+          export TOOLCHAIN=$NDK/toolchains/llvm/prebuilt/linux-x86_64
+          export TARGET=aarch64-linux-android
+          export API=29
+          export AR=$TOOLCHAIN/bin/llvm-ar
+          export CC=$TOOLCHAIN/bin/$TARGET$API-clang
+          export CROSS_COMPILE=$TOOLCHAIN/bin/aarch64-linux-android-
+
+          # Set flags for Android
+          export CFLAGS="-pie -fpic"
+          export LDFLAGS="-pie"
+
+          make -j$(nproc)
+          make install
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: busybox-arm64
+          path: busybox/_install/bin/busybox
