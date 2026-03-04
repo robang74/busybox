@@ -1,4 +1,4 @@
-name: Build BusyBox (Android ARM64)
+name: Build BusyBox Android ARM64
 
 on:
   workflow_dispatch:
@@ -13,15 +13,10 @@ jobs:
       - name: Checkout BusyBox source
         uses: actions/checkout@v4
 
-      - name: Install build dependencies
+      - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            build-essential \
-            wget \
-            unzip \
-            bison \
-            flex
+          sudo apt-get install -y build-essential wget unzip bison flex
 
       - name: Download Android NDK
         run: |
@@ -31,33 +26,24 @@ jobs:
 
       - name: Setup toolchain
         run: |
-          TOOLCHAIN=$NDK/toolchains/llvm/prebuilt/linux-x86_64
-          echo "TOOLCHAIN=$TOOLCHAIN" >> $GITHUB_ENV
-          echo "PATH=$TOOLCHAIN/bin:$PATH" >> $GITHUB_ENV
-          echo "CC=$TOOLCHAIN/bin/aarch64-linux-android21-clang" >> $GITHUB_ENV
-          echo "CXX=$TOOLCHAIN/bin/aarch64-linux-android21-clang++" >> $GITHUB_ENV
-          echo "AR=$TOOLCHAIN/bin/llvm-ar" >> $GITHUB_ENV
-          echo "RANLIB=$TOOLCHAIN/bin/llvm-ranlib" >> $GITHUB_ENV
-          echo "STRIP=$TOOLCHAIN/bin/llvm-strip" >> $GITHUB_ENV
+          echo "TOOLCHAIN=$NDK/toolchains/llvm/prebuilt/linux-x86_64" >> $GITHUB_ENV
+          echo "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_PATH
 
       - name: Configure BusyBox
-        run: |
-          make defconfig
+        run: make defconfig
 
-      - name: Build BusyBox (static)
+      - name: Build BusyBox
         run: |
           make -j$(nproc) \
-            CROSS_COMPILE=aarch64-linux-android- \
-            CC=$CC \
-            CONFIG_STATIC=y
+          CC=$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang \
+          CONFIG_STATIC=y
 
       - name: Strip binary
         run: |
-          $STRIP busybox
+          $NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip busybox
 
-      - name: Rename output
-        run: |
-          mv busybox busybox-arm64
+      - name: Rename binary
+        run: mv busybox busybox-arm64
 
       - name: Verify binary
         run: |
@@ -65,3 +51,7 @@ jobs:
           ls -lh busybox-arm64
 
       - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: busybox-android-arm64
+          path: busybox-arm64
