@@ -1,1 +1,91 @@
+{
+"build_systems": [
 
+{"name":"make","category":"classic","indicator_files":["Makefile","makefile"],"default_command":"make -j","confidence_weight":0.95},
+{"name":"cmake","category":"classic","indicator_files":["CMakeLists.txt"],"default_command":"cmake -B build && cmake --build build","confidence_weight":0.98},
+{"name":"ninja","category":"classic","indicator_files":["build.ninja"],"default_command":"ninja","confidence_weight":0.95},
+{"name":"meson","category":"classic","indicator_files":["meson.build"],"default_command":"meson setup build && meson compile -C build","confidence_weight":0.97},
+{"name":"autotools","category":"classic","indicator_files":["configure.ac","configure"],"default_command":"./configure && make -j","confidence_weight":0.92},
+{"name":"scons","category":"classic","indicator_files":["SConstruct"],"default_command":"scons","confidence_weight":0.96},
+{"name":"waf","category":"classic","indicator_files":["wscript"],"default_command":"./waf build","confidence_weight":0.95},
+{"name":"premake","category":"classic","indicator_files":["premake5.lua"],"default_command":"premake5 gmake && make","confidence_weight":0.93},
+{"name":"qmake","category":"classic","indicator_files":["*.pro"],"default_command":"qmake && make","confidence_weight":0.90},
+{"name":"jam","category":"classic","indicator_files":["Jamfile"],"default_command":"jam","confidence_weight":0.85},
+{"name":"b2","category":"classic","indicator_files":["Jamroot"],"default_command":"b2","confidence_weight":0.85},
+{"name":"tup","category":"classic","indicator_files":["Tupfile"],"default_command":"tup","confidence_weight":0.90},
+{"name":"redo","category":"classic","indicator_files":["redo.do"],"default_command":"redo","confidence_weight":0.80},
+{"name":"xmake","category":"modern","indicator_files":["xmake.lua"],"default_command":"xmake","confidence_weight":0.94},
+
+{"name":"gradle","category":"jvm","indicator_files":["build.gradle","settings.gradle"],"default_command":"./gradlew build","confidence_weight":0.98},
+{"name":"maven","category":"jvm","indicator_files":["pom.xml"],"default_command":"mvn package","confidence_weight":0.98},
+{"name":"ant","category":"jvm","indicator_files":["build.xml"],"default_command":"ant","confidence_weight":0.90},
+{"name":"sbt","category":"jvm","indicator_files":["build.sbt"],"default_command":"sbt compile","confidence_weight":0.96},
+{"name":"leiningen","category":"jvm","indicator_files":["project.clj"],"default_command":"lein build","confidence_weight":0.90},
+{"name":"pants","category":"monorepo","indicator_files":["pants.toml"],"default_command":"pants build","confidence_weight":0.85},
+{"name":"bazel","category":"monorepo","indicator_files":["WORKSPACE","BUILD"],"default_command":"bazel build //...","confidence_weight":0.97},
+{"name":"buck","category":"monorepo","indicator_files":["BUCK"],"default_command":"buck build","confidence_weight":0.95},
+{"name":"buck2","category":"monorepo","indicator_files":["BUCK"],"default_command":"buck2 build","confidence_weight":0.94},
+{"name":"please","category":"monorepo","indicator_files":[".plzconfig"],"default_command":"plz build","confidence_weight":0.90},
+
+{"name":"cargo","category":"rust","indicator_files":["Cargo.toml"],"default_command":"cargo build","confidence_weight":0.99},
+{"name":"go","category":"go","indicator_files":["go.mod"],"default_command":"go build ./...","confidence_weight":0.98},
+{"name":"mage","category":"go","indicator_files":["magefile.go"],"default_command":"mage","confidence_weight":0.85},
+
+{"name":"npm","category":"node","indicator_files":["package.json"],"default_command":"npm install && npm run build","confidence_weight":0.97},
+{"name":"yarn","category":"node","indicator_files":["yarn.lock"],"default_command":"yarn build","confidence_weight":0.95},
+{"name":"pnpm","category":"node","indicator_files":["pnpm-lock.yaml"],"default_command":"pnpm build","confidence_weight":0.95},
+{"name":"gulp","category":"node","indicator_files":["gulpfile.js"],"default_command":"gulp","confidence_weight":0.90},
+{"name":"grunt","category":"node","indicator_files":["Gruntfile.js"],"default_command":"grunt","confidence_weight":0.90},
+{"name":"webpack","category":"node","indicator_files":["webpack.config.js"],"default_command":"webpack","confidence_weight":0.88},
+{"name":"rollup","category":"node","indicator_files":["rollup.config.js"],"default_command":"rollup -c","confidence_weight":0.88},
+{"name":"vite","category":"node","indicator_files":["vite.config.js"],"default_command":"vite build","confidence_weight":0.92},
+{"name":"parcel","category":"node","indicator_files":["package.json"],"default_command":"parcel build","confidence_weight":0.85},
+{"name":"nx","category":"node","indicator_files":["nx.json"],"default_command":"nx build","confidence_weight":0.85},
+{"name":"turborepo","category":"node","indicator_files":["turbo.json"],"default_command":"turbo run build","confidence_weight":0.90},
+
+{"name":"dotnet","category":"dotnet","indicator_files":["*.csproj"],"default_command":"dotnet build","confidence_weight":0.98},
+{"name":"msbuild","category":"dotnet","indicator_files":["*.sln"],"default_command":"msbuild","confidence_weight":0.97},
+{"name":"cake","category":"dotnet","indicator_files":["build.cake"],"default_command":"cake","confidence_weight":0.85},
+{"name":"fake","category":"dotnet","indicator_files":["build.fsx"],"default_command":"fake run build.fsx","confidence_weight":0.85},
+
+{"name":"poetry","category":"python","indicator_files":["pyproject.toml"],"default_command":"poetry build","confidence_weight":0.95},
+{"name":"setuptools","category":"python","indicator_files":["setup.py"],"default_command":"python setup.py build","confidence_weight":0.93},
+{"name":"flit","category":"python","indicator_files":["pyproject.toml"],"default_command":"flit build","confidence_weight":0.85},
+{"name":"hatch","category":"python","indicator_files":["pyproject.toml"],"default_command":"hatch build","confidence_weight":0.85},
+{"name":"pip-build","category":"python","indicator_files":["pyproject.toml"],"default_command":"python -m build","confidence_weight":0.90},
+
+{"name":"rake","category":"ruby","indicator_files":["Rakefile"],"default_command":"rake","confidence_weight":0.96},
+{"name":"bundler","category":"ruby","indicator_files":["Gemfile"],"default_command":"bundle install","confidence_weight":0.90},
+
+{"name":"composer","category":"php","indicator_files":["composer.json"],"default_command":"composer install","confidence_weight":0.96},
+{"name":"phing","category":"php","indicator_files":["build.xml"],"default_command":"phing","confidence_weight":0.85},
+
+{"name":"swiftpm","category":"swift","indicator_files":["Package.swift"],"default_command":"swift build","confidence_weight":0.97},
+{"name":"zig","category":"zig","indicator_files":["build.zig"],"default_command":"zig build","confidence_weight":0.97},
+
+{"name":"platformio","category":"embedded","indicator_files":["platformio.ini"],"default_command":"pio run","confidence_weight":0.98},
+{"name":"esp-idf","category":"embedded","indicator_files":["idf.py"],"default_command":"idf.py build","confidence_weight":0.95},
+{"name":"arduino","category":"embedded","indicator_files":["*.ino"],"default_command":"arduino-cli compile","confidence_weight":0.90},
+{"name":"zephyr","category":"embedded","indicator_files":["west.yml"],"default_command":"west build","confidence_weight":0.92},
+{"name":"riot","category":"embedded","indicator_files":["Makefile"],"default_command":"make","confidence_weight":0.70},
+
+{"name":"yocto","category":"embedded","indicator_files":["bitbake.conf"],"default_command":"bitbake","confidence_weight":0.96},
+{"name":"buildroot","category":"embedded","indicator_files":["Config.in"],"default_command":"make","confidence_weight":0.80},
+{"name":"openwrt","category":"embedded","indicator_files":["rules.mk"],"default_command":"make","confidence_weight":0.85},
+
+{"name":"kbuild","category":"kernel","indicator_files":["Kbuild"],"default_command":"make","confidence_weight":0.95},
+
+{"name":"soong","category":"android","indicator_files":["Android.bp"],"default_command":"m","confidence_weight":0.97},
+{"name":"android-make","category":"android","indicator_files":["Android.mk"],"default_command":"make","confidence_weight":0.95},
+
+{"name":"gn","category":"modern","indicator_files":["BUILD.gn"],"default_command":"gn gen out && ninja -C out","confidence_weight":0.96},
+{"name":"blade","category":"modern","indicator_files":["BLADE_ROOT"],"default_command":"blade build","confidence_weight":0.90},
+{"name":"shake","category":"modern","indicator_files":["Shakefile.hs"],"default_command":"shake","confidence_weight":0.85},
+{"name":"earthly","category":"modern","indicator_files":["Earthfile"],"default_command":"earthly build","confidence_weight":0.92},
+{"name":"just","category":"modern","indicator_files":["justfile"],"default_command":"just","confidence_weight":0.90},
+{"name":"task","category":"modern","indicator_files":["Taskfile.yml"],"default_command":"task","confidence_weight":0.90},
+{"name":"fastbuild","category":"modern","indicator_files":["fbuild.bff"],"default_command":"fbuild","confidence_weight":0.88},
+{"name":"buildxl","category":"modern","indicator_files":["config.dsc"],"default_command":"bxl build","confidence_weight":0.88}
+
+]
+}
