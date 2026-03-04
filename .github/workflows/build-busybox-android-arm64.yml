@@ -42,8 +42,9 @@ jobs:
       - name: Build BusyBox
         run: |
           make -j$(nproc) \
-          ARCH=arm64 \
-          CROSS_COMPILE=$TOOLCHAIN/bin/aarch64-linux-android21-
+            ARCH=arm64 \
+            CC=$TOOLCHAIN/bin/aarch64-linux-android21-clang \
+            HOSTCC=gcc
 
       - name: Strip binary
         run: |
