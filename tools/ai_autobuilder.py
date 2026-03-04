@@ -9,10 +9,13 @@ from ai_build import run_build
 from ai_llm import call_llm
 from ai_patch import extract_unified_diff, apply_patch
 
-# new build intelligence modules
+# build intelligence
 from build.detect import detect_build_type
 from build.knowledge import record
 from build.websearch import search_build_fix
+
+# self-training memory
+from ai_memory.memory import store_failure, store_fix, search_memory
 
 PROJECT_ROOT = Path(".")
 
@@ -51,23 +54,41 @@ Rules:
 """
 
 
+def extract_first_error(log):
+
+    """Try to extract the most useful error line"""
+
+    lines = log.split("\n")
+
+    for l in reversed(lines):
+        if "error" in l.lower():
+            return l
+
+    return lines[-1] if lines else ""
+
+
 def main():
 
     print("== AI Autobuilder ==")
 
-    # detect build type
+    # detect build system
     build_type = detect_build_type(PROJECT_ROOT)
 
     print(f"Detected build system: {build_type}")
 
     code = run_build()
 
+    log_tail = tail_build_log()
+
     # record run
-    record(build_type, code == 0, tail_build_log())
+    record(build_type, code == 0, log_tail)
 
     if code == 0:
         print("Build already works.")
         return 0
+
+    # store failure for training
+    store_failure(build_type, log_tail)
 
     attempts = 0
 
@@ -79,27 +100,35 @@ def main():
 
         log_tail = tail_build_log()
 
-        # try getting hint from web search
-        web_hint = ""
-        try:
-            first_error = log_tail.split("\n")[-1]
-            web_hint = search_build_fix(first_error)
-        except Exception:
-            pass
+        # check memory first
+        mem_patch = search_memory(log_tail)
 
-        prompt = PROMPT.format(
-            build_type=build_type,
-            repo_tree=get_repo_tree(),
-            recent_diff=get_recent_diff(),
-            build_cmd=BUILD_CMD,
-            build_tail=log_tail,
-            project_hint=BUSYBOX_HINT if build_type == "busybox" else "",
-            web_hint=web_hint
-        )
+        if mem_patch:
+            print("Found matching fix in local memory.")
+            diff = mem_patch
+        else:
 
-        llm_out = call_llm(prompt)
+            web_hint = ""
 
-        diff = extract_unified_diff(llm_out)
+            try:
+                err = extract_first_error(log_tail)
+                web_hint = search_build_fix(err)
+            except Exception:
+                pass
+
+            prompt = PROMPT.format(
+                build_type=build_type,
+                repo_tree=get_repo_tree(),
+                recent_diff=get_recent_diff(),
+                build_cmd=BUILD_CMD,
+                build_tail=log_tail,
+                project_hint=BUSYBOX_HINT if build_type == "busybox" else "",
+                web_hint=web_hint
+            )
+
+            llm_out = call_llm(prompt)
+
+            diff = extract_unified_diff(llm_out)
 
         if not diff:
             print("No valid patch returned.")
@@ -109,11 +138,14 @@ def main():
         print(diff[:1500])
 
         if not apply_patch(diff):
+            print("Patch failed to apply.")
             break
+
+        # save successful fix
+        store_fix(diff)
 
         code = run_build()
 
-        # record run again
         record(build_type, code == 0, tail_build_log())
 
         if code == 0:
