@@ -1,0 +1,74 @@
+name: Build BusyBox Android ARM64
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: BusyBox version
+        required: true
+        default: "1.36.1"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Set version
+        run: echo "BUSYBOX_VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential wget bison flex unzip file
+
+      - name: Download BusyBox source
+        run: |
+          wget https://busybox.net/downloads/busybox-${BUSYBOX_VERSION}.tar.bz2
+          tar xf busybox-${BUSYBOX_VERSION}.tar.bz2
+
+      - name: Download Android NDK
+        run: |
+          wget https://dl.google.com/android/repository/android-ndk-r26d-linux.zip
+          unzip android-ndk-r26d-linux.zip
+          echo "NDK=$PWD/android-ndk-r26d" >> $GITHUB_ENV
+
+      - name: Setup toolchain
+        run: |
+          echo "TOOLCHAIN=$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_ENV
+
+      - name: Configure BusyBox
+        run: |
+          cd busybox-${BUSYBOX_VERSION}
+          make defconfig
+          sed -i 's/# CONFIG_STATIC is not set/CONFIG_STATIC=y/' .config
+
+      - name: Build BusyBox
+        run: |
+          cd busybox-${BUSYBOX_VERSION}
+
+          make -j$(nproc) \
+            ARCH=arm64 \
+            CC=$TOOLCHAIN/aarch64-linux-android21-clang \
+            HOSTCC=gcc
+
+      - name: Strip binary
+        run: |
+          $TOOLCHAIN/llvm-strip busybox-${BUSYBOX_VERSION}/busybox
+
+      - name: Prepare binary
+        run: |
+          mkdir release
+          cp busybox-${BUSYBOX_VERSION}/busybox release/busybox
+          chmod +x release/busybox
+
+      - name: Verify binary
+        run: |
+          file release/busybox
+          ls -lh release/busybox
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: busybox-android-arm64
+          path: release/busybox
