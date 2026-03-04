@@ -1,65 +1,100 @@
-name: Build BusyBox Android ARM64
+name: BusyBox Build Matrix
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout BusyBox source
-        uses: actions/checkout@v4
+    strategy:
+      matrix:
+        method:
+          - clang-static
+          - clang-shared
+          - clang-api21
+          - clang-api24
+          - clang-api26
+          - clang-api29
+          - clang-api33
+          - llvm-cross
+          - minimal-config
+          - full-config
 
+    steps:
       - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
+          sudo apt update
+          sudo apt install -y \
             build-essential \
+            wget \
             bison \
             flex \
-            wget \
-            unzip
+            unzip \
+            file
+
+      - name: Download BusyBox
+        run: |
+          wget https://busybox.net/downloads/busybox-1.36.1.tar.bz2
+          tar xf busybox-1.36.1.tar.bz2
 
       - name: Download Android NDK
         run: |
           wget https://dl.google.com/android/repository/android-ndk-r26d-linux.zip
           unzip android-ndk-r26d-linux.zip
           echo "NDK=$PWD/android-ndk-r26d" >> $GITHUB_ENV
-
-      - name: Setup toolchain
-        run: |
-          echo "TOOLCHAIN=$NDK/toolchains/llvm/prebuilt/linux-x86_64" >> $GITHUB_ENV
-          echo "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_PATH
+          echo "TOOLCHAIN=$PWD/android-ndk-r26d/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_ENV
 
       - name: Configure BusyBox
         run: |
+          cd busybox-1.36.1
           make defconfig
-          sed -i 's/# CONFIG_STATIC is not set/CONFIG_STATIC=y/' .config
+
+          if [ "${{ matrix.method }}" = "minimal-config" ]; then
+            make allnoconfig
+          fi
+
+          if [ "${{ matrix.method }}" = "full-config" ]; then
+            make allyesconfig
+          fi
+
+          if [ "${{ matrix.method }}" = "clang-static" ]; then
+            sed -i 's/# CONFIG_STATIC is not set/CONFIG_STATIC=y/' .config
+          fi
 
       - name: Build BusyBox
         run: |
+          cd busybox-1.36.1
+
+          API=21
+
+          case "${{ matrix.method }}" in
+            clang-api24) API=24 ;;
+            clang-api26) API=26 ;;
+            clang-api29) API=29 ;;
+            clang-api33) API=33 ;;
+          esac
+
           make -j$(nproc) \
-            ARCH=arm64 \
-            CC=$TOOLCHAIN/bin/aarch64-linux-android21-clang \
+            CC=$TOOLCHAIN/aarch64-linux-android${API}-clang \
             HOSTCC=gcc
 
       - name: Strip binary
         run: |
-          $TOOLCHAIN/bin/llvm-strip busybox
+          $TOOLCHAIN/llvm-strip busybox-1.36.1/busybox
 
-      - name: Rename binary
-        run: mv busybox busybox-arm64
+      - name: Save build
+        run: |
+          mkdir -p release
+          cp busybox-1.36.1/busybox release/busybox-${{ matrix.method }}
 
       - name: Verify binary
         run: |
-          file busybox-arm64
-          ls -lh busybox-arm64
+          file release/busybox-${{ matrix.method }}
+          ls -lh release/busybox-${{ matrix.method }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: busybox-android-arm64
-          path: busybox-arm64
+          name: busybox-${{ matrix.method }}
+          path: release/busybox-${{ matrix.method }}
