@@ -1,0 +1,67 @@
+name: Build BusyBox (Android ARM64)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout BusyBox source
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            wget \
+            unzip \
+            bison \
+            flex
+
+      - name: Download Android NDK
+        run: |
+          wget https://dl.google.com/android/repository/android-ndk-r26d-linux.zip
+          unzip android-ndk-r26d-linux.zip
+          echo "NDK=$PWD/android-ndk-r26d" >> $GITHUB_ENV
+
+      - name: Setup toolchain
+        run: |
+          TOOLCHAIN=$NDK/toolchains/llvm/prebuilt/linux-x86_64
+          echo "TOOLCHAIN=$TOOLCHAIN" >> $GITHUB_ENV
+          echo "PATH=$TOOLCHAIN/bin:$PATH" >> $GITHUB_ENV
+          echo "CC=$TOOLCHAIN/bin/aarch64-linux-android21-clang" >> $GITHUB_ENV
+          echo "CXX=$TOOLCHAIN/bin/aarch64-linux-android21-clang++" >> $GITHUB_ENV
+          echo "AR=$TOOLCHAIN/bin/llvm-ar" >> $GITHUB_ENV
+          echo "RANLIB=$TOOLCHAIN/bin/llvm-ranlib" >> $GITHUB_ENV
+          echo "STRIP=$TOOLCHAIN/bin/llvm-strip" >> $GITHUB_ENV
+
+      - name: Configure BusyBox
+        run: |
+          make defconfig
+
+      - name: Build BusyBox (static)
+        run: |
+          make -j$(nproc) \
+            CROSS_COMPILE=aarch64-linux-android- \
+            CC=$CC \
+            CONFIG_STATIC=y
+
+      - name: Strip binary
+        run: |
+          $STRIP busybox
+
+      - name: Rename output
+        run: |
+          mv busybox busybox-arm64
+
+      - name: Verify binary
+        run: |
+          file busybox-arm64
+          ls -lh busybox-arm64
+
+      - name: Upload artifact
