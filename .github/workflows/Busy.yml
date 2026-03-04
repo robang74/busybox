@@ -1,0 +1,37 @@
+name: Build BusyBox Android pro
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install deps
+      run: |
+        sudo apt update
+        sudo apt install -y build-essential bc bison flex
+
+    - name: Download Android NDK
+      run: |
+        wget https://dl.google.com/android/repository/android-ndk-r26d-linux.zip
+        unzip android-ndk-r26d-linux.zip
+
+    - name: Build BusyBox
+      env:
+        NDK_PATH: ${{ github.workspace }}/android-ndk-r26d
+      run: |
+        python3 build.py
+
+    - name: Upload binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: busybox-android
+        path: release/busybox
