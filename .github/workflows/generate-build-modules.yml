@@ -24,37 +24,36 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Generate build modules
+      - name: Create generator script
         run: |
-          python << 'PYTHON'
+          cat > generate_modules.py << 'EOF'
+          import json
+          from pathlib import Path
 
-import json
-import os
-from pathlib import Path
+          json_file = Path("tools/build/build_systems.json")
+          out_dir = Path("tools/build")
 
-json_file = Path("tools/build/build_systems.json")
-out_dir = Path("tools/build")
+          with open(json_file) as f:
+              data = json.load(f)
 
-with open(json_file) as f:
-    data = json.load(f)
+          systems = data["build_systems"]
 
-systems = data["build_systems"]
+          for sys in systems:
 
-for sys in systems:
+              name = sys["name"]
+              indicators = sys["indicator_files"]
+              command = sys["default_command"]
 
-    name = sys["name"]
-    indicators = sys["indicator_files"]
-    command = sys["default_command"]
+              file_path = out_dir / f"{name}.py"
 
-    file_path = out_dir / f"{name}.py"
-
-    code = f'''
+              code = f'''
 """
 Auto-generated build module
 Build system: {name}
 """
 
 import os
+import subprocess
 
 INDICATORS = {indicators}
 
@@ -72,17 +71,17 @@ def detect(repo_root="."):
 
 def build():
 
-    import subprocess
-
     print("Running build system: {name}")
-    subprocess.run("{command}", shell=True, check=False)
+    subprocess.run(DEFAULT_COMMAND, shell=True, check=False)
 '''
 
-    file_path.write_text(code)
+              file_path.write_text(code)
 
-print(f"Generated {{len(systems)}} build modules.")
+          print(f"Generated {len(systems)} build modules.")
+          EOF
 
-PYTHON
+      - name: Generate build modules
+        run: python generate_modules.py
 
       - name: Commit modules
         run: |
