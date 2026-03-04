@@ -1,0 +1,64 @@
+name: AI Autobuilder (OpenAI)
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install common build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake git
+          pip install platformio requests || true
+
+      - name: First build (capture)
+        id: build
+        run: |
+          set -euxo pipefail
+          BUILD_CMD="${{ vars.BUILD_CMD || 'pio run' }}"
+          echo "BUILD_CMD=$BUILD_CMD" >> $GITHUB_OUTPUT
+          bash -lc "$BUILD_CMD" | tee build.log
+        continue-on-error: true
+
+      - name: Attempt AI auto-fix with OpenAI
+        if: steps.build.outcome != 'success'
+        env:
+          PROVIDER: openai
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-4.1-mini' }}
+          AI_BUILDER_ATTEMPTS: "2"
+          BUILD_CMD: ${{ steps.build.outputs.BUILD_CMD }}
+        run: |
+          python tools/ai_autobuilder.py || true
+
+      - name: Push branch and open PR if changes
+        if: steps.build.outcome != 'success'
+        run: |
+          set -eux
+          if git diff --quiet HEAD; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          BRANCH="fix/ai-autobuilder-${{ github.run_id }}"
+          git config user.name "ai-autobuilder[bot]"
+          git config user.email "ai-autobuilder@users.noreply.github.com"
+          git checkout -b "$BRANCH" || git switch -c "$BRANCH"
+          git add -A
+          git commit -m "AI autobuilder: automated patch from CI" || true
+          git push --set-upstream origin "$BRANCH" || true
