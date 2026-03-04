@@ -53,6 +53,10 @@ jobs:
         run: |
           cd busybox-${BUSYBOX_VERSION}
 
+          export SYSROOT=$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot
+          export CFLAGS="--sysroot=$SYSROOT"
+          export LDFLAGS="--sysroot=$SYSROOT"
+
           make -j$(nproc) \
             CC=$TOOLCHAIN/aarch64-linux-android21-clang \
             HOSTCC=gcc
