@@ -1,0 +1,89 @@
+name: Generate Build Modules
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - tools/build/build_systems.json
+
+jobs:
+  generate-modules:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Create generator script
+        run: |
+          cat > generate_modules.py <<EOF
+import json
+from pathlib import Path
+
+json_file = Path("tools/build/build_systems.json")
+out_dir = Path("tools/build")
+
+with open(json_file) as f:
+    data = json.load(f)
+
+systems = data["build_systems"]
+
+for sys in systems:
+    name = sys["name"]
+    indicators = sys["indicator_files"]
+    command = sys["default_command"]
+
+    file_path = out_dir / f"{name}.py"
+
+    code = f'''
+"""
+Auto-generated build module
+Build system: {name}
+"""
+
+import os
+import subprocess
+
+INDICATORS = {indicators}
+DEFAULT_COMMAND = "{command}"
+
+def detect(repo_root="."):
+    for root, dirs, files in os.walk(repo_root):
+        for f in files:
+            if f in INDICATORS:
+                return True
+    return False
+
+
+def build():
+    print("Running build system: {name}")
+    subprocess.run(DEFAULT_COMMAND, shell=True, check=False)
+'''
+
+    file_path.write_text(code)
+
+print(f"Generated {len(systems)} build modules.")
+EOF
+
+      - name: Generate build modules
+        run: python generate_modules.py
+
+      - name: Commit modules
+        run: |
+          git config user.name "ai-autobuilder"
+          git config user.email "bot@autobuilder"
+
+          git add tools/build/*.py
+
+          git commit -m "Auto-generate build modules from build_systems.json" || echo "No changes"
+
+          git push
