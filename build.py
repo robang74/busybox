@@ -13,7 +13,7 @@ from pathlib import Path
 BUSYBOX_VERSION = "1.36.1"
 ANDROID_API = "21"
 
-NDK_PATH = os.environ.get("NDK_PATH", "")
+NDK_PATH = os.environ.get("NDK_PATH")
 if not NDK_PATH:
     raise RuntimeError("NDK_PATH environment variable not set")
 
@@ -22,7 +22,7 @@ SYSROOT = f"{NDK_PATH}/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
 
 SRC_DIR = Path(f"busybox-{BUSYBOX_VERSION}")
 TAR_FILE = Path(f"busybox-{BUSYBOX_VERSION}.tar.bz2")
-OUT_DIR = Path("release")
+OUT_DIR = Path("../release")
 
 OUT_DIR.mkdir(exist_ok=True)
 
@@ -37,7 +37,6 @@ def run(cmd):
 def run_list(cmd):
     print(" ".join(cmd))
     subprocess.run(cmd, check=True)
-
 
 # ------------------------------------------------
 # Download BusyBox
@@ -55,12 +54,15 @@ if not SRC_DIR.exists():
     with tarfile.open(TAR_FILE, "r:bz2") as tar:
         tar.extractall()
 
+# ------------------------------------------------
+# Enter source
+# ------------------------------------------------
+
+os.chdir(SRC_DIR)
 
 # ------------------------------------------------
 # Configure BusyBox
 # ------------------------------------------------
-
-os.chdir(SRC_DIR)
 
 print("Applying android_ndk_defconfig")
 
@@ -70,7 +72,7 @@ config_file = Path(".config")
 cfg = config_file.read_text()
 
 # ------------------------------------------------
-# Disable Linux features not supported by Android
+# Disable Android-incompatible features
 # ------------------------------------------------
 
 disable = [
@@ -78,12 +80,19 @@ disable = [
     # BusyBox init system
     "CONFIG_INIT",
     "CONFIG_FEATURE_USE_INITTAB",
-    "CONFIG_BOOTCHARTD",
+    "CONFIG_FEATURE_INIT_SCTTY",
+    "CONFIG_FEATURE_INIT_SYSLOG",
+    "CONFIG_FEATURE_INIT_COREDUMPS",
 
-    # Power utilities
+    # power management
     "CONFIG_HALT",
     "CONFIG_REBOOT",
     "CONFIG_POWEROFF",
+
+    # login tools
+    "CONFIG_LOGIN",
+    "CONFIG_GETTY",
+    "CONFIG_SU",
 
     # runit system
     "CONFIG_RUNSV",
@@ -92,12 +101,7 @@ disable = [
     "CONFIG_SVC",
     "CONFIG_SVLOGD",
 
-    # login / shutdown tools
-    "CONFIG_LOGIN",
-    "CONFIG_GETTY",
-    "CONFIG_SU",
-
-    # console utilities
+    # console tools (not supported on Android)
     "CONFIG_LOADFONT",
     "CONFIG_SETFONT",
     "CONFIG_KBD_MODE",
@@ -105,10 +109,19 @@ disable = [
 
     # incompatible libc features
     "CONFIG_HOSTID",
+
+    # device manager
+    "CONFIG_MDEV",
+
+    # Android doesn't allow mount namespace tools
+    "CONFIG_MOUNT",
+    "CONFIG_UMOUNT",
+    "CONFIG_PIVOT_ROOT",
 ]
 
 for opt in disable:
     cfg = cfg.replace(f"{opt}=y", f"# {opt} is not set")
+    cfg = cfg.replace(f"{opt}=m", f"# {opt} is not set")
 
 # enable static binary
 cfg = cfg.replace("# CONFIG_STATIC is not set", "CONFIG_STATIC=y")
@@ -116,13 +129,12 @@ cfg = cfg.replace("# CONFIG_STATIC is not set", "CONFIG_STATIC=y")
 config_file.write_text(cfg)
 
 # ------------------------------------------------
-# Resolve config automatically
+# Resolve configuration automatically
 # ------------------------------------------------
 
-print("Resolving config")
+print("Resolving BusyBox config")
 
 run("yes '' | make oldconfig")
-
 
 # ------------------------------------------------
 # Build BusyBox
@@ -139,20 +151,20 @@ run_list([
     f"RANLIB={TOOLCHAIN}/llvm-ranlib",
     f"STRIP={TOOLCHAIN}/llvm-strip",
     f"CFLAGS=--sysroot={SYSROOT} -Os",
-    f"LDFLAGS=--sysroot={SYSROOT}"
+    f"LDFLAGS=--sysroot={SYSROOT}",
 ])
 
-
 # ------------------------------------------------
-# Package
+# Package binary
 # ------------------------------------------------
 
-print("Packaging")
+print("Packaging BusyBox")
 
 OUT_DIR.mkdir(exist_ok=True)
 
 run_list(["cp", "busybox", str(OUT_DIR / "busybox")])
 run_list(["chmod", "+x", str(OUT_DIR / "busybox")])
 
+print()
 print("Build complete")
-print(f"Binary: {OUT_DIR}/busybox")
+print(f"Binary location: {OUT_DIR}/busybox")
