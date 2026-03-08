@@ -1,4 +1,4 @@
-name: Build BusyBox Android (Multi-Arch)
+name: Build BusyBox Android ARM64
 
 on:
   workflow_dispatch:
@@ -7,14 +7,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        arch:
-          - arm64
-          - arm
-          - x86
-          - x86_64
-
     env:
       BUSYBOX_VERSION: 1.36.1
       ANDROID_API: 21
@@ -22,11 +14,17 @@ jobs:
 
     steps:
 
-# Checkout
+############################################################
+# CHECKOUT
+############################################################
+
       - uses: actions/checkout@v4
 
-# Install dependencies
-      - name: Install build tools
+############################################################
+# INSTALL BUILD TOOLS
+############################################################
+
+      - name: Install dependencies
         run: |
           sudo apt update
           sudo apt install -y \
@@ -34,77 +32,97 @@ jobs:
             wget \
             bison \
             flex \
-            unzip
+            unzip \
+            file
 
-# Download Android NDK
+############################################################
+# DOWNLOAD ANDROID NDK
+############################################################
+
       - name: Download NDK
         run: |
           wget https://dl.google.com/android/repository/android-ndk-${NDK_VERSION}-linux.zip
           unzip -q android-ndk-${NDK_VERSION}-linux.zip
 
-# Setup environment
+############################################################
+# SET TOOLCHAIN
+############################################################
+
       - name: Setup toolchain
         run: |
           echo "NDK=$PWD/android-ndk-${NDK_VERSION}" >> $GITHUB_ENV
           echo "TOOLCHAIN=$PWD/android-ndk-${NDK_VERSION}/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_ENV
           echo "SYSROOT=$PWD/android-ndk-${NDK_VERSION}/toolchains/llvm/prebuilt/linux-x86_64/sysroot" >> $GITHUB_ENV
 
-# Download BusyBox
+############################################################
+# DOWNLOAD BUSYBOX
+############################################################
+
       - name: Download BusyBox
         run: |
           wget https://busybox.net/downloads/busybox-${BUSYBOX_VERSION}.tar.bz2
           tar xf busybox-${BUSYBOX_VERSION}.tar.bz2
 
-# Configure
+############################################################
+# CONFIGURE BUSYBOX (ANDROID SAFE)
+############################################################
+
       - name: Configure BusyBox
         run: |
           cd busybox-${BUSYBOX_VERSION}
 
-          cp configs/android_ndk_defconfig .config
+          make android_ndk_defconfig
 
-# Build
+############################################################
+# BUILD BUSYBOX
+############################################################
+
       - name: Build BusyBox
         run: |
           cd busybox-${BUSYBOX_VERSION}
 
-          if [ "${{ matrix.arch }}" = "arm64" ]; then
-            TARGET=aarch64-linux-android
-            ARCH=arm64
-          elif [ "${{ matrix.arch }}" = "arm" ]; then
-            TARGET=armv7a-linux-androideabi
-            ARCH=arm
-          elif [ "${{ matrix.arch }}" = "x86" ]; then
-            TARGET=i686-linux-android
-            ARCH=x86
-          elif [ "${{ matrix.arch }}" = "x86_64" ]; then
-            TARGET=x86_64-linux-android
-            ARCH=x86_64
-          fi
-
           make -j$(nproc) \
-            ARCH=$ARCH \
-            CC=$TOOLCHAIN/${TARGET}${ANDROID_API}-clang \
+            ARCH=arm64 \
+            CC=$TOOLCHAIN/aarch64-linux-android${ANDROID_API}-clang \
             AR=$TOOLCHAIN/llvm-ar \
             RANLIB=$TOOLCHAIN/llvm-ranlib \
             STRIP=$TOOLCHAIN/llvm-strip \
             HOSTCC=gcc \
-            CFLAGS="--sysroot=$SYSROOT" \
+            CFLAGS="--sysroot=$SYSROOT -Os" \
             LDFLAGS="--sysroot=$SYSROOT"
 
-# Strip binary
+############################################################
+# STRIP BINARY
+############################################################
+
       - name: Strip binary
         run: |
           $TOOLCHAIN/llvm-strip busybox-${BUSYBOX_VERSION}/busybox
 
-# Package
-      - name: Package artifact
-        run: |
-          mkdir -p release
-          cp busybox-${BUSYBOX_VERSION}/busybox release/busybox-${{ matrix.arch }}
+############################################################
+# PACKAGE
+############################################################
 
-# Upload
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - name: Prepare artifact
+        run: |
+          mkdir release
+          cp busybox-${BUSYBOX_VERSION}/busybox release/busybox
+          chmod +x release/busybox
+
+############################################################
+# VERIFY
+############################################################
+
+      - name: Verify binary
+        run: |
+          file release/busybox
+          ls -lh release/busybox
+
+############################################################
+# UPLOAD
+############################################################
+
+      - uses: actions/upload-artifact@v4
         with:
-          name: busybox-${{ matrix.arch }}
-          path: release/busybox-${{ matrix.arch }}
+          name: busybox-android-arm64
+          path: release/busybox
