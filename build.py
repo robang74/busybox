@@ -4,10 +4,6 @@ import os
 import subprocess
 from pathlib import Path
 
-# ------------------------------------------------
-# Configuration
-# ------------------------------------------------
-
 ANDROID_API = "21"
 
 NDK_PATH = os.environ.get("NDK_PATH")
@@ -17,23 +13,14 @@ if not NDK_PATH:
 NDK_PATH = Path(NDK_PATH)
 
 TOOLCHAIN = NDK_PATH / "toolchains/llvm/prebuilt/linux-x86_64/bin"
-SYSROOT = NDK_PATH / "toolchains/llvm/prebuilt/linux-x86_64/sysroot"
-
-CLANG_ROOT = NDK_PATH / "toolchains/llvm/prebuilt/linux-x86_64/lib/clang"
-CLANG_VERSION = sorted(CLANG_ROOT.iterdir())[-1].name
-CLANG_RUNTIME = CLANG_ROOT / CLANG_VERSION / "lib/linux"
-
-ANDROID_LIB = SYSROOT / f"usr/lib/aarch64-linux-android/{ANDROID_API}"
 
 OUT_DIR = Path("release")
 OUT_DIR.mkdir(exist_ok=True)
 
-print("NDK:", NDK_PATH)
-print("Clang runtime:", CLANG_RUNTIME)
+TARGET = f"aarch64-linux-android{ANDROID_API}"
 
-# ------------------------------------------------
-# Helpers
-# ------------------------------------------------
+print("NDK:", NDK_PATH)
+print("Target:", TARGET)
 
 def run(cmd, env=None):
     print(cmd)
@@ -44,28 +31,26 @@ def run_list(cmd, env=None):
     subprocess.run(cmd, check=True, env=env)
 
 # ------------------------------------------------
-# Clean previous build
+# Clean build
 # ------------------------------------------------
 
 print("Cleaning previous build")
 run_list(["make", "distclean"])
 
 # ------------------------------------------------
-# Apply base config
+# Base config
 # ------------------------------------------------
 
 print("Applying android_ndk_defconfig")
 run_list(["make", "android_ndk_defconfig"])
 
 # ------------------------------------------------
-# Create override config
+# Override config
 # ------------------------------------------------
 
-print("Creating override config")
+override = Path("android_override.config")
 
-override_file = Path("android_override.config")
-
-override_file.write_text("""
+override.write_text("""
 
 CONFIG_INIT=n
 CONFIG_FEATURE_USE_INITTAB=n
@@ -88,27 +73,18 @@ CONFIG_SV=n
 CONFIG_SVC=n
 CONFIG_SVLOGD=n
 
-CONFIG_LOADFONT=n
-CONFIG_SETFONT=n
-CONFIG_KBD_MODE=n
-CONFIG_DUMPKMAP=n
-
-CONFIG_HOSTID=n
 CONFIG_MDEV=n
-
-CONFIG_MOUNT=n
-CONFIG_UMOUNT=n
-CONFIG_PIVOT_ROOT=n
+CONFIG_HOSTID=n
 
 CONFIG_STATIC=y
 
 """)
 
 env = os.environ.copy()
-env["KCONFIG_ALLCONFIG"] = str(override_file)
+env["KCONFIG_ALLCONFIG"] = str(override)
 
 # ------------------------------------------------
-# Resolve config (BusyBox requires oldconfig)
+# Resolve config
 # ------------------------------------------------
 
 print("Resolving BusyBox config")
@@ -116,23 +92,23 @@ print("Resolving BusyBox config")
 run("yes '' | make oldconfig", env=env)
 
 # ------------------------------------------------
-# Compiler configuration
+# Compiler setup
 # ------------------------------------------------
 
-CC = f"{TOOLCHAIN}/aarch64-linux-android{ANDROID_API}-clang"
+CC = TOOLCHAIN / f"{TARGET}-clang"
 
-env["CC"] = CC
-env["LD"] = CC
+env["CC"] = str(CC)
+env["LD"] = str(CC)
 env["HOSTCC"] = "gcc"
-env["AR"] = f"{TOOLCHAIN}/llvm-ar"
-env["RANLIB"] = f"{TOOLCHAIN}/llvm-ranlib"
-env["STRIP"] = f"{TOOLCHAIN}/llvm-strip"
+env["AR"] = str(TOOLCHAIN / "llvm-ar")
+env["RANLIB"] = str(TOOLCHAIN / "llvm-ranlib")
+env["STRIP"] = str(TOOLCHAIN / "llvm-strip")
 
-env["CFLAGS"] = f"--sysroot={SYSROOT} -Os"
-env["LDFLAGS"] = f"--sysroot={SYSROOT} -L{ANDROID_LIB} -L{CLANG_RUNTIME}"
+env["CFLAGS"] = f"--target={TARGET} -Os"
+env["LDFLAGS"] = f"--target={TARGET}"
 
 # ------------------------------------------------
-# Build BusyBox
+# Build
 # ------------------------------------------------
 
 print("Building BusyBox")
@@ -152,7 +128,7 @@ run_list([
 ], env=env)
 
 # ------------------------------------------------
-# Package binary
+# Package
 # ------------------------------------------------
 
 print("Packaging BusyBox")
@@ -162,4 +138,4 @@ run_list(["chmod", "+x", str(OUT_DIR / "busybox")])
 
 print()
 print("Build complete")
-print("Binary location:", OUT_DIR / "busybox")
+print("Binary:", OUT_DIR / "busybox")
