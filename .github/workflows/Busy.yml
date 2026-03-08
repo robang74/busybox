@@ -42,9 +42,9 @@ jobs:
             unzip \
             file
 
-      ############################################################
-      # CACHE ANDROID NDK
-      ############################################################
+############################################################
+# CACHE ANDROID NDK
+############################################################
 
       - name: Cache Android NDK
         id: cache-ndk
@@ -65,9 +65,9 @@ jobs:
           echo "TOOLCHAIN=$PWD/${NDK_DIR}/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_ENV
           echo "SYSROOT=$PWD/${NDK_DIR}/toolchains/llvm/prebuilt/linux-x86_64/sysroot" >> $GITHUB_ENV
 
-      ############################################################
-      # CACHE BUSYBOX SOURCE
-      ############################################################
+############################################################
+# CACHE BUSYBOX SOURCE
+############################################################
 
       - name: Cache BusyBox Source
         id: cache-busybox
@@ -82,9 +82,9 @@ jobs:
           wget https://busybox.net/downloads/busybox-${BUSYBOX_VERSION}.tar.bz2
           tar xf busybox-${BUSYBOX_VERSION}.tar.bz2
 
-      ############################################################
-      # CONFIGURE BUSYBOX
-      ############################################################
+############################################################
+# CONFIGURE BUSYBOX
+############################################################
 
       - name: Configure BusyBox
         run: |
@@ -92,39 +92,34 @@ jobs:
 
           make defconfig
 
-          # Enable static binary
+          # Enable static build
           sed -i 's/# CONFIG_STATIC is not set/CONFIG_STATIC=y/' .config
 
-          # Disable debug for smaller binary
+          # Disable debug
           sed -i 's/CONFIG_DEBUG=y/# CONFIG_DEBUG is not set/' .config
 
-          # Non-interactive config update
-          make olddefconfig
+          # Auto answer config prompts
+          yes "" | make oldconfig
 
-      ############################################################
-      # BUILD BUSYBOX
-      ############################################################
+############################################################
+# BUILD BUSYBOX
+############################################################
 
       - name: Build BusyBox
         run: |
           cd busybox-${BUSYBOX_VERSION}
 
-          export CC=$TOOLCHAIN/aarch64-linux-android${ANDROID_API}-clang
-          export AR=$TOOLCHAIN/llvm-ar
-          export RANLIB=$TOOLCHAIN/llvm-ranlib
-          export STRIP=$TOOLCHAIN/llvm-strip
-
           make -j$(nproc) \
-            CC=$CC \
-            AR=$AR \
-            RANLIB=$RANLIB \
+            CC=$TOOLCHAIN/aarch64-linux-android${ANDROID_API}-clang \
+            AR=$TOOLCHAIN/llvm-ar \
+            RANLIB=$TOOLCHAIN/llvm-ranlib \
             HOSTCC=gcc \
             CFLAGS="--sysroot=$SYSROOT" \
             LDFLAGS="--sysroot=$SYSROOT"
 
-      ############################################################
-      # STRIP AND PACKAGE
-      ############################################################
+############################################################
+# STRIP AND PACKAGE
+############################################################
 
       - name: Strip binary
         run: |
@@ -141,9 +136,9 @@ jobs:
           file release/busybox
           ls -lh release/busybox
 
-      ############################################################
-      # UPLOAD ARTIFACT
-      ############################################################
+############################################################
+# UPLOAD ARTIFACT
+############################################################
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
