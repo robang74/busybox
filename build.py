@@ -44,7 +44,7 @@ def run_list(cmd):
 # ------------------------------------------------
 
 if not TAR_FILE.exists():
-    print(f"Downloading BusyBox {BUSYBOX_VERSION}")
+    print("Downloading BusyBox")
     urllib.request.urlretrieve(
         f"https://busybox.net/downloads/{TAR_FILE}",
         TAR_FILE
@@ -62,7 +62,7 @@ if not SRC_DIR.exists():
 
 os.chdir(SRC_DIR)
 
-print("Using Android NDK config")
+print("Applying android_ndk_defconfig")
 
 run_list(["make", "android_ndk_defconfig"])
 
@@ -70,41 +70,57 @@ config_file = Path(".config")
 cfg = config_file.read_text()
 
 # ------------------------------------------------
-# Disable features incompatible with Android
+# Disable Linux features not supported by Android
 # ------------------------------------------------
 
 disable = [
-    # Console tools
-    "CONFIG_LOADFONT",
-    "CONFIG_SETFONT",
-    "CONFIG_KBD_MODE",
-    "CONFIG_DUMPKMAP",
-
-    # Android Bionic missing APIs
-    "CONFIG_HOSTID",
 
     # BusyBox init system
     "CONFIG_INIT",
     "CONFIG_FEATURE_USE_INITTAB",
     "CONFIG_BOOTCHARTD",
+
+    # Power utilities
     "CONFIG_HALT",
-    "CONFIG_POWEROFF",
     "CONFIG_REBOOT",
+    "CONFIG_POWEROFF",
+
+    # runit system
+    "CONFIG_RUNSV",
+    "CONFIG_RUNSVDIR",
+    "CONFIG_SV",
+    "CONFIG_SVC",
+    "CONFIG_SVLOGD",
+
+    # login / shutdown tools
+    "CONFIG_LOGIN",
+    "CONFIG_GETTY",
+    "CONFIG_SU",
+
+    # console utilities
+    "CONFIG_LOADFONT",
+    "CONFIG_SETFONT",
+    "CONFIG_KBD_MODE",
+    "CONFIG_DUMPKMAP",
+
+    # incompatible libc features
+    "CONFIG_HOSTID",
 ]
 
 for opt in disable:
     cfg = cfg.replace(f"{opt}=y", f"# {opt} is not set")
 
-# Enable static binary
+# enable static binary
 cfg = cfg.replace("# CONFIG_STATIC is not set", "CONFIG_STATIC=y")
 
 config_file.write_text(cfg)
 
 # ------------------------------------------------
-# Resolve config prompts automatically
+# Resolve config automatically
 # ------------------------------------------------
 
-print("Resolving BusyBox config")
+print("Resolving config")
+
 run("yes '' | make oldconfig")
 
 
@@ -118,7 +134,6 @@ run_list([
     "make",
     "-j4",
     "ARCH=arm64",
-    f"CROSS_COMPILE={TOOLCHAIN}/aarch64-linux-android-",
     f"CC={TOOLCHAIN}/aarch64-linux-android{ANDROID_API}-clang",
     f"AR={TOOLCHAIN}/llvm-ar",
     f"RANLIB={TOOLCHAIN}/llvm-ranlib",
@@ -132,13 +147,12 @@ run_list([
 # Package
 # ------------------------------------------------
 
-print("Packaging BusyBox")
+print("Packaging")
 
 OUT_DIR.mkdir(exist_ok=True)
 
 run_list(["cp", "busybox", str(OUT_DIR / "busybox")])
 run_list(["chmod", "+x", str(OUT_DIR / "busybox")])
 
-print()
 print("Build complete")
-print(f"Binary location: {OUT_DIR}/busybox")
+print(f"Binary: {OUT_DIR}/busybox")
