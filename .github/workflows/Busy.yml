@@ -82,26 +82,30 @@ jobs:
         run: |
           cd busybox-${BUSYBOX_VERSION}
 
-          # Android configuration
+          # Android base configuration
           make android_ndk_defconfig
 
-          # Enable static build
+          # Remove problematic Linux-only features
+          sed -i '/CONFIG_INIT/d' .config
+          echo "# CONFIG_INIT is not set" >> .config
+
+          sed -i '/CONFIG_FEATURE_UTMP/d' .config
+          echo "# CONFIG_FEATURE_UTMP is not set" >> .config
+
+          sed -i '/CONFIG_FEATURE_WTMP/d' .config
+          echo "# CONFIG_FEATURE_WTMP is not set" >> .config
+
+          sed -i '/CONFIG_PAM/d' .config
+          echo "# CONFIG_PAM is not set" >> .config
+
+          sed -i '/CONFIG_SELINUX/d' .config
+          echo "# CONFIG_SELINUX is not set" >> .config
+
+          # Enable static binary
           sed -i 's/# CONFIG_STATIC is not set/CONFIG_STATIC=y/' .config
 
-          # Disable debug
-          sed -i 's/CONFIG_DEBUG=y/# CONFIG_DEBUG is not set/' .config
-
-          # Disable Linux-only subsystems
-          sed -i 's/CONFIG_FEATURE_UTMP=y/# CONFIG_FEATURE_UTMP is not set/' .config
-          sed -i 's/CONFIG_FEATURE_WTMP=y/# CONFIG_FEATURE_WTMP is not set/' .config
-          sed -i 's/CONFIG_PAM=y/# CONFIG_PAM is not set/' .config
-          sed -i 's/CONFIG_SELINUX=y/# CONFIG_SELINUX is not set/' .config
-
-          # Resolve dependencies without prompts
-          make olddefconfig
-
-          # Force-disable BusyBox init AFTER dependency resolution
-          sed -i 's/CONFIG_INIT=y/# CONFIG_INIT is not set/' .config
+          # Resolve configuration silently
+          make silentoldconfig
 
 ############################################################
 # BUILD BUSYBOX
