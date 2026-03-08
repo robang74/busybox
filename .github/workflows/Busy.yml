@@ -1,4 +1,4 @@
-name: Build BusyBox Android ARM64
+name: Build BusyBox Android (Multi-Arch)
 
 on:
   workflow_dispatch:
@@ -7,6 +7,14 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    strategy:
+      matrix:
+        arch:
+          - arm64
+          - arm
+          - x86
+          - x86_64
+
     env:
       BUSYBOX_VERSION: 1.36.1
       ANDROID_API: 21
@@ -14,11 +22,11 @@ jobs:
 
     steps:
 
-# Checkout repo
+# Checkout
       - uses: actions/checkout@v4
 
-# Install build tools
-      - name: Install dependencies
+# Install dependencies
+      - name: Install build tools
         run: |
           sudo apt update
           sudo apt install -y \
@@ -28,13 +36,13 @@ jobs:
             flex \
             unzip
 
-# Download NDK
+# Download Android NDK
       - name: Download NDK
         run: |
           wget https://dl.google.com/android/repository/android-ndk-${NDK_VERSION}-linux.zip
           unzip -q android-ndk-${NDK_VERSION}-linux.zip
 
-# Set toolchain variables
+# Setup environment
       - name: Setup toolchain
         run: |
           echo "NDK=$PWD/android-ndk-${NDK_VERSION}" >> $GITHUB_ENV
@@ -47,22 +55,35 @@ jobs:
           wget https://busybox.net/downloads/busybox-${BUSYBOX_VERSION}.tar.bz2
           tar xf busybox-${BUSYBOX_VERSION}.tar.bz2
 
-# Configure BusyBox
-      - name: Configure
+# Configure
+      - name: Configure BusyBox
         run: |
           cd busybox-${BUSYBOX_VERSION}
 
-          # Use official Android config
           cp configs/android_ndk_defconfig .config
 
-# Build BusyBox
-      - name: Build
+# Build
+      - name: Build BusyBox
         run: |
           cd busybox-${BUSYBOX_VERSION}
 
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            TARGET=aarch64-linux-android
+            ARCH=arm64
+          elif [ "${{ matrix.arch }}" = "arm" ]; then
+            TARGET=armv7a-linux-androideabi
+            ARCH=arm
+          elif [ "${{ matrix.arch }}" = "x86" ]; then
+            TARGET=i686-linux-android
+            ARCH=x86
+          elif [ "${{ matrix.arch }}" = "x86_64" ]; then
+            TARGET=x86_64-linux-android
+            ARCH=x86_64
+          fi
+
           make -j$(nproc) \
-            ARCH=arm64 \
-            CC=$TOOLCHAIN/aarch64-linux-android${ANDROID_API}-clang \
+            ARCH=$ARCH \
+            CC=$TOOLCHAIN/${TARGET}${ANDROID_API}-clang \
             AR=$TOOLCHAIN/llvm-ar \
             RANLIB=$TOOLCHAIN/llvm-ranlib \
             STRIP=$TOOLCHAIN/llvm-strip \
@@ -71,18 +92,19 @@ jobs:
             LDFLAGS="--sysroot=$SYSROOT"
 
 # Strip binary
-      - name: Strip
+      - name: Strip binary
         run: |
           $TOOLCHAIN/llvm-strip busybox-${BUSYBOX_VERSION}/busybox
 
-# Package artifact
-      - name: Package
+# Package
+      - name: Package artifact
         run: |
-          mkdir release
-          cp busybox-${BUSYBOX_VERSION}/busybox release/
+          mkdir -p release
+          cp busybox-${BUSYBOX_VERSION}/busybox release/busybox-${{ matrix.arch }}
 
 # Upload
-      - uses: actions/upload-artifact@v4
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: busybox-android-arm64
-          path: release/busybox
+          name: busybox-${{ matrix.arch }}
+          path: release/busybox-${{ matrix.arch }}
