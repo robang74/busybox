@@ -92,13 +92,14 @@ jobs:
 
           make defconfig
 
-          # Static binary
+          # Enable static binary
           sed -i 's/# CONFIG_STATIC is not set/CONFIG_STATIC=y/' .config
 
-          # Smaller binary
-          sed -i 's/.*CONFIG_DEBUG.*/# CONFIG_DEBUG is not set/' .config
+          # Disable debug for smaller binary
+          sed -i 's/CONFIG_DEBUG=y/# CONFIG_DEBUG is not set/' .config
 
-          make oldconfig
+          # Non-interactive config update
+          make olddefconfig
 
       ############################################################
       # BUILD BUSYBOX
@@ -108,10 +109,15 @@ jobs:
         run: |
           cd busybox-${BUSYBOX_VERSION}
 
+          export CC=$TOOLCHAIN/aarch64-linux-android${ANDROID_API}-clang
+          export AR=$TOOLCHAIN/llvm-ar
+          export RANLIB=$TOOLCHAIN/llvm-ranlib
+          export STRIP=$TOOLCHAIN/llvm-strip
+
           make -j$(nproc) \
-            CC=$TOOLCHAIN/aarch64-linux-android${ANDROID_API}-clang \
-            AR=$TOOLCHAIN/aarch64-linux-android-ar \
-            RANLIB=$TOOLCHAIN/aarch64-linux-android-ranlib \
+            CC=$CC \
+            AR=$AR \
+            RANLIB=$RANLIB \
             HOSTCC=gcc \
             CFLAGS="--sysroot=$SYSROOT" \
             LDFLAGS="--sysroot=$SYSROOT"
