@@ -2,70 +2,123 @@ name: Build BusyBox Android ARM64
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: BusyBox version
+        required: true
+        default: "1.36.1"
+      api:
+        description: Android API level
+        required: true
+        default: "21"
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     env:
-      BUSYBOX_VERSION: 1.36.1
-      ANDROID_API: 21
       NDK_VERSION: r26d
+      NDK_ZIP: android-ndk-r26d-linux.zip
+      NDK_DIR: android-ndk-r26d
 
     steps:
 
-      - uses: actions/checkout@v4
+############################################################
+# CHECKOUT
+############################################################
 
-      - name: Install tools
+      - name: Checkout
+        uses: actions/checkout@v4
+
+############################################################
+# SET VARIABLES
+############################################################
+
+      - name: Set variables
+        run: |
+          echo "BUSYBOX_VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
+          echo "ANDROID_API=${{ github.event.inputs.api }}" >> $GITHUB_ENV
+
+############################################################
+# INSTALL BUILD TOOLS
+############################################################
+
+      - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y build-essential wget unzip bison flex
+          sudo apt install -y \
+            build-essential \
+            wget \
+            bison \
+            flex \
+            unzip \
+            file
 
-########################################################
-# Download Android NDK
-########################################################
+############################################################
+# DOWNLOAD ANDROID NDK
+############################################################
 
-      - name: Download NDK
+      - name: Download Android NDK
         run: |
-          wget https://dl.google.com/android/repository/android-ndk-${NDK_VERSION}-linux.zip
-          unzip android-ndk-${NDK_VERSION}-linux.zip
+          wget https://dl.google.com/android/repository/${NDK_ZIP}
+          unzip ${NDK_ZIP}
+
+############################################################
+# SET TOOLCHAIN
+############################################################
 
       - name: Setup toolchain
         run: |
-          echo "NDK=$PWD/android-ndk-${NDK_VERSION}" >> $GITHUB_ENV
-          echo "TOOLCHAIN=$PWD/android-ndk-${NDK_VERSION}/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_ENV
-          echo "SYSROOT=$PWD/android-ndk-${NDK_VERSION}/toolchains/llvm/prebuilt/linux-x86_64/sysroot" >> $GITHUB_ENV
+          echo "NDK=$PWD/${NDK_DIR}" >> $GITHUB_ENV
+          echo "TOOLCHAIN=$PWD/${NDK_DIR}/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_ENV
+          echo "SYSROOT=$PWD/${NDK_DIR}/toolchains/llvm/prebuilt/linux-x86_64/sysroot" >> $GITHUB_ENV
 
-########################################################
-# Download BusyBox
-########################################################
+############################################################
+# DOWNLOAD BUSYBOX
+############################################################
 
       - name: Download BusyBox
         run: |
           wget https://busybox.net/downloads/busybox-${BUSYBOX_VERSION}.tar.bz2
           tar xf busybox-${BUSYBOX_VERSION}.tar.bz2
 
-########################################################
-# Configure BusyBox
-########################################################
+############################################################
+# CONFIGURE BUSYBOX FOR ANDROID
+############################################################
 
-      - name: Configure
+      - name: Configure BusyBox
         run: |
           cd busybox-${BUSYBOX_VERSION}
 
+          # Android-friendly config
           make android_ndk_defconfig
 
-          # Disable BusyBox init (Android incompatible)
-          sed -i 's/CONFIG_INIT=y/# CONFIG_INIT is not set/' .config
+          # Disable init (Android incompatible)
+          sed -i 's/^CONFIG_INIT=y/# CONFIG_INIT is not set/' .config
+
+          # Disable bootchart
+          sed -i 's/^CONFIG_BOOTCHARTD=y/# CONFIG_BOOTCHARTD is not set/' .config
+
+          # Disable login utilities
+          sed -i 's/^CONFIG_LOGIN=y/# CONFIG_LOGIN is not set/' .config
+          sed -i 's/^CONFIG_SU=y/# CONFIG_SU is not set/' .config
+
+          # Disable PAM and SELinux
+          sed -i 's/^CONFIG_PAM=y/# CONFIG_PAM is not set/' .config
+          sed -i 's/^CONFIG_SELINUX=y/# CONFIG_SELINUX is not set/' .config
+
+          # Disable utmp/wtmp
+          sed -i 's/^CONFIG_FEATURE_UTMP=y/# CONFIG_FEATURE_UTMP is not set/' .config
+          sed -i 's/^CONFIG_FEATURE_WTMP=y/# CONFIG_FEATURE_WTMP is not set/' .config
 
           # Enable static binary
           sed -i 's/# CONFIG_STATIC is not set/CONFIG_STATIC=y/' .config
 
-########################################################
-# Build BusyBox
-########################################################
+############################################################
+# BUILD BUSYBOX
+############################################################
 
-      - name: Build
+      - name: Build BusyBox
         run: |
           cd busybox-${BUSYBOX_VERSION}
 
@@ -78,17 +131,39 @@ jobs:
             CFLAGS="--sysroot=$SYSROOT -Os" \
             LDFLAGS="--sysroot=$SYSROOT"
 
-########################################################
-# Package
-########################################################
+############################################################
+# STRIP BINARY
+############################################################
 
-      - name: Package
+      - name: Strip binary
+        run: |
+          $TOOLCHAIN/llvm-strip busybox-${BUSYBOX_VERSION}/busybox
+
+############################################################
+# PACKAGE
+############################################################
+
+      - name: Prepare release
         run: |
           mkdir release
-          cp busybox-${BUSYBOX_VERSION}/busybox release/
-          $TOOLCHAIN/llvm-strip release/busybox
+          cp busybox-${BUSYBOX_VERSION}/busybox release/busybox
+          chmod +x release/busybox
 
-      - uses: actions/upload-artifact@v4
+############################################################
+# VERIFY
+############################################################
+
+      - name: Verify binary
+        run: |
+          file release/busybox
+          ls -lh release/busybox
+
+############################################################
+# UPLOAD
+############################################################
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: busybox-android-arm64
+          name: busybox-${{ env.BUSYBOX_VERSION }}-android-arm64
           path: release/busybox
