@@ -19,7 +19,6 @@ NDK_PATH = Path(NDK_PATH)
 TOOLCHAIN = NDK_PATH / "toolchains/llvm/prebuilt/linux-x86_64/bin"
 SYSROOT = NDK_PATH / "toolchains/llvm/prebuilt/linux-x86_64/sysroot"
 
-# Detect clang runtime
 CLANG_ROOT = NDK_PATH / "toolchains/llvm/prebuilt/linux-x86_64/lib/clang"
 CLANG_VERSION = sorted(CLANG_ROOT.iterdir())[-1].name
 CLANG_RUNTIME = CLANG_ROOT / CLANG_VERSION / "lib/linux"
@@ -45,7 +44,7 @@ def run_list(cmd, env=None):
     subprocess.run(cmd, check=True, env=env)
 
 # ------------------------------------------------
-# Clean
+# Clean previous build
 # ------------------------------------------------
 
 print("Cleaning previous build")
@@ -109,15 +108,12 @@ env = os.environ.copy()
 env["KCONFIG_ALLCONFIG"] = str(override_file)
 
 # ------------------------------------------------
-# Resolve config (non-interactive)
+# Resolve config (BusyBox requires oldconfig)
 # ------------------------------------------------
 
 print("Resolving BusyBox config")
 
-run_list([
-    "make",
-    "olddefconfig"
-], env=env)
+run("yes '' | make oldconfig", env=env)
 
 # ------------------------------------------------
 # Compiler configuration
@@ -127,6 +123,7 @@ CC = f"{TOOLCHAIN}/aarch64-linux-android{ANDROID_API}-clang"
 
 env["CC"] = CC
 env["LD"] = CC
+env["HOSTCC"] = "gcc"
 env["AR"] = f"{TOOLCHAIN}/llvm-ar"
 env["RANLIB"] = f"{TOOLCHAIN}/llvm-ranlib"
 env["STRIP"] = f"{TOOLCHAIN}/llvm-strip"
@@ -146,6 +143,7 @@ run_list([
     "ARCH=arm64",
     f"CC={env['CC']}",
     f"LD={env['LD']}",
+    f"HOSTCC={env['HOSTCC']}",
     f"AR={env['AR']}",
     f"RANLIB={env['RANLIB']}",
     f"STRIP={env['STRIP']}",
@@ -164,4 +162,4 @@ run_list(["chmod", "+x", str(OUT_DIR / "busybox")])
 
 print()
 print("Build complete")
-print(f"Binary location: {OUT_DIR}/busybox")
+print("Binary location:", OUT_DIR / "busybox")
