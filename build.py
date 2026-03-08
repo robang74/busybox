@@ -17,9 +17,7 @@ if not NDK_PATH:
 TOOLCHAIN = Path(NDK_PATH) / "toolchains/llvm/prebuilt/linux-x86_64/bin"
 SYSROOT = Path(NDK_PATH) / "toolchains/llvm/prebuilt/linux-x86_64/sysroot"
 
-SRC_DIR = Path("busybox")
 OUT_DIR = Path("release")
-
 OUT_DIR.mkdir(exist_ok=True)
 
 # ------------------------------------------------
@@ -33,12 +31,6 @@ def run(cmd):
 def run_list(cmd):
     print(" ".join(cmd))
     subprocess.run(cmd, check=True)
-
-# ------------------------------------------------
-# Enter BusyBox source
-# ------------------------------------------------
-
-os.chdir(SRC_DIR)
 
 # ------------------------------------------------
 # Clean previous builds
@@ -138,8 +130,8 @@ run_list([
 
 print("Packaging BusyBox")
 
-run_list(["cp", "busybox", f"../{OUT_DIR}/busybox"])
-run_list(["chmod", "+x", f"../{OUT_DIR}/busybox"])
+run_list(["cp", "busybox", str(OUT_DIR / "busybox")])
+run_list(["chmod", "+x", str(OUT_DIR / "busybox")])
 
 print()
 print("Build complete")
