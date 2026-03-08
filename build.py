@@ -4,10 +4,6 @@ import os
 import subprocess
 from pathlib import Path
 
-# ------------------------------------------------
-# Configuration
-# ------------------------------------------------
-
 ANDROID_API = "21"
 
 NDK_PATH = os.environ.get("NDK_PATH")
@@ -19,7 +15,6 @@ NDK_PATH = Path(NDK_PATH)
 TOOLCHAIN = NDK_PATH / "toolchains/llvm/prebuilt/linux-x86_64/bin"
 SYSROOT = NDK_PATH / "toolchains/llvm/prebuilt/linux-x86_64/sysroot"
 
-# Detect clang runtime automatically
 CLANG_ROOT = NDK_PATH / "toolchains/llvm/prebuilt/linux-x86_64/lib/clang"
 CLANG_VERSION = sorted(CLANG_ROOT.iterdir())[-1].name
 CLANG_RUNTIME = CLANG_ROOT / CLANG_VERSION / "lib/linux"
@@ -31,10 +26,6 @@ OUT_DIR.mkdir(exist_ok=True)
 
 print("Using Clang runtime:", CLANG_RUNTIME)
 
-# ------------------------------------------------
-# Helpers
-# ------------------------------------------------
-
 def run(cmd, env=None):
     print(cmd)
     subprocess.run(cmd, shell=True, check=True, env=env)
@@ -43,23 +34,11 @@ def run_list(cmd, env=None):
     print(" ".join(cmd))
     subprocess.run(cmd, check=True, env=env)
 
-# ------------------------------------------------
-# Clean previous builds
-# ------------------------------------------------
-
 print("Cleaning previous build")
 run_list(["make", "distclean"])
 
-# ------------------------------------------------
-# Apply Android base config
-# ------------------------------------------------
-
 print("Applying android_ndk_defconfig")
 run_list(["make", "android_ndk_defconfig"])
-
-# ------------------------------------------------
-# Create forced config overrides
-# ------------------------------------------------
 
 print("Creating Android override config")
 
@@ -104,18 +83,12 @@ CONFIG_STATIC=y
 """)
 
 env = os.environ.copy()
+
 env["KCONFIG_ALLCONFIG"] = str(override_file)
 
-# ------------------------------------------------
-# Resolve config
-# ------------------------------------------------
+env["ARCH"] = "arm64"
 
-print("Resolving BusyBox config with forced overrides")
-run("yes '' | make oldconfig", env=env)
-
-# ------------------------------------------------
-# Setup compiler environment
-# ------------------------------------------------
+env["CROSS_COMPILE"] = str(TOOLCHAIN) + "/aarch64-linux-android-"
 
 env["CC"] = f"{TOOLCHAIN}/aarch64-linux-android{ANDROID_API}-clang"
 env["AR"] = f"{TOOLCHAIN}/llvm-ar"
@@ -130,21 +103,15 @@ env["LDFLAGS"] = (
     f"-L{CLANG_RUNTIME}"
 )
 
-# ------------------------------------------------
-# Build BusyBox
-# ------------------------------------------------
+print("Resolving BusyBox config with forced overrides")
+run("yes '' | make oldconfig", env=env)
 
 print("Building BusyBox")
 
 run_list([
     "make",
-    "-j4",
-    "ARCH=arm64"
+    "-j4"
 ], env=env)
-
-# ------------------------------------------------
-# Package binary
-# ------------------------------------------------
 
 print("Packaging BusyBox")
 
