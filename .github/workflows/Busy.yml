@@ -90,7 +90,7 @@ jobs:
         run: |
           cd busybox-${BUSYBOX_VERSION}
 
-          # Use Android-compatible configuration
+          # Android-friendly default config
           make android_ndk_defconfig
 
           # Enable static binary
@@ -99,7 +99,14 @@ jobs:
           # Disable debug
           sed -i 's/CONFIG_DEBUG=y/# CONFIG_DEBUG is not set/' .config
 
-          # Non-interactive config update
+          # Disable Linux-only features
+          sed -i 's/CONFIG_INIT=y/# CONFIG_INIT is not set/' .config
+          sed -i 's/CONFIG_FEATURE_UTMP=y/# CONFIG_FEATURE_UTMP is not set/' .config
+          sed -i 's/CONFIG_FEATURE_WTMP=y/# CONFIG_FEATURE_WTMP is not set/' .config
+          sed -i 's/CONFIG_PAM=y/# CONFIG_PAM is not set/' .config
+          sed -i 's/CONFIG_SELINUX=y/# CONFIG_SELINUX is not set/' .config
+
+          # Resolve config automatically
           yes "" | make oldconfig
 
 ############################################################
