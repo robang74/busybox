@@ -43,7 +43,7 @@ jobs:
             file
 
 ############################################################
-# CACHE ANDROID NDK
+# ANDROID NDK
 ############################################################
 
       - name: Cache Android NDK
@@ -59,25 +59,17 @@ jobs:
           wget https://dl.google.com/android/repository/${NDK_ZIP}
           unzip ${NDK_ZIP}
 
-      - name: Set toolchain paths
+      - name: Setup toolchain
         run: |
           echo "NDK=$PWD/${NDK_DIR}" >> $GITHUB_ENV
           echo "TOOLCHAIN=$PWD/${NDK_DIR}/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_ENV
           echo "SYSROOT=$PWD/${NDK_DIR}/toolchains/llvm/prebuilt/linux-x86_64/sysroot" >> $GITHUB_ENV
 
 ############################################################
-# CACHE BUSYBOX SOURCE
+# BUSYBOX SOURCE
 ############################################################
 
-      - name: Cache BusyBox Source
-        id: cache-busybox
-        uses: actions/cache@v4
-        with:
-          path: busybox-${{ env.BUSYBOX_VERSION }}
-          key: busybox-${{ env.BUSYBOX_VERSION }}
-
       - name: Download BusyBox
-        if: steps.cache-busybox.outputs.cache-hit != 'true'
         run: |
           wget https://busybox.net/downloads/busybox-${BUSYBOX_VERSION}.tar.bz2
           tar xf busybox-${BUSYBOX_VERSION}.tar.bz2
@@ -90,24 +82,26 @@ jobs:
         run: |
           cd busybox-${BUSYBOX_VERSION}
 
-          # Android-friendly default config
+          # Android configuration
           make android_ndk_defconfig
 
-          # Enable static binary
+          # Enable static build
           sed -i 's/# CONFIG_STATIC is not set/CONFIG_STATIC=y/' .config
 
           # Disable debug
           sed -i 's/CONFIG_DEBUG=y/# CONFIG_DEBUG is not set/' .config
 
-          # Disable Linux-only features
-          sed -i 's/CONFIG_INIT=y/# CONFIG_INIT is not set/' .config
+          # Disable Linux-only subsystems
           sed -i 's/CONFIG_FEATURE_UTMP=y/# CONFIG_FEATURE_UTMP is not set/' .config
           sed -i 's/CONFIG_FEATURE_WTMP=y/# CONFIG_FEATURE_WTMP is not set/' .config
           sed -i 's/CONFIG_PAM=y/# CONFIG_PAM is not set/' .config
           sed -i 's/CONFIG_SELINUX=y/# CONFIG_SELINUX is not set/' .config
 
-          # Resolve config automatically
-          yes "" | make oldconfig
+          # Resolve dependencies without prompts
+          make olddefconfig
+
+          # Force-disable BusyBox init AFTER dependency resolution
+          sed -i 's/CONFIG_INIT=y/# CONFIG_INIT is not set/' .config
 
 ############################################################
 # BUILD BUSYBOX
