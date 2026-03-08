@@ -24,13 +24,13 @@ OUT_DIR.mkdir(exist_ok=True)
 # Helpers
 # ------------------------------------------------
 
-def run(cmd):
+def run(cmd, env=None):
     print(cmd)
-    subprocess.run(cmd, shell=True, check=True)
+    subprocess.run(cmd, shell=True, check=True, env=env)
 
-def run_list(cmd):
+def run_list(cmd, env=None):
     print(" ".join(cmd))
-    subprocess.run(cmd, check=True)
+    subprocess.run(cmd, check=True, env=env)
 
 # ------------------------------------------------
 # Clean previous builds
@@ -40,81 +40,77 @@ print("Cleaning previous build")
 run_list(["make", "distclean"])
 
 # ------------------------------------------------
-# Configure BusyBox
+# Apply Android base config
 # ------------------------------------------------
 
 print("Applying android_ndk_defconfig")
 run_list(["make", "android_ndk_defconfig"])
 
 # ------------------------------------------------
-# Resolve config automatically
+# Create forced config overrides
 # ------------------------------------------------
 
-print("Resolving BusyBox config")
-run("yes '' | make oldconfig")
+print("Creating Android override config")
 
-# ------------------------------------------------
-# Force-disable Android incompatible features
-# ------------------------------------------------
+override_file = Path("android_override.config")
 
-print("Applying Android config overrides")
-
-config_file = Path(".config")
-
-with open(config_file, "a") as f:
-    f.write("""
-
-# Android compatibility overrides
+override_file.write_text("""
 
 # Disable BusyBox init subsystem
-# CONFIG_INIT is not set
-# CONFIG_FEATURE_USE_INITTAB is not set
-# CONFIG_FEATURE_INIT_SCTTY is not set
-# CONFIG_FEATURE_INIT_SYSLOG is not set
-# CONFIG_FEATURE_INIT_COREDUMPS is not set
-# CONFIG_BOOTCHARTD is not set
+CONFIG_INIT=n
+CONFIG_FEATURE_USE_INITTAB=n
+CONFIG_FEATURE_INIT_SCTTY=n
+CONFIG_FEATURE_INIT_SYSLOG=n
+CONFIG_FEATURE_INIT_COREDUMPS=n
+CONFIG_BOOTCHARTD=n
 
 # Disable power utilities
-# CONFIG_HALT is not set
-# CONFIG_REBOOT is not set
-# CONFIG_POWEROFF is not set
+CONFIG_HALT=n
+CONFIG_REBOOT=n
+CONFIG_POWEROFF=n
 
 # Disable login utilities
-# CONFIG_LOGIN is not set
-# CONFIG_GETTY is not set
-# CONFIG_SU is not set
+CONFIG_LOGIN=n
+CONFIG_GETTY=n
+CONFIG_SU=n
 
 # Disable runit
-# CONFIG_RUNSV is not set
-# CONFIG_RUNSVDIR is not set
-# CONFIG_SV is not set
-# CONFIG_SVC is not set
-# CONFIG_SVLOGD is not set
+CONFIG_RUNSV=n
+CONFIG_RUNSVDIR=n
+CONFIG_SV=n
+CONFIG_SVC=n
+CONFIG_SVLOGD=n
 
-# Disable console tools
-# CONFIG_LOADFONT is not set
-# CONFIG_SETFONT is not set
-# CONFIG_KBD_MODE is not set
-# CONFIG_DUMPKMAP is not set
+# Disable console utilities
+CONFIG_LOADFONT=n
+CONFIG_SETFONT=n
+CONFIG_KBD_MODE=n
+CONFIG_DUMPKMAP=n
 
 # Disable incompatible libc features
-# CONFIG_HOSTID is not set
+CONFIG_HOSTID=n
 
 # Disable device manager
-# CONFIG_MDEV is not set
+CONFIG_MDEV=n
 
 # Disable mount utilities
-# CONFIG_MOUNT is not set
-# CONFIG_UMOUNT is not set
-# CONFIG_PIVOT_ROOT is not set
+CONFIG_MOUNT=n
+CONFIG_UMOUNT=n
+CONFIG_PIVOT_ROOT=n
 
 # Static binary
 CONFIG_STATIC=y
-
 """)
 
-# Reprocess config
-run("yes '' | make oldconfig")
+env = os.environ.copy()
+env["KCONFIG_ALLCONFIG"] = str(override_file)
+
+# ------------------------------------------------
+# Re-resolve config with overrides
+# ------------------------------------------------
+
+print("Resolving BusyBox config with forced overrides")
+run("yes '' | make oldconfig", env=env)
 
 # ------------------------------------------------
 # Build BusyBox
@@ -132,7 +128,7 @@ run_list([
     f"STRIP={TOOLCHAIN}/llvm-strip",
     f"CFLAGS=--sysroot={SYSROOT} -Os",
     f"LDFLAGS=--sysroot={SYSROOT}",
-])
+], env=env)
 
 # ------------------------------------------------
 # Package binary
