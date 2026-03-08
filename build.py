@@ -15,6 +15,10 @@ NDK_PATH = Path(NDK_PATH)
 TOOLCHAIN = NDK_PATH / "toolchains/llvm/prebuilt/linux-x86_64/bin"
 SYSROOT = NDK_PATH / "toolchains/llvm/prebuilt/linux-x86_64/sysroot"
 
+# Android runtime libraries
+ANDROID_LIB = SYSROOT / f"usr/lib/aarch64-linux-android/{ANDROID_API}"
+CLANG_LIB = NDK_PATH / "toolchains/llvm/prebuilt/linux-x86_64/lib/clang/17/lib/linux"
+
 OUT_DIR = Path("release")
 OUT_DIR.mkdir(exist_ok=True)
 
@@ -78,7 +82,7 @@ CONFIG_SVLOGD=n
 CONFIG_MDEV=n
 CONFIG_HOSTID=n
 
-# Android must use dynamic linking
+# Android requires dynamic linking
 # CONFIG_STATIC is not set
 
 """)
@@ -91,7 +95,6 @@ env["KCONFIG_ALLCONFIG"] = str(override)
 # ------------------------------------------------
 
 print("Resolving BusyBox config")
-
 run("yes '' | make oldconfig", env=env)
 
 # ------------------------------------------------
@@ -107,8 +110,18 @@ env["AR"] = str(TOOLCHAIN / "llvm-ar")
 env["RANLIB"] = str(TOOLCHAIN / "llvm-ranlib")
 env["STRIP"] = str(TOOLCHAIN / "llvm-strip")
 
-env["CFLAGS"] = f"--target={TARGET} --sysroot={SYSROOT} -Os -fPIC"
-env["LDFLAGS"] = f"--target={TARGET} --sysroot={SYSROOT}"
+env["CFLAGS"] = (
+    f"--target={TARGET} "
+    f"--sysroot={SYSROOT} "
+    "-Os -fPIC"
+)
+
+env["LDFLAGS"] = (
+    f"--target={TARGET} "
+    f"--sysroot={SYSROOT} "
+    f"-L{ANDROID_LIB} "
+    f"-L{CLANG_LIB}"
+)
 
 # ------------------------------------------------
 # Build BusyBox
