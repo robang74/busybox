@@ -90,15 +90,16 @@ jobs:
         run: |
           cd busybox-${BUSYBOX_VERSION}
 
-          make defconfig
+          # Use Android-compatible configuration
+          make android_ndk_defconfig
 
-          # Enable static build
+          # Enable static binary
           sed -i 's/# CONFIG_STATIC is not set/CONFIG_STATIC=y/' .config
 
           # Disable debug
           sed -i 's/CONFIG_DEBUG=y/# CONFIG_DEBUG is not set/' .config
 
-          # Auto answer config prompts
+          # Non-interactive config update
           yes "" | make oldconfig
 
 ############################################################
@@ -113,8 +114,9 @@ jobs:
             CC=$TOOLCHAIN/aarch64-linux-android${ANDROID_API}-clang \
             AR=$TOOLCHAIN/llvm-ar \
             RANLIB=$TOOLCHAIN/llvm-ranlib \
+            STRIP=$TOOLCHAIN/llvm-strip \
             HOSTCC=gcc \
-            CFLAGS="--sysroot=$SYSROOT" \
+            CFLAGS="--sysroot=$SYSROOT -Os" \
             LDFLAGS="--sysroot=$SYSROOT"
 
 ############################################################
@@ -127,7 +129,7 @@ jobs:
 
       - name: Prepare release
         run: |
-          mkdir release
+          mkdir -p release
           cp busybox-${BUSYBOX_VERSION}/busybox release/busybox
           chmod +x release/busybox
 
