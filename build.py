@@ -37,7 +37,6 @@ def run_list(cmd):
 # ------------------------------------------------
 
 print("Cleaning previous build")
-
 run_list(["make", "distclean"])
 
 # ------------------------------------------------
@@ -45,65 +44,76 @@ run_list(["make", "distclean"])
 # ------------------------------------------------
 
 print("Applying android_ndk_defconfig")
-
 run_list(["make", "android_ndk_defconfig"])
-
-config_file = Path(".config")
-cfg = config_file.read_text()
-
-# ------------------------------------------------
-# Disable Android-incompatible features
-# ------------------------------------------------
-
-disable = [
-
-    "CONFIG_INIT",
-    "CONFIG_FEATURE_USE_INITTAB",
-    "CONFIG_FEATURE_INIT_SCTTY",
-    "CONFIG_FEATURE_INIT_SYSLOG",
-    "CONFIG_FEATURE_INIT_COREDUMPS",
-
-    "CONFIG_HALT",
-    "CONFIG_REBOOT",
-    "CONFIG_POWEROFF",
-
-    "CONFIG_LOGIN",
-    "CONFIG_GETTY",
-    "CONFIG_SU",
-
-    "CONFIG_RUNSV",
-    "CONFIG_RUNSVDIR",
-    "CONFIG_SV",
-    "CONFIG_SVC",
-    "CONFIG_SVLOGD",
-
-    "CONFIG_LOADFONT",
-    "CONFIG_SETFONT",
-    "CONFIG_KBD_MODE",
-    "CONFIG_DUMPKMAP",
-
-    "CONFIG_HOSTID",
-    "CONFIG_MDEV",
-
-    "CONFIG_MOUNT",
-    "CONFIG_UMOUNT",
-    "CONFIG_PIVOT_ROOT",
-]
-
-for opt in disable:
-    cfg = cfg.replace(f"{opt}=y", f"# {opt} is not set")
-    cfg = cfg.replace(f"{opt}=m", f"# {opt} is not set")
-
-cfg = cfg.replace("# CONFIG_STATIC is not set", "CONFIG_STATIC=y")
-
-config_file.write_text(cfg)
 
 # ------------------------------------------------
 # Resolve config automatically
 # ------------------------------------------------
 
 print("Resolving BusyBox config")
+run("yes '' | make oldconfig")
 
+# ------------------------------------------------
+# Force-disable Android incompatible features
+# ------------------------------------------------
+
+print("Applying Android config overrides")
+
+config_file = Path(".config")
+
+with open(config_file, "a") as f:
+    f.write("""
+
+# Android compatibility overrides
+
+# Disable BusyBox init subsystem
+# CONFIG_INIT is not set
+# CONFIG_FEATURE_USE_INITTAB is not set
+# CONFIG_FEATURE_INIT_SCTTY is not set
+# CONFIG_FEATURE_INIT_SYSLOG is not set
+# CONFIG_FEATURE_INIT_COREDUMPS is not set
+# CONFIG_BOOTCHARTD is not set
+
+# Disable power utilities
+# CONFIG_HALT is not set
+# CONFIG_REBOOT is not set
+# CONFIG_POWEROFF is not set
+
+# Disable login utilities
+# CONFIG_LOGIN is not set
+# CONFIG_GETTY is not set
+# CONFIG_SU is not set
+
+# Disable runit
+# CONFIG_RUNSV is not set
+# CONFIG_RUNSVDIR is not set
+# CONFIG_SV is not set
+# CONFIG_SVC is not set
+# CONFIG_SVLOGD is not set
+
+# Disable console tools
+# CONFIG_LOADFONT is not set
+# CONFIG_SETFONT is not set
+# CONFIG_KBD_MODE is not set
+# CONFIG_DUMPKMAP is not set
+
+# Disable incompatible libc features
+# CONFIG_HOSTID is not set
+
+# Disable device manager
+# CONFIG_MDEV is not set
+
+# Disable mount utilities
+# CONFIG_MOUNT is not set
+# CONFIG_UMOUNT is not set
+# CONFIG_PIVOT_ROOT is not set
+
+# Static binary
+CONFIG_STATIC=y
+
+""")
+
+# Reprocess config
 run("yes '' | make oldconfig")
 
 # ------------------------------------------------
