@@ -1,138 +1,76 @@
-name: Build BusyBox Android ARM64
+name: Build BusyBox (Magisk Method)
 
 on:
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-
-    env:
-      BUSYBOX_VERSION: 1.36.1
-      ANDROID_API: 21
-      NDK_VERSION: r26d
+    runs-on: ubuntu-24.04
 
     steps:
 
 ############################################################
-# INSTALL BUILD DEPENDENCIES
+# CHECKOUT MAGISK SOURCE
+############################################################
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          repository: topjohnwu/Magisk
+          submodules: recursive
+
+############################################################
+# INSTALL DEPENDENCIES
 ############################################################
 
       - name: Install dependencies
         run: |
           sudo apt update
           sudo apt install -y \
-            build-essential \
-            wget \
-            bison \
-            flex \
+            python3 \
+            python3-pip \
             unzip \
-            file
+            zip \
+            git
 
 ############################################################
-# DOWNLOAD BUSYBOX
+# INSTALL ANDROID SDK
 ############################################################
 
-      - name: Download BusyBox
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+############################################################
+# INSTALL MAGISK NDK
+############################################################
+
+      - name: Install Magisk NDK
         run: |
-          wget https://busybox.net/downloads/busybox-${BUSYBOX_VERSION}.tar.bz2
-          tar xf busybox-${BUSYBOX_VERSION}.tar.bz2
+          python3 build.py ndk
 
 ############################################################
-# DOWNLOAD ANDROID NDK
+# BUILD NATIVE BINARIES
 ############################################################
 
-      - name: Download Android NDK
+      - name: Build native tools
         run: |
-          wget https://dl.google.com/android/repository/android-ndk-${NDK_VERSION}-linux.zip
-          unzip -q android-ndk-${NDK_VERSION}-linux.zip
+          python3 build.py native
 
 ############################################################
-# SET TOOLCHAIN VARIABLES
+# COLLECT BUSYBOX BINARIES
 ############################################################
 
-      - name: Setup toolchain
+      - name: Collect BusyBox
         run: |
-          echo "NDK=$PWD/android-ndk-${NDK_VERSION}" >> $GITHUB_ENV
-          echo "TOOLCHAIN=$PWD/android-ndk-${NDK_VERSION}/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_ENV
-          echo "SYSROOT=$PWD/android-ndk-${NDK_VERSION}/toolchains/llvm/prebuilt/linux-x86_64/sysroot" >> $GITHUB_ENV
+          mkdir busybox
+          cp native/out/*/busybox busybox/ || true
 
 ############################################################
-# CONFIGURE BUSYBOX
+# UPLOAD ARTIFACTS
 ############################################################
 
-      - name: Configure BusyBox
-        run: |
-          cd busybox-${BUSYBOX_VERSION}
-
-          # Android configuration
-          make android_ndk_defconfig
-
-          # Disable features Android does not support
-          sed -i 's/^CONFIG_INIT=y/# CONFIG_INIT is not set/' .config
-          sed -i 's/^CONFIG_LOGIN=y/# CONFIG_LOGIN is not set/' .config
-          sed -i 's/^CONFIG_BOOTCHARTD=y/# CONFIG_BOOTCHARTD is not set/' .config
-          sed -i 's/^CONFIG_PAM=y/# CONFIG_PAM is not set/' .config
-          sed -i 's/^CONFIG_FEATURE_UTMP=y/# CONFIG_FEATURE_UTMP is not set/' .config
-          sed -i 's/^CONFIG_FEATURE_WTMP=y/# CONFIG_FEATURE_WTMP is not set/' .config
-
-          # Enable static binary
-          sed -i 's/# CONFIG_STATIC is not set/CONFIG_STATIC=y/' .config
-
-          # Auto-accept any new config options
-          yes "" | make oldconfig
-
-############################################################
-# BUILD BUSYBOX
-############################################################
-
-      - name: Build BusyBox
-        run: |
-          cd busybox-${BUSYBOX_VERSION}
-
-          make -j$(nproc) \
-            ARCH=arm64 \
-            CC=$TOOLCHAIN/aarch64-linux-android${ANDROID_API}-clang \
-            AR=$TOOLCHAIN/llvm-ar \
-            RANLIB=$TOOLCHAIN/llvm-ranlib \
-            STRIP=$TOOLCHAIN/llvm-strip \
-            HOSTCC=gcc \
-            CFLAGS="--sysroot=$SYSROOT -Os" \
-            LDFLAGS="--sysroot=$SYSROOT -static"
-
-############################################################
-# STRIP BINARY
-############################################################
-
-      - name: Strip binary
-        run: |
-          $TOOLCHAIN/llvm-strip busybox-${BUSYBOX_VERSION}/busybox
-
-############################################################
-# PACKAGE
-############################################################
-
-      - name: Prepare artifact
-        run: |
-          mkdir release
-          cp busybox-${BUSYBOX_VERSION}/busybox release/busybox
-          chmod +x release/busybox
-
-############################################################
-# VERIFY
-############################################################
-
-      - name: Verify binary
-        run: |
-          file release/busybox
-          ls -lh release/busybox
-
-############################################################
-# UPLOAD
-############################################################
-
-      - name: Upload artifact
+      - name: Upload BusyBox binaries
         uses: actions/upload-artifact@v4
         with:
-          name: busybox-android-arm64
-          path: release/busybox
+          name: busybox-magisk
+          path: busybox
