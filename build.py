@@ -89,7 +89,7 @@ cfg = cfg.replace("# CONFIG_STATIC is not set", "CONFIG_STATIC=y")
 config_file.write_text(cfg)
 
 # Regenerate headers
-run(["make", "oldconfig"])
+run(["make", "olddefconfig"])
 
 
 # ------------------------------------------------
