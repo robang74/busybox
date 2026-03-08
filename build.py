@@ -27,10 +27,14 @@ OUT_DIR = Path("release")
 OUT_DIR.mkdir(exist_ok=True)
 
 # ------------------------------------------------
-# Helper
+# Helpers
 # ------------------------------------------------
 
 def run(cmd):
+    print(cmd)
+    subprocess.run(cmd, shell=True, check=True)
+
+def run_list(cmd):
     print(" ".join(cmd))
     subprocess.run(cmd, check=True)
 
@@ -58,15 +62,14 @@ if not SRC_DIR.exists():
 
 os.chdir(SRC_DIR)
 
-print("Using Android config")
+print("Using Android NDK config")
 
-run(["make", "android_ndk_defconfig"])
+run_list(["make", "android_ndk_defconfig"])
 
 config_file = Path(".config")
-
 cfg = config_file.read_text()
 
-# Disable Linux console features
+# Disable Linux console features not available on Android
 disable = [
     "CONFIG_LOADFONT",
     "CONFIG_SETFONT",
@@ -77,19 +80,20 @@ disable = [
 for opt in disable:
     cfg = cfg.replace(f"{opt}=y", f"# {opt} is not set")
 
-# Disable hostid
+# Disable hostid (not available in Android Bionic)
 cfg = cfg.replace("CONFIG_HOSTID=y", "# CONFIG_HOSTID is not set")
 
-# Disable init (Android doesn't use BusyBox init)
+# Disable BusyBox init
 cfg = cfg.replace("CONFIG_INIT=y", "# CONFIG_INIT is not set")
 
-# Enable static binary
+# Enable static build
 cfg = cfg.replace("# CONFIG_STATIC is not set", "CONFIG_STATIC=y")
 
 config_file.write_text(cfg)
 
-# Regenerate headers
-run(["make", "olddefconfig"])
+# Resolve config prompts automatically
+print("Resolving BusyBox config")
+run("yes '' | make oldconfig")
 
 
 # ------------------------------------------------
@@ -98,10 +102,11 @@ run(["make", "olddefconfig"])
 
 print("Building BusyBox")
 
-run([
+run_list([
     "make",
     "-j4",
     "ARCH=arm64",
+    f"CROSS_COMPILE={TOOLCHAIN}/aarch64-linux-android-",
     f"CC={TOOLCHAIN}/aarch64-linux-android{ANDROID_API}-clang",
     f"AR={TOOLCHAIN}/llvm-ar",
     f"RANLIB={TOOLCHAIN}/llvm-ranlib",
@@ -115,12 +120,12 @@ run([
 # Package
 # ------------------------------------------------
 
-print("Packaging")
+print("Packaging BusyBox")
 
 OUT_DIR.mkdir(exist_ok=True)
 
-run(["cp", "busybox", str(OUT_DIR / "busybox")])
-run(["chmod", "+x", str(OUT_DIR / "busybox")])
+run_list(["cp", "busybox", str(OUT_DIR / "busybox")])
+run_list(["chmod", "+x", str(OUT_DIR / "busybox")])
 
 print()
 print("Build complete")
