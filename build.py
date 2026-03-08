@@ -69,29 +69,41 @@ run_list(["make", "android_ndk_defconfig"])
 config_file = Path(".config")
 cfg = config_file.read_text()
 
-# Disable Linux console features not available on Android
+# ------------------------------------------------
+# Disable features incompatible with Android
+# ------------------------------------------------
+
 disable = [
+    # Console tools
     "CONFIG_LOADFONT",
     "CONFIG_SETFONT",
     "CONFIG_KBD_MODE",
     "CONFIG_DUMPKMAP",
+
+    # Android Bionic missing APIs
+    "CONFIG_HOSTID",
+
+    # BusyBox init system
+    "CONFIG_INIT",
+    "CONFIG_FEATURE_USE_INITTAB",
+    "CONFIG_BOOTCHARTD",
+    "CONFIG_HALT",
+    "CONFIG_POWEROFF",
+    "CONFIG_REBOOT",
 ]
 
 for opt in disable:
     cfg = cfg.replace(f"{opt}=y", f"# {opt} is not set")
 
-# Disable hostid (not available in Android Bionic)
-cfg = cfg.replace("CONFIG_HOSTID=y", "# CONFIG_HOSTID is not set")
-
-# Disable BusyBox init
-cfg = cfg.replace("CONFIG_INIT=y", "# CONFIG_INIT is not set")
-
-# Enable static build
+# Enable static binary
 cfg = cfg.replace("# CONFIG_STATIC is not set", "CONFIG_STATIC=y")
 
 config_file.write_text(cfg)
 
+# ------------------------------------------------
 # Resolve config prompts automatically
+# ------------------------------------------------
+
 print("Resolving BusyBox config")
 run("yes '' | make oldconfig")
 
