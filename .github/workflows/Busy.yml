@@ -15,16 +15,10 @@ jobs:
     steps:
 
 ############################################################
-# CHECKOUT
+# INSTALL DEPENDENCIES
 ############################################################
 
-      - uses: actions/checkout@v4
-
-############################################################
-# INSTALL BUILD TOOLS
-############################################################
-
-      - name: Install dependencies
+      - name: Install build tools
         run: |
           sudo apt update
           sudo apt install -y \
@@ -36,25 +30,6 @@ jobs:
             file
 
 ############################################################
-# DOWNLOAD ANDROID NDK
-############################################################
-
-      - name: Download NDK
-        run: |
-          wget https://dl.google.com/android/repository/android-ndk-${NDK_VERSION}-linux.zip
-          unzip -q android-ndk-${NDK_VERSION}-linux.zip
-
-############################################################
-# SET TOOLCHAIN
-############################################################
-
-      - name: Setup toolchain
-        run: |
-          echo "NDK=$PWD/android-ndk-${NDK_VERSION}" >> $GITHUB_ENV
-          echo "TOOLCHAIN=$PWD/android-ndk-${NDK_VERSION}/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_ENV
-          echo "SYSROOT=$PWD/android-ndk-${NDK_VERSION}/toolchains/llvm/prebuilt/linux-x86_64/sysroot" >> $GITHUB_ENV
-
-############################################################
 # DOWNLOAD BUSYBOX
 ############################################################
 
@@ -64,7 +39,26 @@ jobs:
           tar xf busybox-${BUSYBOX_VERSION}.tar.bz2
 
 ############################################################
-# CONFIGURE BUSYBOX (ANDROID SAFE)
+# DOWNLOAD ANDROID NDK
+############################################################
+
+      - name: Download Android NDK
+        run: |
+          wget https://dl.google.com/android/repository/android-ndk-${NDK_VERSION}-linux.zip
+          unzip -q android-ndk-${NDK_VERSION}-linux.zip
+
+############################################################
+# SET TOOLCHAIN VARIABLES
+############################################################
+
+      - name: Setup environment
+        run: |
+          echo "NDK=$PWD/android-ndk-${NDK_VERSION}" >> $GITHUB_ENV
+          echo "TOOLCHAIN=$PWD/android-ndk-${NDK_VERSION}/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_ENV
+          echo "SYSROOT=$PWD/android-ndk-${NDK_VERSION}/toolchains/llvm/prebuilt/linux-x86_64/sysroot" >> $GITHUB_ENV
+
+############################################################
+# CONFIGURE BUSYBOX
 ############################################################
 
       - name: Configure BusyBox
@@ -72,6 +66,14 @@ jobs:
           cd busybox-${BUSYBOX_VERSION}
 
           make android_ndk_defconfig
+
+          # Build static binary
+          sed -i 's/# CONFIG_STATIC is not set/CONFIG_STATIC=y/' .config
+
+          # Disable features Android doesn't use
+          sed -i 's/CONFIG_FEATURE_UTMP=y/# CONFIG_FEATURE_UTMP is not set/' .config
+          sed -i 's/CONFIG_FEATURE_WTMP=y/# CONFIG_FEATURE_WTMP is not set/' .config
+          sed -i 's/CONFIG_PAM=y/# CONFIG_PAM is not set/' .config
 
 ############################################################
 # BUILD BUSYBOX
@@ -81,15 +83,17 @@ jobs:
         run: |
           cd busybox-${BUSYBOX_VERSION}
 
+          export CROSS_COMPILE=aarch64-linux-android-
+          export ARCH=arm64
+
           make -j$(nproc) \
-            ARCH=arm64 \
             CC=$TOOLCHAIN/aarch64-linux-android${ANDROID_API}-clang \
             AR=$TOOLCHAIN/llvm-ar \
             RANLIB=$TOOLCHAIN/llvm-ranlib \
             STRIP=$TOOLCHAIN/llvm-strip \
             HOSTCC=gcc \
-            CFLAGS="--sysroot=$SYSROOT -Os" \
-            LDFLAGS="--sysroot=$SYSROOT"
+            CFLAGS="--sysroot=$SYSROOT -Os -fPIC" \
+            LDFLAGS="--sysroot=$SYSROOT -static"
 
 ############################################################
 # STRIP BINARY
@@ -122,7 +126,8 @@ jobs:
 # UPLOAD
 ############################################################
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload BusyBox
+        uses: actions/upload-artifact@v4
         with:
           name: busybox-android-arm64
           path: release/busybox
