@@ -14,14 +14,17 @@ NDK_PATH = Path(NDK_PATH)
 
 TOOLCHAIN = NDK_PATH / "toolchains/llvm/prebuilt/linux-x86_64"
 BIN = TOOLCHAIN / "bin"
+SYSROOT = TOOLCHAIN / "sysroot"
 
 OUT_DIR = Path("release")
 OUT_DIR.mkdir(exist_ok=True)
 
 TARGET = f"aarch64-linux-android{ANDROID_API}"
 
+CC = BIN / f"{TARGET}-clang"
+
 print("NDK:", NDK_PATH)
-print("Target:", TARGET)
+print("Compiler:", CC)
 
 def run(cmd, env=None):
     print(cmd)
@@ -85,29 +88,27 @@ CONFIG_HOSTID=n
 env = os.environ.copy()
 env["KCONFIG_ALLCONFIG"] = str(override)
 
-# ------------------------------------------------
-# Resolve config
-# ------------------------------------------------
-
 print("Resolving BusyBox config")
+
 run("yes '' | make oldconfig", env=env)
 
 # ------------------------------------------------
-# Toolchain setup
+# Toolchain
 # ------------------------------------------------
 
 env["ARCH"] = "arm64"
-env["CROSS_COMPILE"] = str(BIN / "aarch64-linux-android-")
 
-env["CC"] = str(BIN / f"{TARGET}-clang")
-env["LD"] = env["CC"]
+env["CC"] = str(CC)
+env["HOSTCC"] = "gcc"
 env["AR"] = str(BIN / "llvm-ar")
 env["RANLIB"] = str(BIN / "llvm-ranlib")
 env["STRIP"] = str(BIN / "llvm-strip")
-env["HOSTCC"] = "gcc"
 
-env["CFLAGS"] = "-Os"
-env["LDFLAGS"] = ""
+env["CFLAGS"] = f"--target={TARGET} --sysroot={SYSROOT} -Os"
+env["LDFLAGS"] = f"--target={TARGET} --sysroot={SYSROOT}"
+
+# VERY IMPORTANT
+env["CROSS_COMPILE"] = ""
 
 # ------------------------------------------------
 # Build
@@ -115,10 +116,7 @@ env["LDFLAGS"] = ""
 
 print("Building BusyBox")
 
-run_list([
-    "make",
-    "-j4"
-], env=env)
+run_list(["make", "-j4"], env=env)
 
 # ------------------------------------------------
 # Package
