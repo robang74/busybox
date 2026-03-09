@@ -49,7 +49,7 @@ env["CFLAGS"] = f"--target={TARGET} --sysroot={SYSROOT} -Os"
 env["LDFLAGS"] = f"--target={TARGET} --sysroot={SYSROOT}"
 
 print("Resolving config")
-run("make oldconfig", env=env)
+run("yes '' | make oldconfig", env=env)
 
 print("Building")
 run_list(["make", "-j4"], env=env)
