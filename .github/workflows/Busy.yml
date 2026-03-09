@@ -1,84 +1,37 @@
-name: Build BusyBox ARM64
+name: Build BusyBox Android pro
 
 on:
+  push:
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+
+    runs-on: ubuntu-latest
 
     steps:
 
-############################################################
-# CHECKOUT REPOSITORY
-############################################################
+    - name: Checkout
+      uses: actions/checkout@v4
 
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Install deps
+      run: |
+        sudo apt update
+        sudo apt install -y build-essential bc bison flex
 
-############################################################
-# INSTALL BUILD DEPENDENCIES
-############################################################
+    - name: Download Android NDK
+      run: |
+        wget https://dl.google.com/android/repository/android-ndk-r26d-linux.zip
+        unzip android-ndk-r26d-linux.zip
 
-      - name: Install dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y \
-            python3 \
-            python3-pip \
-            build-essential \
-            wget \
-            tar \
-            unzip \
-            bison \
-            flex \
-            file
+    - name: Build BusyBox
+      env:
+        NDK_PATH: ${{ github.workspace }}/android-ndk-r26d
+      run: |
+        python3 build.py
 
-############################################################
-# DOWNLOAD ANDROID NDK
-############################################################
-
-      - name: Download Android NDK
-        run: |
-          wget -q https://dl.google.com/android/repository/android-ndk-r26d-linux.zip
-          unzip -q android-ndk-r26d-linux.zip
-
-############################################################
-# SET NDK ENVIRONMENT VARIABLE
-############################################################
-
-      - name: Set NDK path
-        run: |
-          echo "NDK_PATH=$PWD/android-ndk-r26d" >> $GITHUB_ENV
-
-############################################################
-# RUN BUILD SCRIPT
-############################################################
-
-      - name: Build BusyBox
-        run: |
-          python3 build.py
-
-############################################################
-# VERIFY BINARY
-############################################################
-
-      - name: Verify BusyBox binary
-        run: |
-          if [ ! -f release/busybox ]; then
-            echo "BusyBox binary not found!"
-            exit 1
-          fi
-
-          file release/busybox
-          ls -lh release/busybox
-
-############################################################
-# UPLOAD ARTIFACT
-############################################################
-
-      - name: Upload BusyBox artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: busybox-android-arm64
-          path: release/busybox
+    - name: Upload binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: busybox-android
+        path: release/busybox
