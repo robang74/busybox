@@ -46,7 +46,7 @@ print("Applying android_ndk_defconfig")
 run_list(["make", "android_ndk_defconfig"])
 
 # ------------------------------------------------
-# BusyBox overrides
+# Override config
 # ------------------------------------------------
 
 override = Path("android_override.config")
@@ -77,7 +77,7 @@ CONFIG_SVLOGD=n
 CONFIG_MDEV=n
 CONFIG_HOSTID=n
 
-# Android dynamic linking
+# Android must use dynamic linking
 # CONFIG_STATIC is not set
 
 """)
@@ -93,16 +93,18 @@ print("Resolving BusyBox config")
 run("yes '' | make oldconfig", env=env)
 
 # ------------------------------------------------
-# Toolchain
+# Toolchain setup
 # ------------------------------------------------
 
 env["ARCH"] = "arm64"
+env["CROSS_COMPILE"] = str(BIN / "aarch64-linux-android-")
+
 env["CC"] = str(BIN / f"{TARGET}-clang")
 env["LD"] = env["CC"]
-env["HOSTCC"] = "gcc"
 env["AR"] = str(BIN / "llvm-ar")
 env["RANLIB"] = str(BIN / "llvm-ranlib")
 env["STRIP"] = str(BIN / "llvm-strip")
+env["HOSTCC"] = "gcc"
 
 env["CFLAGS"] = "-Os"
 env["LDFLAGS"] = ""
@@ -115,7 +117,7 @@ print("Building BusyBox")
 
 run_list([
     "make",
-    "-j4",
+    "-j4"
 ], env=env)
 
 # ------------------------------------------------
