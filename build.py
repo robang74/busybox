@@ -3,6 +3,7 @@
 import os
 import subprocess
 from pathlib import Path
+import glob
 
 ANDROID_API = "21"
 
@@ -12,12 +13,21 @@ if not NDK_PATH:
 
 NDK_PATH = Path(NDK_PATH)
 
-TOOLCHAIN = NDK_PATH / "toolchains/llvm/prebuilt/linux-x86_64/bin"
-SYSROOT = NDK_PATH / "toolchains/llvm/prebuilt/linux-x86_64/sysroot"
+TOOLCHAIN = NDK_PATH / "toolchains/llvm/prebuilt/linux-x86_64"
+BIN = TOOLCHAIN / "bin"
+SYSROOT = TOOLCHAIN / "sysroot"
 
-# Android runtime libraries
+# ------------------------------------------------
+# Detect clang runtime directory automatically
+# ------------------------------------------------
+
+clang_dirs = glob.glob(str(TOOLCHAIN / "lib/clang/*"))
+if not clang_dirs:
+    raise RuntimeError("Unable to locate clang runtime directory in NDK")
+
+CLANG_LIB = Path(clang_dirs[0]) / "lib/linux"
+
 ANDROID_LIB = SYSROOT / f"usr/lib/aarch64-linux-android/{ANDROID_API}"
-CLANG_LIB = NDK_PATH / "toolchains/llvm/prebuilt/linux-x86_64/lib/clang/17/lib/linux"
 
 OUT_DIR = Path("release")
 OUT_DIR.mkdir(exist_ok=True)
@@ -27,6 +37,7 @@ TARGET = f"aarch64-linux-android{ANDROID_API}"
 print("NDK:", NDK_PATH)
 print("Target:", TARGET)
 print("Sysroot:", SYSROOT)
+print("Clang runtime:", CLANG_LIB)
 
 def run(cmd, env=None):
     print(cmd)
@@ -101,14 +112,14 @@ run("yes '' | make oldconfig", env=env)
 # Compiler setup
 # ------------------------------------------------
 
-CC = TOOLCHAIN / f"{TARGET}-clang"
+CC = BIN / f"{TARGET}-clang"
 
 env["CC"] = str(CC)
 env["LD"] = str(CC)
 env["HOSTCC"] = "gcc"
-env["AR"] = str(TOOLCHAIN / "llvm-ar")
-env["RANLIB"] = str(TOOLCHAIN / "llvm-ranlib")
-env["STRIP"] = str(TOOLCHAIN / "llvm-strip")
+env["AR"] = str(BIN / "llvm-ar")
+env["RANLIB"] = str(BIN / "llvm-ranlib")
+env["STRIP"] = str(BIN / "llvm-strip")
 
 env["CFLAGS"] = (
     f"--target={TARGET} "
