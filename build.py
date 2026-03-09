@@ -3,7 +3,6 @@
 import os
 import subprocess
 from pathlib import Path
-import glob
 
 ANDROID_API = "21"
 
@@ -15,19 +14,6 @@ NDK_PATH = Path(NDK_PATH)
 
 TOOLCHAIN = NDK_PATH / "toolchains/llvm/prebuilt/linux-x86_64"
 BIN = TOOLCHAIN / "bin"
-SYSROOT = TOOLCHAIN / "sysroot"
-
-# ------------------------------------------------
-# Detect clang runtime directory automatically
-# ------------------------------------------------
-
-clang_dirs = glob.glob(str(TOOLCHAIN / "lib/clang/*"))
-if not clang_dirs:
-    raise RuntimeError("Unable to locate clang runtime directory in NDK")
-
-CLANG_LIB = Path(clang_dirs[0]) / "lib/linux"
-
-ANDROID_LIB = SYSROOT / f"usr/lib/aarch64-linux-android/{ANDROID_API}"
 
 OUT_DIR = Path("release")
 OUT_DIR.mkdir(exist_ok=True)
@@ -36,8 +22,6 @@ TARGET = f"aarch64-linux-android{ANDROID_API}"
 
 print("NDK:", NDK_PATH)
 print("Target:", TARGET)
-print("Sysroot:", SYSROOT)
-print("Clang runtime:", CLANG_LIB)
 
 def run(cmd, env=None):
     print(cmd)
@@ -62,7 +46,7 @@ print("Applying android_ndk_defconfig")
 run_list(["make", "android_ndk_defconfig"])
 
 # ------------------------------------------------
-# BusyBox override config
+# BusyBox overrides
 # ------------------------------------------------
 
 override = Path("android_override.config")
@@ -93,7 +77,7 @@ CONFIG_SVLOGD=n
 CONFIG_MDEV=n
 CONFIG_HOSTID=n
 
-# Android requires dynamic linking
+# Android dynamic linking
 # CONFIG_STATIC is not set
 
 """)
@@ -109,33 +93,22 @@ print("Resolving BusyBox config")
 run("yes '' | make oldconfig", env=env)
 
 # ------------------------------------------------
-# Compiler setup
+# Toolchain
 # ------------------------------------------------
 
-CC = BIN / f"{TARGET}-clang"
-
-env["CC"] = str(CC)
-env["LD"] = str(CC)
+env["ARCH"] = "arm64"
+env["CC"] = str(BIN / f"{TARGET}-clang")
+env["LD"] = env["CC"]
 env["HOSTCC"] = "gcc"
 env["AR"] = str(BIN / "llvm-ar")
 env["RANLIB"] = str(BIN / "llvm-ranlib")
 env["STRIP"] = str(BIN / "llvm-strip")
 
-env["CFLAGS"] = (
-    f"--target={TARGET} "
-    f"--sysroot={SYSROOT} "
-    "-Os -fPIC"
-)
-
-env["LDFLAGS"] = (
-    f"--target={TARGET} "
-    f"--sysroot={SYSROOT} "
-    f"-L{ANDROID_LIB} "
-    f"-L{CLANG_LIB}"
-)
+env["CFLAGS"] = "-Os"
+env["LDFLAGS"] = ""
 
 # ------------------------------------------------
-# Build BusyBox
+# Build
 # ------------------------------------------------
 
 print("Building BusyBox")
@@ -143,15 +116,6 @@ print("Building BusyBox")
 run_list([
     "make",
     "-j4",
-    "ARCH=arm64",
-    f"CC={env['CC']}",
-    f"LD={env['LD']}",
-    f"HOSTCC={env['HOSTCC']}",
-    f"AR={env['AR']}",
-    f"RANLIB={env['RANLIB']}",
-    f"STRIP={env['STRIP']}",
-    f"CFLAGS={env['CFLAGS']}",
-    f"LDFLAGS={env['LDFLAGS']}"
 ], env=env)
 
 # ------------------------------------------------
