@@ -369,15 +369,15 @@ static void option_to_env(const uint8_t *option, const uint8_t *option_end)
 			addrs = option[3] >> 4;
 
 			/* Setup environment variable */
-			*new_env() = dlist = xmalloc(4 + addrs * 40 - 1);
+			*new_env() = dlist = xmalloc(4 + addrs * 40 + 1);
 			dlist = stpcpy(dlist, "dns=");
 			option_offset = 0;
 
-			while (addrs--) {
+			while (addrs-- != 0) {
 				sprint_nip6(dlist, option + 4 + option_offset);
 				dlist += 39;
 				option_offset += 16;
-				if (addrs)
+				if (addrs != 0)
 					*dlist++ = ' ';
 			}
 
