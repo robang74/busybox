@@ -106,23 +106,18 @@ if ! check_cc "-Wl,--warn-common"; then
     echo "Your linker does not support --warn-common"
     WARN_COMMON=""
 fi
-
-MAP_OPT=true
+MAP_OPT="-Wl,-Map,$EXE.map"
 if ! check_cc "-Wl,-Map,/dev/null"; then
     echo "Your linker does not support -Map"
-    MAP_OPT=false
+    MAP_OPT=""
 fi
-
 VERBOSE_OPT="-Wl,--verbose"
 if ! check_cc "-Wl,--verbose"; then
     echo "Your linker does not support --verbose"
     VERBOSE_OPT=""
 fi
-
 INFO_OPTS() {
-	local map_flag=""
-	$MAP_OPT && map_flag="-Wl,-Map,$EXE.map"
-	echo "$WARN_COMMON $map_flag $VERBOSE_OPT"
+	echo "$WARN_COMMON $MAP_OPT $VERBOSE_OPT"
 }
 
 # gold may not support --sort-common (yet)
