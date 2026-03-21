@@ -38,14 +38,14 @@
 #include <utmp.h>
 #include <pty.h>
 
-static int ptyfd = 0;
+static int ptyfd = -1;
 static pid_t fwdpid = 0;
 
 static void sigwinch_handler(int sig UNUSED_PARAM)
 {
     struct winsize ws;
     if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0) {
-        if(ptyfd) ioctl(ptyfd, TIOCSWINSZ, &ws);
+        ioctl(ptyfd, TIOCSWINSZ, &ws);
     }
 }
 
