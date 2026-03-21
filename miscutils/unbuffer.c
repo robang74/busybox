@@ -23,14 +23,13 @@
      text	   data	    bss	    dec	    hex	filename
   1096595	  16691	   1656	1114942	 11033e	busybox
      text	   data	    bss	    dec	    hex	filename
-  1097330	  16707	   1664	1115701	 110635	busybox
+  1097330	  16707	   1664	1115701	 11062c	busybox
 
   how to apply:
   copy this file into in miscutils/unbuffer.
 */
 // how to activate:
 // make oldconfig && sed "s/^# *\(CONFIG_UNBUFFER\).*/\\1=y/" -i .config
-
 
 #include "libbb.h"
 #include <termios.h>
@@ -68,8 +67,6 @@ int unbuffer_main(int argc, char **argv)
 
     sigfillset(&set);
     sigprocmask(SIG_BLOCK, &set, &oldset);
-
-    bb_signals(SIG_BLOCK, NULL);
     signal(SIGWINCH, sigwinch_handler);
     signal(SIGCHLD, SIG_DFL);
 
