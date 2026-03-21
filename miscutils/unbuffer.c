@@ -39,7 +39,7 @@
 #include <pty.h>
 
 static int ptyfd = -1;
-static pid_t fwdpid = 0;
+static pid_t pidfw = 0;
 
 static void sigwinch_handler(int sig UNUSED_PARAM)
 {
@@ -50,7 +50,7 @@ static void sigwinch_handler(int sig UNUSED_PARAM)
 }
 
 static void forward_signals(int sig) {
-    if (fwdpid) kill(fwdpid, sig);
+    if (pidfw) kill(pidfw, sig);
 }
 
 int unbuffer_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
@@ -80,7 +80,7 @@ int unbuffer_main(int argc, char **argv)
         sigprocmask(SIG_SETMASK, &oldset, NULL);
         BB_EXECVP_or_die(argv + 1);
     } // parent process
-    ptyfd = fd; fwdpid = pid;
+    ptyfd = fd; pidfw = pid;
 
     #define SIGS_BITMASK ((1<<SIGINT)|(1<<SIGTERM)|(1<<SIGHUP)|(1<<SIGQUIT))
     bb_signals(SIGS_BITMASK, forward_signals);
