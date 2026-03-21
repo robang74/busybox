@@ -3,7 +3,7 @@
  */
 
 //config:config UNBUFFER
-//config:	bool "unbuffer (0.7kb)"
+//config:	bool "unbuffer (0.8kb)"
 //config:	default n
 //config:	help
 //config:	  Run a command in a PTY to disable buffering.
@@ -23,14 +23,14 @@
      text	   data	    bss	    dec	    hex	filename
   1096595	  16691	   1656	1114942	 11033e	busybox
      text	   data	    bss	    dec	    hex	filename
-  1097296	  16711	   1656	1115663	 11060f	busybox
+  1097330	  16707	   1664	1115701	 110635	busybox
 
   how to apply:
-  copy this file into in miscutils/unbuffer.c
-
-  how to activate:
-  make oldconfig && sed "s/^# *\(CONFIG_UNBUFFER\).*/\\1=y/" -i .config
+  copy this file into in miscutils/unbuffer.
 */
+// how to activate:
+// make oldconfig && sed "s/^# *\(CONFIG_UNBUFFER\).*/\\1=y/" -i .config
+
 
 #include "libbb.h"
 #include <termios.h>
@@ -38,13 +38,19 @@
 #include <utmp.h>
 #include <pty.h>
 
-static int ptyfd = -1;
+static int ptyfd = 0;
+static pid_t fwdpid = 0;
 
 static void sigwinch_handler(int sig UNUSED_PARAM)
 {
     struct winsize ws;
-    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0)
-        ioctl(ptyfd, TIOCSWINSZ, &ws);
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0) {
+        if(ptyfd) ioctl(ptyfd, TIOCSWINSZ, &ws);
+    }
+}
+
+static void forward_signals(int sig) {
+    if (fwdpid) kill(fwdpid, sig);
 }
 
 int unbuffer_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
@@ -74,9 +80,10 @@ int unbuffer_main(int argc, char **argv)
         sigprocmask(SIG_SETMASK, &oldset, NULL);
         BB_EXECVP_or_die(argv + 1);
     } // parent process
-    ptyfd = fd;
+    ptyfd = fd; fwdpid = pid;
 
-    bb_signals((1<<SIGINT)|(1<<SIGTERM)|(1<<SIGHUP)|(1<<SIGQUIT), SIG_IGN);
+    #define SIGS_BITMASK ((1<<SIGINT)|(1<<SIGTERM)|(1<<SIGHUP)|(1<<SIGQUIT))
+    bb_signals(SIGS_BITMASK, forward_signals);
     sigprocmask(SIG_SETMASK, &oldset, NULL);
     sigwinch_handler(0);
 
