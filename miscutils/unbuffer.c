@@ -3,7 +3,7 @@
  */
 
 //config:config UNBUFFER
-//config:	bool "unbuffer (0.5kb)"
+//config:	bool "unbuffer (0.7kb)"
 //config:	default n
 //config:	help
 //config:	  Run a command in a PTY to disable buffering.
@@ -19,24 +19,17 @@
 //usage: "Run a command in a PTY to disable buffering."
 
 /*
-  size check: before vs after
+  size check: before vs after:
      text	   data	    bss	    dec	    hex	filename
   1096595	  16691	   1656	1114942	 11033e	busybox
      text	   data	    bss	    dec	    hex	filename
-  1097217	  16711	   1656	1115584	 1105c0	busybox
+  1097296	  16711	   1656	1115663	 11060f	busybox
 
-  function                                             old     new   delta
-  unbuffer_main                                          -     370    +370
-  sigwinch_handler                                      15      98     +83
-  packed_usage                                       35565   35602     +37
-  applet_names                                        2817    2826      +9
-  applet_main                                         3264    3272      +8
-  .rodata                                           103410  103418      +8
-  ptyfd                                                  -       4      +4
-  applet_suid                                          102     103      +1
-  applet_install_loc                                   204     205      +1
-  ------------------------------------------------------------------------------
-  (add/remove: 3/0 grow/shrink: 7/0 up/down: 521/0)             Total: 521 bytes
+  how to apply:
+  copy this file into in miscutils/unbuffer.c
+
+  how to activate:
+  make oldconfig && sed "s/^# *\(CONFIG_UNBUFFER\).*/\\1=y/" -i .config
 */
 
 #include "libbb.h"
@@ -47,7 +40,7 @@
 
 static int ptyfd = -1;
 
-static inline void sigwinch_handler(int sig UNUSED_PARAM)
+static void sigwinch_handler(int sig UNUSED_PARAM)
 {
     struct winsize ws;
     if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0)
@@ -60,27 +53,36 @@ int unbuffer_main(int argc, char **argv)
     int n, fd;
     pid_t pid;
     struct termios tios;
+    sigset_t set, oldset;
     char ch;
-    
-    if (!argv[1]) bb_show_usage();
-    
+
+    if (!(argc >> 1)) bb_show_usage();
+
     setvbuf(stdout, NULL, _IONBF, 0);
+
+    sigfillset(&set);
+    sigprocmask(SIG_BLOCK, &set, &oldset);
+
+    bb_signals(SIG_BLOCK, NULL);
+    signal(SIGWINCH, sigwinch_handler);
+    signal(SIGCHLD, SIG_DFL);
 
     if((pid = forkpty(&fd, NULL, NULL, NULL)) < 0)
         bb_perror_msg_and_die("forkpty");
+
     if (pid == 0) { // child proccess
+        sigprocmask(SIG_SETMASK, &oldset, NULL);
         BB_EXECVP_or_die(argv + 1);
     } // parent process
     ptyfd = fd;
 
-    signal(SIGINT, SIG_IGN);
-    signal(SIGTERM, SIG_IGN);
-    bb_signals(1 << SIGWINCH, sigwinch_handler);
+    bb_signals((1<<SIGINT)|(1<<SIGTERM)|(1<<SIGHUP)|(1<<SIGQUIT), SIG_IGN);
+    sigprocmask(SIG_SETMASK, &oldset, NULL);
     sigwinch_handler(0);
 
     if (tcgetattr(ptyfd, &tios) == 0) {
         cfmakeraw(&tios);
-        tios.c_oflag |= ONLCR; 
+        tios.c_oflag |= ONLCR;
         tcsetattr(ptyfd, TCSANOW, &tios);
     }
 
@@ -94,6 +96,6 @@ int unbuffer_main(int argc, char **argv)
         bb_simple_perror_msg("read");
 
     close(ptyfd);
-    
+
     return wait_for_exitstatus(pid);
 }
