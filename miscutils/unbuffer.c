@@ -11,7 +11,6 @@
 //applet:IF_UNBUFFER(APPLET(unbuffer, BB_DIR_USR_BIN, BB_SUID_DROP))
 
 //kbuild:lib-$(CONFIG_UNBUFFER) += unbuffer.o
-//kbuild:ldflags-$(CONFIG_UNBUFFER) += -lutil
 
 //usage:#define unbuffer_trivial_usage
 //usage: "CMD [ARGS]"
