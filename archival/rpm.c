@@ -533,9 +533,9 @@ int rpm2cpio_main(int argc UNUSED_PARAM, char **argv)
 	//	/* We need to know whether child (gzip/bzip/etc) exits abnormally */
 	//	signal(SIGCHLD, check_errors_in_children);
 
-	str = NULL;
+	str = rpm_getstr0(TAG_PAYLOADCOMPRESSOR);
 	if (ENABLE_FEATURE_SEAMLESS_LZMA
-	 && (str = rpm_getstr0(TAG_PAYLOADCOMPRESSOR)) != NULL
+	 && str != NULL
 	 && strcmp(str, "lzma") == 0
 	) {
 		// lzma compression can't be detected
