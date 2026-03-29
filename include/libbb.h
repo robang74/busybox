@@ -541,6 +541,8 @@ typedef struct recursive_state {
 	unsigned flags;
 	unsigned depth;
 	void *userData;
+	char *fileName, *baseName;
+	int dirfd;
 	int FAST_FUNC (*fileAction)(struct recursive_state *state, const char *fileName, struct stat* statbuf);
 	int FAST_FUNC  (*dirAction)(struct recursive_state *state, const char *fileName, struct stat* statbuf);
 } recursive_state_t;
