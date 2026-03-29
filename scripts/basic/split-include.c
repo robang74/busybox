@@ -195,7 +195,7 @@ int main(int argc, const char * argv [])
 	ERROR_EXIT( "find" );
 
     line[0] = '\n';
-    while (fgets(line+1, buffer_size, fp_find))
+    while (fgets(line+1, buffer_size-1, fp_find))
     {
 	if (strstr(list_target, line) == NULL)
 	{
