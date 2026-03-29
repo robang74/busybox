@@ -654,8 +654,7 @@ static void load_pattern_list(llist_t **lst, char *pattern)
 		llist_add_to(lst, new_grep_list_data(p, 0));
 }
 
-static int FAST_FUNC file_action_grep(struct recursive_state *state UNUSED_PARAM,
-		const char *filename,
+static int FAST_FUNC file_action_grep(struct recursive_state *state,
 		struct stat *statbuf)
 {
 	FILE *file;
@@ -666,23 +665,23 @@ static int FAST_FUNC file_action_grep(struct recursive_state *state UNUSED_PARAM
 	 * example will return the raw directory contents). */
 	if (S_ISLNK(statbuf->st_mode)) {
 		struct stat sb;
-		if (stat(filename, &sb) != 0) {
+		if (stat(state->fileName, &sb) != 0) {
 			if (!SUPPRESS_ERR_MSGS)
-				bb_simple_perror_msg(filename);
+				bb_simple_perror_msg(state->fileName);
 			return 0;
 		}
 		if (S_ISDIR(sb.st_mode))
 			return 1;
 	}
 
-	file = fopen_for_read(filename);
+	file = fopen_for_read(state->fileName);
 	if (file == NULL) {
 		if (!SUPPRESS_ERR_MSGS)
-			bb_simple_perror_msg(filename);
+			bb_simple_perror_msg(state->fileName);
 		open_errors = 1;
 		return 0;
 	}
-	cur_file = filename;
+	cur_file = state->fileName;
 	*(int*)state->userData |= grep_file(file);
 	fclose(file);
 	return 1;

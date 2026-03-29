@@ -20,7 +20,6 @@
  */
 
 static int FAST_FUNC true_action(struct recursive_state *state UNUSED_PARAM,
-		const char *fileName UNUSED_PARAM,
 		struct stat *statbuf UNUSED_PARAM)
 {
 	return TRUE;
@@ -84,7 +83,7 @@ static int recursive_action1(recursive_state_t *state)
 		 && fstatat(state->dirfd, state->baseName, &statbuf, AT_SYMLINK_NOFOLLOW) == 0
 		) {
 			/* Dangling link */
-			return state->fileAction(state, state->fileName, &statbuf);
+			return state->fileAction(state, &statbuf);
 		}
 		goto done_nak_warn;
 	}
@@ -95,18 +94,18 @@ static int recursive_action1(recursive_state_t *state)
 	if ( /* (!(state->flags & ACTION_FOLLOWLINKS) && S_ISLNK(statbuf.st_mode)) || */
 	 !S_ISDIR(statbuf.st_mode)
 	) {
-		return state->fileAction(state, state->fileName, &statbuf);
+		return state->fileAction(state, &statbuf);
 	}
 
 	/* It's a directory (or a link to one, and followLinks is set) */
 
 	if (!(state->flags & ACTION_RECURSE)) {
-		return state->dirAction(state, state->fileName, &statbuf);
+		return state->dirAction(state, &statbuf);
 	}
 
 	if (state->flags & ACTION_DEPTH_PRE) {
 		state->state = ACTION_DEPTH_PRE;
-		status = state->dirAction(state, state->fileName, &statbuf);
+		status = state->dirAction(state, &statbuf);
 		if (status == FALSE)
 			goto done_nak_warn;
 		if (status == SKIP)
@@ -165,7 +164,7 @@ static int recursive_action1(recursive_state_t *state)
 
 	if (state->flags & ACTION_DEPTH_POST) {
 		state->state = ACTION_DEPTH_POST;
-		if (!state->dirAction(state, state->fileName, &statbuf))
+		if (!state->dirAction(state, &statbuf))
 			goto done_nak_warn;
 	}
 
@@ -181,8 +180,8 @@ static int recursive_action1(recursive_state_t *state)
 
 int FAST_FUNC recursive_action(const char *fileName,
 		unsigned flags,
-		int FAST_FUNC (*fileAction)(struct recursive_state *state, const char *fileName, struct stat* statbuf),
-		int FAST_FUNC  (*dirAction)(struct recursive_state *state, const char *fileName, struct stat* statbuf),
+		int FAST_FUNC (*fileAction)(struct recursive_state *state, struct stat* statbuf),
+		int FAST_FUNC  (*dirAction)(struct recursive_state *state, struct stat* statbuf),
 		void *userData)
 {
 	int ret;

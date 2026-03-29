@@ -63,7 +63,6 @@ static char *range = NULL;
 static char *specified_context = NULL;
 
 static int FAST_FUNC change_filedir_context(struct recursive_state *state UNUSED_PARAM,
-		const char *fname,
 		struct stat *stbuf UNUSED_PARAM)
 {
 	context_t context = NULL;
@@ -73,18 +72,18 @@ static int FAST_FUNC change_filedir_context(struct recursive_state *state UNUSED
 	int status = 0;
 
 	if (option_mask32 & OPT_NODEREFERENCE) {
-		status = lgetfilecon(fname, &file_context);
+		status = lgetfilecon(state->fileName, &file_context);
 	} else {
-		status = getfilecon(fname, &file_context);
+		status = getfilecon(state->fileName, &file_context);
 	}
 	if (status < 0 && errno != ENODATA) {
 		if ((option_mask32 & OPT_QUIET) == 0)
-			bb_error_msg("can't obtain security context: %s", fname);
+			bb_error_msg("can't obtain security context: %s", state->fileName);
 		goto skip;
 	}
 
 	if (file_context == NULL && specified_context == NULL) {
-		bb_error_msg("can't apply partial context to unlabeled file %s", fname);
+		bb_error_msg("can't apply partial context to unlabeled file %s", state->fileName);
 		goto skip;
 	}
 
@@ -113,25 +112,25 @@ static int FAST_FUNC change_filedir_context(struct recursive_state *state UNUSED
 		int fail;
 
 		if (option_mask32 & OPT_NODEREFERENCE) {
-			fail = lsetfilecon(fname, context_string);
+			fail = lsetfilecon(state->fileName, context_string);
 		} else {
-			fail = setfilecon(fname, context_string);
+			fail = setfilecon(state->fileName, context_string);
 		}
 		if ((option_mask32 & OPT_VERBOSE) || ((option_mask32 & OPT_CHANHES) && !fail)) {
 			printf(!fail
 				? "context of %s changed to %s\n"
 				: "can't change context of %s to %s\n",
-				fname, context_string);
+				state->fileName, context_string);
 		}
 		if (!fail) {
 			rc = TRUE;
 		} else if ((option_mask32 & OPT_QUIET) == 0) {
 			bb_error_msg("can't change context of %s to %s",
-					fname, context_string);
+					state->fileName, context_string);
 		}
 	} else {
 		if (option_mask32 & OPT_VERBOSE) {
-			printf("context of %s retained as %s\n", fname, context_string);
+			printf("context of %s retained as %s\n", state->fileName, context_string);
 		}
 		rc = TRUE;
 	}

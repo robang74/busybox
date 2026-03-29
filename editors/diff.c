@@ -804,11 +804,10 @@ struct dlist {
 
 /* This function adds a filename to dl, the directory listing. */
 static int FAST_FUNC add_to_dirlist(struct recursive_state *state,
-		const char *filename,
 		struct stat *sb UNUSED_PARAM)
 {
 	struct dlist *const l = state->userData;
-	const char *file = filename + l->len;
+	const char *file = state->fileName + l->len;
 	while (*file == '/')
 		file++;
 	l->dl = xrealloc_vector(l->dl, 6, l->e);
@@ -821,11 +820,10 @@ static int FAST_FUNC add_to_dirlist(struct recursive_state *state,
  * to the list and prevents recursive_action from recursing into it.
  */
 static int FAST_FUNC skip_dir(struct recursive_state *state,
-		const char *filename,
 		struct stat *sb)
 {
 	if (!(option_mask32 & FLAG(r)) && state->depth) {
-		add_to_dirlist(state, filename, sb);
+		add_to_dirlist(state, sb);
 		return SKIP;
 	}
 	if (!(option_mask32 & FLAG(N))) {
@@ -834,7 +832,7 @@ static int FAST_FUNC skip_dir(struct recursive_state *state,
 		 * Testcase: diff -r /tmp /
 		 * (it would recurse deep into /proc without this code) */
 		struct dlist *const l = state->userData;
-		filename += l->len;
+		char *filename = state->fileName + l->len;
 		if (filename[0]) {
 			struct stat osb;
 			char *othername = concat_path_file(G.other_dir, filename);

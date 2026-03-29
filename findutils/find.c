@@ -1011,7 +1011,6 @@ ACTF(links)
 
 static int FAST_FUNC fileAction(
 		struct recursive_state *state IF_NOT_FEATURE_FIND_MAXDEPTH(UNUSED_PARAM),
-		const char *fileName,
 		struct stat *statbuf)
 {
 	int r;
@@ -1024,7 +1023,7 @@ static int FAST_FUNC fileAction(
 			if (G.xdev_dev[i] == statbuf->st_dev)
 				goto found;
 		}
-		//bb_error_msg("'%s': not same fs", fileName);
+		//bb_error_msg("'%s': not same fs", state->fileName);
 		same_fs = 0;
  found: ;
 	}
@@ -1040,10 +1039,10 @@ static int FAST_FUNC fileAction(
 		return SKIP; /* stop recursing */
 #endif
 
-	r = exec_actions(G.actions, fileName, statbuf);
+	r = exec_actions(G.actions, state->fileName, statbuf);
 	/* Had no explicit -print[0] or -exec? then print */
 	if ((r & TRUE) && G.need_print)
-		puts(fileName);
+		puts(state->fileName);
 
 #if ENABLE_FEATURE_FIND_MAXDEPTH
 	if (S_ISDIR(statbuf->st_mode)) {

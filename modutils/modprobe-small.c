@@ -379,7 +379,6 @@ static int parse_module(module_info *info, const char *pathname)
 }
 
 static FAST_FUNC int fileAction(struct recursive_state *state,
-		const char *pathname,
 		struct stat *sb UNUSED_PARAM)
 {
 	const char *modname_to_match = state->userData;
@@ -388,7 +387,7 @@ static FAST_FUNC int fileAction(struct recursive_state *state,
 	bool is_remove = (ENABLE_RMMOD && ONLY_APPLET)
 		|| ((ENABLE_RMMOD || ENABLE_MODPROBE) && (option_mask32 & OPT_r));
 
-	pathname += 2; /* skip "./" */
+	char *pathname = state->fileName + 2; /* skip "./" */
 	fname = bb_get_last_path_component_nostrip(pathname);
 	if (!strrstr(fname, ".ko")) {
 		dbg1_error_msg("'%s' is not a module", pathname);

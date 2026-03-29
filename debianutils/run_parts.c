@@ -143,21 +143,21 @@ static int bb_alphasort(const void *p1, const void *p2)
 }
 
 static int FAST_FUNC act(struct recursive_state *state,
-		const char *file, struct stat *statbuf)
+		struct stat *statbuf)
 {
 	if (state->depth == 0)
 		return TRUE;
 
 	if (state->depth == 1
 	 && (  !(statbuf->st_mode & (S_IFREG | S_IFLNK))
-	    || invalid_name(file)
+	    || invalid_name(state->fileName)
 	    || (!(option_mask32 & OPT_l) && faccessat(state->dirfd, state->baseName, W_OK, 0) != 0))
 	) {
 		return SKIP;
 	}
 
 	names = xrealloc_vector(names, 4, cur);
-	names[cur++] = xstrdup(file);
+	names[cur++] = xstrdup(state->fileName);
 	/*names[cur] = NULL; - xrealloc_vector did it */
 
 	return TRUE;

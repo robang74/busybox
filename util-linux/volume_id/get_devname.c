@@ -103,14 +103,13 @@ uuidcache_addentry(char *device, /*int major, int minor,*/ char *label, char *uu
  * add a cache entry for this device.
  * If device node does not exist, it will be temporarily created. */
 static int FAST_FUNC
-uuidcache_check_device(struct recursive_state *state UNUSED_PARAM,
-		const char *device,
+uuidcache_check_device(struct recursive_state *state,
 		struct stat *statbuf)
 {
 	/* note: this check rejects links to devices, among other nodes */
 	if (!S_ISBLK(statbuf->st_mode)
 #if ENABLE_FEATURE_VOLUMEID_UBIFS
-	 && !(S_ISCHR(statbuf->st_mode) && is_prefixed_with(bb_basename(device), "ubi"))
+	 && !(S_ISCHR(statbuf->st_mode) && is_prefixed_with(bb_basename(state->fileName), "ubi"))
 #endif
 	)
 		return TRUE;
@@ -123,7 +122,7 @@ uuidcache_check_device(struct recursive_state *state UNUSED_PARAM,
 	if (major(statbuf->st_rdev) == 2)
 		return TRUE;
 
-	add_to_uuid_cache(device);
+	add_to_uuid_cache(state->fileName);
 
 	return TRUE;
 }

@@ -100,7 +100,7 @@ struct param_t {
 };
 
 static int FAST_FUNC fileAction(struct recursive_state *state,
-		const char *fileName, struct stat *statbuf)
+		struct stat *statbuf)
 {
 #define param  (*(struct param_t*)state->userData)
 #define opt option_mask32
@@ -112,12 +112,12 @@ static int FAST_FUNC fileAction(struct recursive_state *state,
 		 || (OPT_CHANGED && (statbuf->st_uid != u || statbuf->st_gid != g))
 		) {
 			printf("changed ownership of '%s' to %u:%u\n",
-					fileName, (unsigned)u, (unsigned)g);
+					state->fileName, (unsigned)u, (unsigned)g);
 		}
 		return TRUE;
 	}
 	if (!OPT_QUIET)
-		bb_simple_perror_msg(fileName);
+		bb_simple_perror_msg(state->fileName);
 	return FALSE;
 #undef opt
 #undef param

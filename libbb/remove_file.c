@@ -11,7 +11,6 @@
 /* Used from NOFORK applets. Must not allocate anything */
 
 static int FAST_FUNC fileAction(struct recursive_state *state,
-		const char *fileName,
 		struct stat *statbuf)
 {
 	int flags = *((int*)state->userData);
@@ -19,7 +18,7 @@ static int FAST_FUNC fileAction(struct recursive_state *state,
 
 	if (!isdir || (state->state & ACTION_DEPTH_PRE)) {
 		if (isdir && !(flags & FILEUTILS_RECUR)) {
-			bb_error_msg("'%s' is a directory", fileName);
+			bb_error_msg("'%s' is a directory", state->fileName);
 			return FALSE;
 		}
 
@@ -40,12 +39,12 @@ static int FAST_FUNC fileAction(struct recursive_state *state,
 
 	// FIXME isdir && status == 0
 	if (unlinkat(state->dirfd, state->baseName, isdir ? AT_REMOVEDIR : 0) < 0) {
-		bb_perror_msg("can't remove '%s'", fileName);
+		bb_perror_msg("can't remove '%s'", state->fileName);
 		return FALSE;
 	}
 
 	if (flags & FILEUTILS_VERBOSE) {
-		printf("removed %s'%s'\n", isdir ? "directory: " : "", fileName);
+		printf("removed %s'%s'\n", isdir ? "directory: " : "", state->fileName);
 	}
 
 	return TRUE;
