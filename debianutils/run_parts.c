@@ -151,7 +151,7 @@ static int FAST_FUNC act(struct recursive_state *state,
 	if (state->depth == 1
 	 && (  !(statbuf->st_mode & (S_IFREG | S_IFLNK))
 	    || invalid_name(file)
-	    || (!(option_mask32 & OPT_l) && access(file, X_OK) != 0))
+	    || (!(option_mask32 & OPT_l) && faccessat(state->dirfd, state->baseName, W_OK, 0) != 0))
 	) {
 		return SKIP;
 	}
