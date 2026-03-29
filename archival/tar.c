@@ -526,8 +526,9 @@ static int FAST_FUNC writeFileToTarball(struct recursive_state *state,
 	/* Is this a regular file? */
 	if (tbInfo->hlInfo == NULL && S_ISREG(statbuf->st_mode)) {
 		/* open the file we want to archive, and make sure all is well */
-		inputFileFd = open_or_warn(fileName, O_RDONLY);
+		inputFileFd = openat(state->dirfd, state->baseName, O_RDONLY);
 		if (inputFileFd < 0) {
+			bb_perror_msg("can't open '%s'", fileName);
 			return FALSE; /* make recursive_action() return FALSE */
 		}
 	}
