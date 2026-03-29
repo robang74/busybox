@@ -1,0 +1,390 @@
+[PATCH] ash: fix wait -n behavior for multiple PIDs and pipe jobs
+
+Luiz Angelo Daros de Luca <luizluca@gmail.com> on 19 Mar 2026, 22:14
+
+- "wait -n $p1 $p2" should return when the FIRST of the listed jobs
+   finishes, not wait for all of them (Bugzilla 15970).
+- "wait -n" with a pipe job returns only when the entire job completes
+   (e.g., `(sleep 1; exit 1) | (sleep 2; exit 2) & wait -n` returns 2).
+- "wait -n" with no arguments now correctly finds older finished jobs
+   instead of blocking on the newest running job
+   (e.g., `(exit 42) & sleep 1; sleep 5 & wait -n` now returns 42 immediately
+   instead of blocking for 5 seconds and returning 0).
+- "wait -n" with no arguments now correctly returns 127 if all finished
+   jobs have already been waited for
+   (e.g., `(exit 42) & wait; wait -n` now returns 127 instead of 0).
+- Added comprehensive test cases: wait_n1.tests and wait_n2.tests.
+
+Link: https://bugs.busybox.net/show_bug.cgi?id=15970
+Signed-off-by: Luiz Angelo Daros de Luca <luizluca@gmail.com>
+---
+ shell/ash.c                           | 176 ++++++++++++++++++++++----
+ shell/ash_test/ash-misc/wait_n1.right |  16 +++
+ shell/ash_test/ash-misc/wait_n1.tests |  62 +++++++++
+ shell/ash_test/ash-misc/wait_n2.right |   3 +
+ shell/ash_test/ash-misc/wait_n2.tests |   5 +
+ 5 files changed, 234 insertions(+), 28 deletions(-)
+ create mode 100644 shell/ash_test/ash-misc/wait_n1.right
+ create mode 100755 shell/ash_test/ash-misc/wait_n1.tests
+ create mode 100644 shell/ash_test/ash-misc/wait_n2.right
+ create mode 100755 shell/ash_test/ash-misc/wait_n2.tests
+
+diff --git a/shell/ash.c b/shell/ash.c
+index fb887f31b..ec7b10ed1 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -3844,7 +3844,8 @@ struct job {
+ #endif
+                waited: 1,      /* true if this entry has been waited for */
+                used: 1,        /* true if this entry is in used */
+-               changed: 1;     /* true if status has changed */
++               changed: 1,     /* true if status has changed */
++               wait_n: 1;      /* wait -n is interested in this job */
+        struct job *prev_job;   /* previous job */
+ };
+
+@@ -4462,9 +4463,17 @@ static int waitone(int block, struct job *job)
+
+ #if BASH_WAIT_N
+        if (want_jobexitstatus) {
+-               pid = -1;
+-               if (thisjob && thisjob->state == JOBDONE)
+-                       pid = thisjob->ps[thisjob->nprocs - 1].ps_status;
++               if (pid > 0) {
++                       /* Reaped a child. If its job is done, return its status.
++                        * If not done yet, return -2 (indicates "reaped, but job still running").
++                        */
++                       int exit_status = -2;
++                       if (thisjob && thisjob->state == JOBDONE)
++                               exit_status = thisjob->ps[thisjob->nprocs - 1].ps_status;
++                       pid = exit_status;
++               } else if (pid == 0) {
++                       pid = -1; /* No child reaped, prevent returning 0 (success) */
++               }
+        }
+ #endif
+        if (thisjob && thisjob == job) {
+@@ -4493,10 +4502,30 @@ static int dowait(int block, struct job *jp)
+        if (block == DOWAIT_NONBLOCK && !gotchld)
+                return 1;
+
++       /* rpid tracks if we reaped a child (pid > 0) in every waitone call.
++        * If any waitone call returns 0 (e.g. signal received but no child reaped),
++        * rpid will become 0. It stays 1 if all calls reaped a child or if the
++        * loop was not entered.
++        */
+        rpid = 1;
+
++#if BASH_WAIT_N
++ again:
++#endif
+        do {
+                pid = waitone(block, jp);
++#if BASH_WAIT_N
++               if (block & DOWAIT_JOBSTATUS) {
++                       if (pid >= 0)
++                               return pid;
++                       if (pid == -2)
++                               goto again;
++                       if (block == DOWAIT_NONBLOCK || pending_sig)
++                               return -1;
++                       goto again;
++               }
++#endif
++               /* rpid remains 1 only if all waitone calls returned pid > 0 */
+                rpid &= !!pid;
+
+                if (!pid || (jp && jp->state != JOBRUNNING))
+@@ -4808,33 +4837,69 @@ stoppedjobs(void)
+ static int FAST_FUNC
+ waitcmd(int argc UNUSED_PARAM, char **argv)
+ {
+-       struct job *job;
+        int retval;
+        struct job *jp;
+ #if BASH_WAIT_N
+        int status;
+        char one = nextopt("n");
++       bool any_waitable = false;
+ #else
+        nextopt(nullstr);
+ #endif
+        retval = 0;
+
+        argv = argptr;
++       /* wait without IDs */
+        if (!argv[0]) {
+                /* wait for all jobs / one job if -n */
+                for (;;) {
+-                       jp = curjob;
+ #if BASH_WAIT_N
+-                       if (one && !jp)
+-                               /* exitcode of "wait -n" with nothing to wait for is 127, not 0 */
+-                               retval = 127;
++                       bool found_running = false;
+ #endif
++                       jp = curjob;
+                        while (1) {
+-                               if (!jp) /* no running procs */
++                               if (!jp) { /* no more jobs */
++#if BASH_WAIT_N
++                                       if (one) {
++                                               if (found_running)
++                                                       /* if we have a running job, we can wait for it.
++                                                        * exit while(1), will call dowait aftewards
++                                                        */
++                                                       break;
++                                               /* without jobs, exitcode of "wait -n" is 127, not 0 */
++                                               retval = 127;
++                                       }
++#endif
+                                        goto ret;
+-                               if (jp->state == JOBRUNNING)
+-                                       break;
+-                               jp->waited = 1;
++                               }
++
++                               /* non-running jobs are first in the list. For standard "wait",
++                                * when we reach a running one, we can stop scanning and block.
++                                */
++#if BASH_WAIT_N
++                               if (one) {
++                                       if (jp->state != JOBRUNNING) {
++                                               /* when we have a non-running job not reported yet, we can
++                                                * return "wait -n" immediately
++                                                */
++                                               if (!jp->waited) {
++                                                       jp->waited = 1;
++                                                       retval = getstatus(jp);
++                                                       goto ret_n;
++                                               }
++                                       } else {
++                                               found_running = true;
++                                       }
++                               } else
++#endif
++                               {
++                                       if (jp->state == JOBRUNNING)
++                                               break;
++                                       jp->waited = 1;
++                               }
++                               /* check the remaining jobs for a running job (to wait for)
++                                * or a non-running job to mark as waited or return if '-n'
++                                */
+                                jp = jp->prev_job;
+                        }
+        /* man bash:
+@@ -4872,30 +4937,85 @@ waitcmd(int argc UNUSED_PARAM, char **argv)
+                }
+        }
+
+-       retval = 127;
++#if BASH_WAIT_N
++       if (one)
++               retval = 127;
++#endif
++
++       /* wait with IDs */
+        do {
+-               if (**argv != '%') {
++               if (**argv == '%') {
++                       jp = getjob(*argv, 0);
++               } else {
+                        pid_t pid = number(*argv);
+-                       job = curjob;
+-                       while (1) {
+-                               if (!job)
+-                                       goto repeat;
+-                               if (job->ps[job->nprocs - 1].ps_pid == pid)
+-                                       break;
+-                               job = job->prev_job;
++                       jp = curjob;
++                       while (jp && jp->ps[jp->nprocs - 1].ps_pid != pid)
++                               jp = jp->prev_job;
++               }
++
++#if BASH_WAIT_N
++               if (one) {
++                       if (jp) {
++                               if (jp->state != JOBRUNNING) {
++                                       /* when we have a non-running job, we can
++                                        * return "wait -n" immediately.
++                                        *
++                                        * Bash returns the job status if the non-running job
++                                        * exists, even if it was already waited. It only returns
++                                        * 127 if the job was reaped. In Bash, the job cleanup
++                                        * moment might be influenced by whether it runs as a
++                                        * command (-c), a script or interactive.
++                                        */
++                                       jp->waited = 1;
++                                       retval = getstatus(jp);
++                                       goto ret_n;
++                               } else {
++                                       any_waitable = true;
++                                       jp->wait_n = 1;
++                               }
+                        }
+-               } else {
+-                       job = getjob(*argv, 0);
++                       continue;
+                }
++#endif
++               if (!jp)
++                       continue;
++
+                /* loop until process terminated or stopped */
+-               dowait(DOWAIT_CHILD_OR_SIG, job);
++               dowait(DOWAIT_CHILD_OR_SIG, jp);
+                if (pending_sig)
+                        goto sigout;
+-               job->waited = 1;
+-               retval = getstatus(job);
+- repeat: ;
++               jp->waited = 1;
++               retval = getstatus(jp);
+        } while (*++argv);
+
++#if BASH_WAIT_N
++       if (one) {
++               if (!any_waitable)
++                       goto ret_n; /* retval is 127 */
++
++               /* Wait for any job to finish */
++               for (;;) {
++                       if (dowait(DOWAIT_CHILD_OR_SIG | DOWAIT_JOBSTATUS, NULL) == -1) {
++                               retval = 127;
++                               break;
++                       }
++                       if (pending_sig)
++                               goto sigout;
++                       /* Check if any of our marked jobs is done */
++                       for (jp = curjob; jp; jp = jp->prev_job) {
++                               if (jp->wait_n && jp->state == JOBDONE && !jp->waited) {
++                                       jp->waited = 1;
++                                       retval = getstatus(jp);
++                                       goto ret_n;
++                               }
++                       }
++               }
++ ret_n:
++               /* Unmark all jobs */
++               for (jp = curjob; jp; jp = jp->prev_job) jp->wait_n = 0;
++       }
++#endif
++
+  ret:
+        return retval;
+  sigout:
+diff --git a/shell/ash_test/ash-misc/wait_n1.right b/shell/ash_test/ash-misc/wait_n1.right
+new file mode 100644
+index 000000000..edae8d87d
+--- /dev/null
++++ b/shell/ash_test/ash-misc/wait_n1.right
+@@ -0,0 +1,16 @@
++Wait 1 returned: 42. (expects 42)
++p1 active: 0 (expects 0)
++p2 active: 1 (expects 1)
++Wait 2 returned: 41 (expects 41)
++Wait 3 returned: 41 (expects 41)
++Wait 4 returned: 127 (expects 127)
++Wait 5 returned: 42 (expects 42)
++Wait 6 returned: 42 (expects 42)
++Wait 7 returned: 42 (expects 42)
++Wait 8 returned: 42 (expects 42)
++Wait 9 returned: 42 (expects 42)
++Wait 10 returned: 42 (expects 42)
++Wait 11 returned: 127 (expects 127)
++Wait 12 returned: 42 (expects 42)
++p7 active: 0 (expects 0)
++Wait 13 returned: 127 (expects 127)
+diff --git a/shell/ash_test/ash-misc/wait_n1.tests b/shell/ash_test/ash-misc/wait_n1.tests
+new file mode 100755
+index 000000000..8864649b7
+--- /dev/null
++++ b/shell/ash_test/ash-misc/wait_n1.tests
+@@ -0,0 +1,62 @@
++# Wait for any of p1, p2. p2 finishes first.
++(sleep 2; exit 41) & p1=$!
++(sleep 1; exit 42) & p2=$!
++wait -n $p1 $p2
++echo "Wait 1 returned: $?. (expects 42)"
++kill -0 $p1 2>/dev/null; echo "p1 active: $? (expects 0)"
++kill -0 $p2 2>/dev/null; echo "p2 active: $? (expects 1)"
++
++# wait $p1
++wait $p1
++echo "Wait 2 returned: $? (expects 41)"
++
++# wait -n $p1 again.
++# bash as script returns 41 while command (-c) returns 127
++wait -n $p1
++echo "Wait 3 returned: $? (expects 41)"
++
++# wait -n (no args) with only already-waited jobs should return 127
++wait -n
++echo "Wait 4 returned: $? (expects 127)"
++# Test: wait -n with a job that finished before wait was called
++(sleep 1; exit 42) & p3=$!
++sleep 2
++# p3 is done but not reaped. wait -n should return 42.
++wait -n $p3
++echo "Wait 5 returned: $? (expects 42)"
++# wait -n $p3 again should return 42
++wait -n $p3
++echo "Wait 6 returned: $? (expects 42)"
++# wait $p3 again should return 42
++wait $p3
++echo "Wait 7 returned: $? (expects 42)"
++# wait -n $p3 should return 42
++wait -n $p3
++echo "Wait 8 returned: $? (expects 42)"
++
++# Test: wait -n with multiple already finished jobs
++(sleep 1; exit 42) & p4=$!
++(sleep 1; exit 42) & p5=$!
++sleep 2
++# Both p4 and p5 are done.
++wait -n
++echo "Wait 9 returned: $? (expects 42)"
++wait -n
++echo "Wait 10 returned: $? (expects 42)"
++wait -n
++echo "Wait 11 returned: $? (expects 127)"
++
++# Test: wait -n with a buried finished job (p6 done, p7 running)
++# This used to deadlock.
++(sleep 1; exit 42) & p6=$!
++(sleep 5; exit 41) & p7=$!
++sleep 2
++wait -n
++echo "Wait 12 returned: $? (expects 42)"
++# p7 should still be running
++kill -0 $p7 2>/dev/null; echo "p7 active: $? (expects 0)"
++wait $p7
++
++# Test: wait -n with no jobs at all
++wait -n
++echo "Wait 13 returned: $? (expects 127)"
+diff --git a/shell/ash_test/ash-misc/wait_n2.right b/shell/ash_test/ash-misc/wait_n2.right
+new file mode 100644
+index 000000000..95e266646
+--- /dev/null
++++ b/shell/ash_test/ash-misc/wait_n2.right
+@@ -0,0 +1,3 @@
++P1 done
++P2 done
++Wait returned: 0
+diff --git a/shell/ash_test/ash-misc/wait_n2.tests b/shell/ash_test/ash-misc/wait_n2.tests
+new file mode 100755
+index 000000000..e41b90d85
+--- /dev/null
++++ b/shell/ash_test/ash-misc/wait_n2.tests
+@@ -0,0 +1,5 @@
++# Testing wait -n with a pipe
++# It should wait for the WHOLE job.
++(sleep 1; echo "P1 done" >&2) | (sleep 3; echo "P2 done" >&2) &
++wait -n
++echo "Wait returned: $?"
+--
+2.53.0
+
