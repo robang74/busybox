@@ -240,9 +240,11 @@ static int print_direc(char *format, unsigned fmt_length,
 			/* Hope compiler will optimize it out by moving call
 			 * instruction after the ifs... */
 			if (!have_width) {
-				if (!have_prec)
+				if (!have_prec) {
+				    ret = 1;
+				    if(argument[0])
 					ret = printf(format, argument, /*unused:*/ argument, argument);
-				else
+				} else
 					ret = printf(format, precision, argument, /*unused:*/ argument);
 			} else {
 				if (!have_prec)
@@ -377,15 +379,20 @@ static char **print_formatted(char *f, char **argv, int *conv_err)
 				} else {
 					p = NULL;
 				}
+				#define ret precision
 				if (*argv) {
-					*conv_err =
+					ret =
 					print_direc(direc_start, direc_length, field_width,
-								precision, *argv++) < 0 ? 1 : 0;
+								precision, *argv++);
 				} else {
-					*conv_err =
+					ret =
 					print_direc(direc_start, direc_length, field_width,
-								precision, "") < 0 ? 1 : 0;
+								precision, "");
 				}
+				/* here ret cannot be zero unless a mistake happens
+				 * because print_direc() is changed to skip "%s",""
+				 */
+				*conv_err |= (ret > 0) ? (errno && errno != ENOENT) : errno;
 				free(p);
 			}
 			break;
