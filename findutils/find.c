@@ -1307,7 +1307,7 @@ static action*** parse_params(char **argv)
 #if ENABLE_FEATURE_FIND_DEPTH
 		else if (parm == OPT_DEPTH) {
 			dbg("%d", __LINE__);
-			G.recurse_flags |= ACTION_DEPTHFIRST;
+			G.recurse_flags |= ACTION_DEPTH_POST;
 		}
 #endif
 /* Actions are grouped by operators
@@ -1369,7 +1369,7 @@ static action*** parse_params(char **argv)
 		else if (parm == PARM_delete) {
 			dbg("%d", __LINE__);
 			G.need_print = 0;
-			G.recurse_flags |= ACTION_DEPTHFIRST;
+			G.recurse_flags |= ACTION_DEPTH_POST;
 			(void) ALLOC_ACTION(delete);
 		}
 #endif

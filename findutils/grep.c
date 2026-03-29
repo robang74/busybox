@@ -695,7 +695,7 @@ static int grep_dir(const char *dir)
 		| ACTION_RECURSE
 		| ((option_mask32 & OPT_R) ? ACTION_FOLLOWLINKS : 0)
 		| ACTION_FOLLOWLINKS_L0 /* grep -r ... SYMLINK follows it */
-		| ACTION_DEPTHFIRST
+		| ACTION_DEPTH_POST
 		| 0,
 		/* fileAction= */ file_action_grep,
 		/* dirAction= */ NULL,
