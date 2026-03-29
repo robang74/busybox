@@ -94,14 +94,12 @@ static const char chown_longopts[] ALIGN1 =
 	;
 #endif
 
-typedef int (*chown_fptr)(const char *, uid_t, gid_t);
-
 struct param_t {
 	struct bb_uidgid_t ugid;
-	chown_fptr chown_func;
+	int chown_flag;
 };
 
-static int FAST_FUNC fileAction(struct recursive_state *state UNUSED_PARAM,
+static int FAST_FUNC fileAction(struct recursive_state *state,
 		const char *fileName, struct stat *statbuf)
 {
 #define param  (*(struct param_t*)state->userData)
@@ -109,7 +107,7 @@ static int FAST_FUNC fileAction(struct recursive_state *state UNUSED_PARAM,
 	uid_t u = (param.ugid.uid == (uid_t)-1L) ? statbuf->st_uid : param.ugid.uid;
 	gid_t g = (param.ugid.gid == (gid_t)-1L) ? statbuf->st_gid : param.ugid.gid;
 
-	if (param.chown_func(fileName, u, g) == 0) {
+	if (fchownat(state->dirfd, state->baseName, u, g, param.chown_flag) == 0) {
 		if (OPT_VERBOSE
 		 || (OPT_CHANGED && (statbuf->st_uid != u || statbuf->st_gid != g))
 		) {
@@ -139,12 +137,12 @@ int chown_main(int argc UNUSED_PARAM, char **argv)
 	argv += optind;
 
 	/* This matches coreutils behavior (almost - see below) */
-	param.chown_func = chown;
+	param.chown_flag = 0;
 	if (OPT_NODEREF
 	/* || (OPT_RECURSE && !OPT_TRAVERSE_TOP): */
 	IF_DESKTOP( || (opt & (BIT_RECURSE|BIT_TRAVERSE_TOP)) == BIT_RECURSE)
 	) {
-		param.chown_func = lchown;
+		param.chown_flag = AT_SYMLINK_NOFOLLOW;
 	}
 
 	flags = ACTION_DEPTH_POST; /* match coreutils order */
