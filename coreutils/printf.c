@@ -183,7 +183,7 @@ static int print_esc_string(const char *str)
 	return 0;
 }
 
-static void print_direc(char *format, unsigned fmt_length,
+static int print_direc(char *format, unsigned fmt_length,
 		int field_width, int precision,
 		const char *argument)
 {
@@ -191,6 +191,7 @@ static void print_direc(char *format, unsigned fmt_length,
 	double dv;
 	char saved;
 	char *have_prec, *have_width;
+	int ret = -1;
 
 	saved = format[fmt_length];
 	format[fmt_length] = '\0';
@@ -205,7 +206,7 @@ static void print_direc(char *format, unsigned fmt_length,
 
 	switch (format[fmt_length - 1]) {
 	case 'c':
-		printf(format, *argument);
+		ret = printf(format, *argument);
 		break;
 	case 'd':
 	case 'i':
@@ -213,14 +214,14 @@ static void print_direc(char *format, unsigned fmt_length,
  print_long:
 		if (!have_width) {
 			if (!have_prec)
-				printf(format, llv);
+				ret = printf(format, llv);
 			else
-				printf(format, precision, llv);
+				ret = printf(format, precision, llv);
 		} else {
 			if (!have_prec)
-				printf(format, field_width, llv);
+				ret = printf(format, field_width, llv);
 			else
-				printf(format, field_width, precision, llv);
+				ret = printf(format, field_width, precision, llv);
 		}
 		break;
 	case 'o':
@@ -240,14 +241,14 @@ static void print_direc(char *format, unsigned fmt_length,
 			 * instruction after the ifs... */
 			if (!have_width) {
 				if (!have_prec)
-					printf(format, argument, /*unused:*/ argument, argument);
+					ret = printf(format, argument, /*unused:*/ argument, argument);
 				else
-					printf(format, precision, argument, /*unused:*/ argument);
+					ret = printf(format, precision, argument, /*unused:*/ argument);
 			} else {
 				if (!have_prec)
-					printf(format, field_width, argument, /*unused:*/ argument);
+					ret = printf(format, field_width, argument, /*unused:*/ argument);
 				else
-					printf(format, field_width, precision, argument);
+					ret = printf(format, field_width, precision, argument);
 			}
 			break;
 		}
@@ -259,19 +260,20 @@ static void print_direc(char *format, unsigned fmt_length,
 		dv = my_xstrtod(argument);
 		if (!have_width) {
 			if (!have_prec)
-				printf(format, dv);
+				ret = printf(format, dv);
 			else
-				printf(format, precision, dv);
+				ret = printf(format, precision, dv);
 		} else {
 			if (!have_prec)
-				printf(format, field_width, dv);
+				ret = printf(format, field_width, dv);
 			else
-				printf(format, field_width, precision, dv);
+				ret = printf(format, field_width, precision, dv);
 		}
 		break;
 	} /* switch */
 
 	format[fmt_length] = saved;
+	return ret;
 }
 
 /* Handle params for "%*.*f". Negative numbers are ok (compat). */
@@ -376,13 +378,14 @@ static char **print_formatted(char *f, char **argv, int *conv_err)
 					p = NULL;
 				}
 				if (*argv) {
+					*conv_err =
 					print_direc(direc_start, direc_length, field_width,
-								precision, *argv++);
+								precision, *argv++) < 0 ? 1 : 0;
 				} else {
+					*conv_err =
 					print_direc(direc_start, direc_length, field_width,
-								precision, "");
+								precision, "") < 0 ? 1 : 0;
 				}
-				*conv_err |= errno;
 				free(p);
 			}
 			break;
