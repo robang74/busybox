@@ -3844,7 +3844,8 @@ struct job {
 #endif
 		waited: 1,      /* true if this entry has been waited for */
 		used: 1,        /* true if this entry is in used */
-		changed: 1;     /* true if status has changed */
+		changed: 1,     /* true if status has changed */
+		wait_n: 1;      /* wait -n is interested in this job */
 	struct job *prev_job;   /* previous job */
 };
 
@@ -4462,9 +4463,17 @@ static int waitone(int block, struct job *job)
 
 #if BASH_WAIT_N
 	if (want_jobexitstatus) {
-		pid = -1;
-		if (thisjob && thisjob->state == JOBDONE)
-			pid = thisjob->ps[thisjob->nprocs - 1].ps_status;
+		if (pid > 0) {
+			/* Reaped a child. If its job is done, return its status.
+			 * If not done yet, return -2 (indicates "reaped, but job still running").
+			 */
+			int exit_status = -2;
+			if (thisjob && thisjob->state == JOBDONE)
+				exit_status = thisjob->ps[thisjob->nprocs - 1].ps_status;
+			pid = exit_status;
+		} else if (pid == 0) {
+			pid = -1; /* No child reaped, prevent returning 0 (success) */
+		}
 	}
 #endif
 	if (thisjob && thisjob == job) {
@@ -4493,10 +4502,30 @@ static int dowait(int block, struct job *jp)
 	if (block == DOWAIT_NONBLOCK && !gotchld)
 		return 1;
 
+	/* rpid tracks if we reaped a child (pid > 0) in every waitone call.
+	 * If any waitone call returns 0 (e.g. signal received but no child reaped),
+	 * rpid will become 0. It stays 1 if all calls reaped a child or if the
+	 * loop was not entered.
+	 */
 	rpid = 1;
 
+#if BASH_WAIT_N
+ again:
+#endif
 	do {
 		pid = waitone(block, jp);
+#if BASH_WAIT_N
+		if (block & DOWAIT_JOBSTATUS) {
+			if (pid >= 0)
+				return pid;
+			if (pid == -2)
+				goto again;
+			if (block == DOWAIT_NONBLOCK || pending_sig)
+				return -1;
+			goto again;
+		}
+#endif
+		/* rpid remains 1 only if all waitone calls returned pid > 0 */
 		rpid &= !!pid;
 
 		if (!pid || (jp && jp->state != JOBRUNNING))
@@ -4808,33 +4837,69 @@ stoppedjobs(void)
 static int FAST_FUNC
 waitcmd(int argc UNUSED_PARAM, char **argv)
 {
-	struct job *job;
 	int retval;
 	struct job *jp;
 #if BASH_WAIT_N
 	int status;
 	char one = nextopt("n");
+	bool any_waitable = false;
 #else
 	nextopt(nullstr);
 #endif
 	retval = 0;
 
 	argv = argptr;
+	/* wait without IDs */
 	if (!argv[0]) {
 		/* wait for all jobs / one job if -n */
 		for (;;) {
-			jp = curjob;
 #if BASH_WAIT_N
-			if (one && !jp)
-				/* exitcode of "wait -n" with nothing to wait for is 127, not 0 */
-				retval = 127;
+			bool found_running = false;
 #endif
+			jp = curjob;
 			while (1) {
-				if (!jp) /* no running procs */
+				if (!jp) { /* no more jobs */
+#if BASH_WAIT_N
+					if (one) {
+						if (found_running)
+							/* if we have a running job, we can wait for it.
+							 * exit while(1), will call dowait aftewards
+							 */
+							break;
+						/* without jobs, exitcode of "wait -n" is 127, not 0 */
+						retval = 127;
+					}
+#endif
 					goto ret;
-				if (jp->state == JOBRUNNING)
-					break;
-				jp->waited = 1;
+				}
+
+				/* non-running jobs are first in the list. For standard "wait",
+				 * when we reach a running one, we can stop scanning and block.
+				 */
+#if BASH_WAIT_N
+				if (one) {
+					if (jp->state != JOBRUNNING) {
+						/* when we have a non-running job not reported yet, we can
+						 * return "wait -n" immediately
+						 */
+						if (!jp->waited) {
+							jp->waited = 1;
+							retval = getstatus(jp);
+							goto ret_n;
+						}
+					} else {
+						found_running = true;
+					}
+				} else
+#endif
+				{
+					if (jp->state == JOBRUNNING)
+						break;
+					jp->waited = 1;
+				}
+				/* check the remaining jobs for a running job (to wait for)
+				 * or a non-running job to mark as waited or return if '-n'
+				 */
 				jp = jp->prev_job;
 			}
 	/* man bash:
@@ -4862,39 +4927,91 @@ waitcmd(int argc UNUSED_PARAM, char **argv)
 				 * should wait for 2 seconds. Not 1 or 3.
 				 */
 				if (status != -1 && !WIFSTOPPED(status)) {
-					retval = WEXITSTATUS(status);
-					if (WIFSIGNALED(status))
-						retval = 128 | WTERMSIG(status);
-					goto ret;
+					continue;
 				}
 			}
 #endif
 		}
 	}
 
-	retval = 127;
+#if BASH_WAIT_N
+	if (one)
+		retval = 127;
+#endif
+
+	/* wait with IDs */
 	do {
-		if (**argv != '%') {
-			pid_t pid = number(*argv);
-			job = curjob;
-			while (1) {
-				if (!job)
-					goto repeat;
-				if (job->ps[job->nprocs - 1].ps_pid == pid)
-					break;
-				job = job->prev_job;
-			}
+		if (**argv == '%') {
+			jp = getjob(*argv, 0);
 		} else {
-			job = getjob(*argv, 0);
+			pid_t pid = number(*argv);
+			jp = curjob;
+			while (jp && jp->ps[jp->nprocs - 1].ps_pid != pid)
+				jp = jp->prev_job;
 		}
+
+#if BASH_WAIT_N
+		if (one) {
+			if (jp) {
+				if (jp->state != JOBRUNNING) {
+					/* when we have a non-running job, we can
+					 * return "wait -n" immediately.
+					 *
+					 * Bash returns the job status if the non-running job
+					 * exists, even if it was already waited. It only returns
+					 * 127 if the job was reaped. In Bash, the job cleanup
+					 * moment might be influenced by whether it runs as a
+					 * command (-c), a script or interactive.
+					 */
+					jp->waited = 1;
+					retval = getstatus(jp);
+					goto ret_n;
+				} else {
+					any_waitable = true;
+					jp->wait_n = 1;
+				}
+			}
+			continue;
+		}
+#endif
+		if (!jp)
+			continue;
+
 		/* loop until process terminated or stopped */
-		dowait(DOWAIT_CHILD_OR_SIG, job);
+		dowait(DOWAIT_CHILD_OR_SIG, jp);
 		if (pending_sig)
 			goto sigout;
-		job->waited = 1;
-		retval = getstatus(job);
- repeat: ;
+		jp->waited = 1;
+		retval = getstatus(jp);
 	} while (*++argv);
+
+#if BASH_WAIT_N
+	if (one) {
+		if (!any_waitable)
+			goto ret_n; /* retval is 127 */
+
+		/* Wait for any job to finish */
+		for (;;) {
+			if (dowait(DOWAIT_CHILD_OR_SIG | DOWAIT_JOBSTATUS, NULL) == -1) {
+				retval = 127;
+				break;
+			}
+			if (pending_sig)
+				goto sigout;
+			/* Check if any of our marked jobs is done */
+			for (jp = curjob; jp; jp = jp->prev_job) {
+				if (jp->wait_n && jp->state == JOBDONE && !jp->waited) {
+					jp->waited = 1;
+					retval = getstatus(jp);
+					goto ret_n;
+				}
+			}
+		}
+ ret_n:
+		/* Unmark all jobs */
+		for (jp = curjob; jp; jp = jp->prev_job) jp->wait_n = 0;
+	}
+#endif
 
  ret:
 	return retval;

@@ -1,0 +1,61 @@
+# wait -n tests
+
+# should never wait for this one
+sleep 5 && echo "Background1: BUG!" & #A
+bg=$!
+
+# normal process
+echo "Test1 (wait with zero exit status of bg process)"
+sleep 1 & #B
+wait -n #B, A still 4s to end
+rc=$?
+if [ "$rc" != 0 ]; then
+	echo "Test1 exit code was not 0: $rc"
+fi
+
+# non-zero return code
+echo "Test2 (wait with non-zero exit status of bg process)"
+sh -c 'sleep 1; false' & #C
+pid2=$!
+wait -n #C, #A still 3s to end
+rc=$?
+if [ "$rc" != 1 ]; then
+	echo "Test2 exit code was not 1: $rc"
+fi
+
+wait $pid2 # asking to wait for a waited pid is prone to racing condition as it can both return C exit status, if the process was already cleaned, or 0 if already cleaned (or 127 if -n). A is still running
+rc=$?
+if [ "$rc" != 1 ]; then
+	echo "Test2 exit code was not 1 on recheck: $rc"
+fi
+
+# pipeline... not too fast
+echo "Test3 (pipeline wait for whole job)"
+d1=$(date +%s)
+sleep 2 | sleep 1 & #D
+wait -n #D, A is still 2s to end
+rc=$?
+if [ "$rc" != 0 ]; then
+	echo "Test3 exit code was not 0: $rc"
+fi
+d2=$(date +%s)
+if [ "$d2" -lt "$((d1 + 2))" ]; then
+	echo "Test3 finished in less than 2s"
+fi
+
+kill $bg # kill A
+echo Ok:$?
+
+echo "Test4 (wait exit code with signal)"
+wait -n #A
+rc=$?
+if [ "$rc" != 143 ]; then
+	echo "Test4 exit code was not 143 (128+SIGTERM): $rc"
+fi
+
+echo "Test5 (wait -n exits 127 if nothing to wait for)"
+wait -n #none
+rc=$?
+if [ "$rc" != 127 ]; then
+	echo "wait -n with nothing to wait was not 127: $rc"
+fi
