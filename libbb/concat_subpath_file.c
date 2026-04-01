@@ -24,7 +24,7 @@ char* FAST_FUNC concat_subpath_file(const char *path, const char *f)
 
 char* FAST_FUNC concat_subpath_file_fast(const char *path, const struct dirent *dirp)
 {
-	if (dirp->d_name && DOT_OR_DOTDOT(dirp->d_name))
+	if (DOT_OR_DOTDOT(dirp->d_name))
 		return NULL;
 	return concat_path_file_fast(path, dirp);
 }
