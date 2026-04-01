@@ -59,45 +59,32 @@ char* FAST_FUNC concat_path_file(const char *path, const char *filename)
 #endif
 }
 
-/* If second component comes from struct dirent,
- * it's possible to eliminate one strlen() by using name length
- * provided by kernel in struct dirent. See below.
- * However, the win seems to be insignificant.
- */
 
-#if 0
-
-/* Extract d_namlen from struct dirent */
-static size_t get_d_namlen(const struct dirent *de)
+char* FAST_FUNC concat_path_file_fast(const char *path, const struct dirent *dirp)
 {
-#if defined(_DIRENT_HAVE_D_NAMLEN)
-	return de->d_namlen;
-#elif defined(_DIRENT_HAVE_D_RECLEN)
-	const size_t prefix_sz = offsetof(struct dirent, d_name);
-	return de->d_reclen - prefix_sz;
-#else
-	return strlen(de->d_name);
-#endif
-}
+	const char *filename = dirp->d_name;
+	char *buf;
+	int lc_slash = 0;
+	int name_offset, end_offset;
+	int pathlen, namelen;
 
-char* FAST_FUNC concat_path_dirent(const char *path, const struct dirent *de)
-{
-	char *buf, *p;
-	size_t n1, n2, n3;
-
-	if (!path || !path[0])
-		return xstrdup(de->d_name);
-
-	n1 = strlen(path);
-	n2 = (path[n1 - 1] != '/');
-	n3 = get_d_namlen(de) + 1;
-
-	buf = xmalloc(n1 + n2 + n3);
-	p = mempcpy(buf, path, n1);
-	if (n2)
-		*p++ = '/';
-	memcpy(p, de->d_name, n3);
+	if (!path) {
+		path = "";
+		pathlen = 0;
+	} else pathlen = strlen(path);
+	namelen = get_d_namlen(dirp);
+	if (last_char_is_fast(path, '/', pathlen) == NULL) lc_slash = 1;
+	while (*filename == '/') {
+		filename++;
+		namelen--;
+	}
+	name_offset = pathlen + lc_slash;
+	end_offset = name_offset + namelen;
+	buf = (char *)xmalloc(end_offset + 1);
+	if (!buf) return NULL;
+	memcpy(buf, path, pathlen);
+	if (lc_slash == 1) *(buf + pathlen) = '/';
+	memcpy((buf + name_offset), filename, namelen);
+	*(buf + end_offset) = '\0';
 	return buf;
 }
-
-#endif

@@ -899,7 +899,7 @@ static void travdone_free(struct travdone * const restrict cur)
   if (cur == NULL) return;
   if (cur->left != NULL) travdone_free(cur->left);
   if (cur->right != NULL) travdone_free(cur->right);
-  string_free(cur);
+  free(cur);
   return;
 }
 #endif /* ENABLE_FEATURE_JDUPES_TRAVERSAL_SAFETY */
