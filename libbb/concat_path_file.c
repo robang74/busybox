@@ -60,20 +60,22 @@ char* FAST_FUNC concat_path_file(const char *path, const char *filename)
 }
 
 
+/* Optimized concatenate for directory entries - uses d_reclen/d_namlen optimization */
 char* FAST_FUNC concat_path_file_fast(const char *path, const struct dirent *dirp)
 {
 	const char *filename = dirp->d_name;
-	char *buf;
+	char *buf, *p;
 	int lc_slash = 0;
 	int name_offset, end_offset;
 	int pathlen, namelen;
 
-	if (!path) {
-		path = "";
-		pathlen = 0;
-	} else pathlen = strlen(path);
+	if (!path || !path[0])
+		return xstrdup(filename);
+
+	pathlen = strlen(path);
 	namelen = get_d_namlen(dirp);
-	if (last_char_is_fast(path, '/', pathlen) == NULL) lc_slash = 1;
+
+	if (path[pathlen - 1] != '/') lc_slash = 1;
 	while (*filename == '/') {
 		filename++;
 		namelen--;
@@ -82,9 +84,9 @@ char* FAST_FUNC concat_path_file_fast(const char *path, const struct dirent *dir
 	end_offset = name_offset + namelen;
 	buf = (char *)xmalloc(end_offset + 1);
 	if (!buf) return NULL;
-	memcpy(buf, path, pathlen);
-	if (lc_slash == 1) *(buf + pathlen) = '/';
-	memcpy((buf + name_offset), filename, namelen);
-	*(buf + end_offset) = '\0';
+	p = mempcpy(buf, path, pathlen);
+	if (lc_slash == 1) *p = '/';
+	p++;
+	memcpy(p, filename, namelen + 1);
 	return buf;
 }

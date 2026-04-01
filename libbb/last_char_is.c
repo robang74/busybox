@@ -17,12 +17,3 @@ char* FAST_FUNC last_char_is(const char *s, int c)
 		s++;
 	return (*s == (char)c) ? (char *) s : NULL;
 }
-
-
-/* Same as last_char_is() but uses a known length to skip the loop */
-char* FAST_FUNC last_char_is_fast(const char *s, int c, int len)
-{
-	if (len == 0) return NULL;
-	s += len - 1;
-	return (*s == (char)c) ? (char *) s : NULL;
-}
