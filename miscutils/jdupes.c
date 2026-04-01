@@ -27,8 +27,7 @@
 //config:	A powerful duplicate file finder and manager
 //config:
 //config:config FEATURE_JDUPES_BTRFS
-//config:	bool "btrfs dedupe support"
-//config:	select PLATFORM_LINUX
+//config:	bool "reflink deduplication support (-B)"
 //config:	default y
 //config:	depends on JDUPES
 //config:	help
