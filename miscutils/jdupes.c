@@ -2110,47 +2110,47 @@ int jdupes_main(int argc, char **argv)
   static ordertype_t ordertype = ORDER_NAME;
 #endif
 
-  static const char jdupes_longopts[] ALIGN1 =
-    "loud\0" No_argument "@"
-    "printnull\0" No_argument "0"
-    "one-file-system\0" No_argument "1"
-    "nohidden\0" No_argument "A"
-    "dedupe\0" No_argument "B"
-    "chunksize\0" Required_argument "C"
-    "delete\0" No_argument "d"
-    "debug\0" No_argument "D"
-    "omitfirst\0" No_argument "f"
-    "help\0" No_argument "h"
-    "hardlinks\0" No_argument "H"
-    "reverse\0" No_argument "i"
-    "isolate\0" No_argument "I"
-    "json\0" No_argument "j"
-    "linksoft\0" No_argument "l"
-    "linkhard\0" No_argument "L"
-    "summarize\0" No_argument "m"},
-    "printwithsummary\0" No_argument "M"},
-    "noempty\0" No_argument "n"
-    "noprompt\0" No_argument "N"
-    "order\0" Required_argument "o"
-    "paramorder\0" No_argument "O"
-    "permissions\0" No_argument "p"
-    "print\0" No_argument "P"
-    "quiet\0" No_argument "q"
-    "quick\0" No_argument "Q"
-    "recurse\0" No_argument "r"
-    "recursive\0" No_argument "r"
-    "recurse:\0" No_argument "R"
-    "recursive:\0" No_argument "R"
-    "symlinks\0" No_argument "s"
-    "size\0" No_argument "S"
-    "nochangecheck\0" No_argument "t"
-    "partial-only\0" No_argument "T"
-    "version\0" No_argument "v"
-    "xsize\0" Required_argument "x"
-    "exclude\0" Required_argument "X"
-    "zeromatch\0" No_argument "z"
-    "softabort\0" No_argument "Z"
-  ;
+  static const struct option long_options[] =
+  {
+    { "loud", 0, 0, '@' },
+    { "printnull", 0, 0, '0' },
+    { "one-file-system", 0, 0, '1' },
+    { "nohidden", 0, 0, 'A' },
+    { "dedupe", 0, 0, 'B' },
+    { "chunksize", 1, 0, 'C' },
+    { "delete", 0, 0, 'd' },
+    { "debug", 0, 0, 'D' },
+    { "omitfirst", 0, 0, 'f' },
+    { "help", 0, 0, 'h' },
+    { "hardlinks", 0, 0, 'H' },
+    { "reverse", 0, 0, 'i' },
+    { "isolate", 0, 0, 'I' },
+    { "linksoft", 0, 0, 'l' },
+    { "linkhard", 0, 0, 'L' },
+    { "summarize", 0, 0, 'm'},
+    { "printwithsummary", 0, 0, 'M'},
+    { "noempty", 0, 0, 'n' },
+    { "noprompt", 0, 0, 'N' },
+    { "order", 1, 0, 'o' },
+    { "paramorder", 0, 0, 'O' },
+    { "permissions", 0, 0, 'p' },
+    { "print", 0, 0, 'P' },
+    { "quiet", 0, 0, 'q' },
+    { "quick", 0, 0, 'Q' },
+    { "recurse", 0, 0, 'r' },
+    { "recursive", 0, 0, 'r' },
+    { "recurse:", 0, 0, 'R' },
+    { "recursive:", 0, 0, 'R' },
+    { "symlinks", 0, 0, 's' },
+    { "size", 0, 0, 'S' },
+    { "partial-only", 0, 0, 'T' },
+    { "version", 0, 0, 'v' },
+    { "xsize", 1, 0, 'x' },
+    { "exclude", 1, 0, 'X' },
+    { "zeromatch", 0, 0, 'z' },
+    { "softabort", 0, 0, 'Z' },
+    { NULL, 0, 0, 0 }
+  };
 
   tempname = xmalloc(PATHBUF_SIZE);
 
