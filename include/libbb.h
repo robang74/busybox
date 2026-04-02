@@ -584,6 +584,7 @@ char *bb_get_last_path_component_nostrip(const char *path) FAST_FUNC;
 const char *bb_basename(const char *name) FAST_FUNC;
 /* NB: can violate const-ness (similarly to strchr) */
 char *last_char_is(const char *s, int c) FAST_FUNC;
+char *last_char_is_fast(const char *s, int c, int len) FAST_FUNC;
 const char* endofname(const char *name) FAST_FUNC;
 char *is_prefixed_with(const char *string, const char *key) FAST_FUNC;
 char *is_suffixed_with(const char *string, const char *key) FAST_FUNC;
@@ -1832,9 +1833,12 @@ void config_close(parser_t *parser) FAST_FUNC;
  * If path is NULL, it is assumed to be "/".
  * filename should not be NULL. */
 char *concat_path_file(const char *path, const char *filename) FAST_FUNC;
+char *concat_path_file_fast(const char *path, const struct dirent *dirp) FAST_FUNC;
 /* Returns NULL on . and .. */
 char *concat_subpath_file(const char *path, const char *filename) FAST_FUNC;
+char *concat_subpath_file_fast(const char *path, const struct dirent *dirp) FAST_FUNC;
 
+size_t get_d_namlen(const struct dirent * const dirent) FAST_FUNC;
 
 int bb_make_directory(char *path, long mode, int flags) FAST_FUNC;
 
