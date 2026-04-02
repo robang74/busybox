@@ -127,7 +127,6 @@ static int recursive_action1(recursive_state_t *state, const char *fileName)
 		char *nextFile;
 		int s;
 
-//		nextFile = concat_subpath_file(fileName, next->d_name);
 		nextFile = concat_subpath_file_fast(fileName, next);
 		if (nextFile == NULL)
 			continue;

@@ -1025,7 +1025,6 @@ static struct dnode **scan_one_dir(const char *path, unsigned *nfiles_p)
 				continue; /* if only -A, skip . and .. but show other dotfiles */
 			}
 		}
-//		fullname = concat_path_file(path, entry->d_name);
 		fullname = concat_path_file_fast(path, entry);
 		cur = my_stat(fullname, bb_basename(fullname), 0);
 		if (!cur) {
