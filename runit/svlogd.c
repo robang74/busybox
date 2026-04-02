@@ -518,7 +518,6 @@ static void rmoldest(struct logdir *ld)
 	errno = 0;
 	while ((f = readdir(d))) {
 		if ((f->d_name[0] == '@') && (get_d_namlen(f) == 27)) {
-//		if ((f->d_name[0] == '@') && (strlen(f->d_name) == 27)) {
 			if (f->d_name[26] == 't') {
 				if (unlink(f->d_name) == -1)
 					warn2("can't unlink processor leftover", f->d_name);
