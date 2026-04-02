@@ -59,6 +59,36 @@ char* FAST_FUNC concat_path_file(const char *path, const char *filename)
 #endif
 }
 
+char* FAST_FUNC concat_path_file_fast(const char *path, const struct dirent *dirp)
+{
+	const char *filename = dirp->d_name;
+	char *buf;
+	int lc_slash = 0;
+	int name_offset, end_offset;
+	int pathlen, namelen;
+
+	if (!path) {
+		path = "";
+		pathlen = 0;
+	} else {
+		pathlen = strlen(path);
+		if (last_char_is_fast(path, '/', pathlen) == NULL) lc_slash = 1;
+	}
+	namelen = get_d_namlen(dirp);
+	while (*filename == '/') {
+		filename++;
+		namelen--;
+	}
+	name_offset = pathlen + lc_slash;
+	end_offset = name_offset + namelen;
+	buf = (char *)malloc(end_offset + 1);
+	if (!buf) return NULL;
+	memcpy(buf, path, pathlen);
+	if (lc_slash == 1) *(buf + pathlen) = '/';
+		memcpy((buf + name_offset), filename, namelen + 1);
+	return buf;
+}
+
 /* If second component comes from struct dirent,
  * it's possible to eliminate one strlen() by using name length
  * provided by kernel in struct dirent. See below.
