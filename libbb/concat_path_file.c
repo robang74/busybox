@@ -81,8 +81,7 @@ char* FAST_FUNC concat_path_file_fast(const char *path, const struct dirent *dir
 	}
 	name_offset = pathlen + lc_slash;
 	end_offset = name_offset + namelen;
-	buf = (char *)malloc(end_offset + 1);
-	if (!buf) return NULL;
+	buf = xmalloc(end_offset + 1);
 	memcpy(buf, path, pathlen);
 	if (lc_slash == 1) *(buf + pathlen) = '/';
 		memcpy((buf + name_offset), filename, namelen + 1);
