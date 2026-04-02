@@ -197,7 +197,8 @@ int FAST_FUNC copy_file(const char *source, const char *dest, int flags)
 		while ((d = readdir(dp)) != NULL) {
 			char *new_source, *new_dest;
 
-			new_source = concat_subpath_file(source, d->d_name);
+//			new_source = concat_subpath_file(source, d->d_name);
+			new_source = concat_subpath_file_fast(source, d);
 			if (new_source == NULL)
 				continue;
 			new_dest = concat_path_file(dest, d->d_name);

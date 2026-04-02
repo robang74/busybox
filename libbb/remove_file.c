@@ -53,7 +53,8 @@ int FAST_FUNC remove_file(const char *path, int flags)
 		while ((d = readdir(dp)) != NULL) {
 			char *new_path;
 
-			new_path = concat_subpath_file(path, d->d_name);
+//			new_path = concat_subpath_file(path, d->d_name);
+			new_path = concat_subpath_file_fast(path, d);
 			if (new_path == NULL)
 				continue;
 			if (remove_file(new_path, flags) < 0)

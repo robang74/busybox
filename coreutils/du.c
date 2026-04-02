@@ -200,7 +200,8 @@ static unsigned long long du(const char *filename)
 		}
 
 		while ((entry = readdir(dir))) {
-			newfile = concat_subpath_file(filename, entry->d_name);
+//			newfile = concat_subpath_file(filename, entry->d_name);
+			newfile = concat_subpath_file_fast(filename, entry);
 			if (newfile == NULL)
 				continue;
 			++G.du_depth;

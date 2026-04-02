@@ -40,6 +40,7 @@ lib-y += find_pid_by_name.o
 lib-y += find_root_device.o
 lib-y += full_write.o
 lib-y += get_console.o
+lib-y += get_d_namlen.o
 lib-y += get_last_path_component.o
 lib-y += get_line_from_file.o
 lib-y += getpty.o
