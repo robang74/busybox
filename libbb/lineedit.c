@@ -921,7 +921,8 @@ static NOINLINE unsigned complete_cmd_dir_file(const char *command, int type)
 			if (strncmp(basecmd, name_found, baselen) != 0)
 				continue; /* no */
 
-			found = concat_path_file(lpath, name_found);
+//			found = concat_path_file(lpath, name_found);
+			found = concat_path_file_fast(lpath, next);
 			/* NB: stat() first so that we see is it a directory;
 			 * but if that fails, use lstat() so that
 			 * we still match dangling links */
