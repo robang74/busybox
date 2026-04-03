@@ -2784,7 +2784,7 @@ static void handle_incoming_and_exit(const len_and_sockaddr *fromAddr)
 	/* !CGI: it can be only GET or HEAD */
 #endif
 
-#if ENABLE_FEATURE_HTTPD_BASIC_AUTH
+#if ENABLE_FEATURE_HTTPD_BASIC_AUTH || ENABLE_FEATURE_HTTPD_CGI
 	/* Restore truncated .../index.html */
 	if (urlp[-1] == '/')
 		urlp[0] = index_page[0];
