@@ -4324,9 +4324,6 @@ getstatus(struct job *job)
 #define DOWAIT_NONBLOCK 0	/* waitpid() will use WNOHANG and won't wait for signals */
 #define DOWAIT_BLOCK    1	/* waitpid() will NOT use WNOHANG */
 #define DOWAIT_CHILD_OR_SIG 2	/* waitpid() will use WNOHANG and if got 0, will wait for signals, then loop back */
-#if BASH_WAIT_N
-# define DOWAIT_JOBSTATUS 0x10  /* OR this to get job's exitstatus instead of pid */
-#endif
 
 static int
 waitproc(int block, int *status)
@@ -4378,10 +4375,6 @@ static int waitone(int block, struct job *job)
 	int status;
 	struct job *jp;
 	struct job *thisjob = NULL;
-#if BASH_WAIT_N
-	bool want_jobexitstatus = (block & DOWAIT_JOBSTATUS);
-	block = (block & ~DOWAIT_JOBSTATUS);
-#endif
 
 	TRACE(("dowait(0x%x) called\n", block));
 
@@ -4407,7 +4400,7 @@ static int waitone(int block, struct job *job)
 	pid = waitproc(block, &status);
 	TRACE(("wait returns pid %d, status=%d\n", pid, status));
 	if (pid <= 0)
-		goto out;
+		return pid;
 
 	for (jp = curjob; jp; jp = jp->prev_job) {
 		int jobstate;
@@ -4460,13 +4453,6 @@ static int waitone(int block, struct job *job)
  out:
 	INTON;
 
-#if BASH_WAIT_N
-	if (want_jobexitstatus) {
-		pid = -1;
-		if (thisjob && thisjob->state == JOBDONE)
-			pid = thisjob->ps[thisjob->nprocs - 1].ps_status;
-	}
-#endif
 	if (thisjob && thisjob == job) {
 		char s[48 + 1];
 		int len;
@@ -4478,32 +4464,49 @@ static int waitone(int block, struct job *job)
 			out2str(s);
 		}
 	}
-	return pid;
+
+	status = INT_MAX;
+	if (thisjob && thisjob->state == JOBDONE)
+		status = thisjob->ps[thisjob->nprocs - 1].ps_status;
+
+	return status;
 }
 
-static int dowait(int block, struct job *jp)
+static int dowait_status(void)
+{
+	int status, rstatus = -ENOENT;
+	int block = DOWAIT_CHILD_OR_SIG;
+
+	do {
+		status = waitone(block, NULL);
+		if (status >= 0 && status < INT_MAX) {
+			rstatus = status;
+			block = DOWAIT_NONBLOCK;
+		}
+		if (pending_sig)
+			break;
+	} while (status >= 0);
+
+	return rstatus;
+}
+
+static void dowait(int block, struct job *jp)
 {
 	smallint gotchld = *(volatile smallint *)&gotsigchld;
-	int rpid;
-	int pid;
+	int status;
 
 	if (jp && jp->state != JOBRUNNING)
 		block = DOWAIT_NONBLOCK;
 
 	if (block == DOWAIT_NONBLOCK && !gotchld)
-		return 1;
-
-	rpid = 1;
+		return;
 
 	do {
-		pid = waitone(block, jp);
-		rpid &= !!pid;
+		status = waitone(block, jp);
 
-		if (!pid || (jp && jp->state != JOBRUNNING))
+		if (!status || (jp && jp->state != JOBRUNNING))
 			block = DOWAIT_NONBLOCK;
-	} while (pid >= 0);
-
-	return rpid;
+	} while (status >= 0);
 }
 
 /*
@@ -4845,7 +4848,7 @@ waitcmd(int argc UNUSED_PARAM, char **argv)
 	 * the trap is executed."
 	 */
 #if BASH_WAIT_N
-			status = dowait(DOWAIT_CHILD_OR_SIG | DOWAIT_JOBSTATUS, NULL);
+			status = dowait_status();
 #else
 			dowait(DOWAIT_CHILD_OR_SIG, NULL);
 #endif
