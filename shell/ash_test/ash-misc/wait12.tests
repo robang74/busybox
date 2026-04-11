@@ -1,0 +1,18 @@
+# Test wait -n with multiple PIDs
+# It should return when ANY of the specified jobs finishes.
+
+(sleep 2; exit 41) & p1=$!
+(sleep 1; exit 42) & p2=$!
+(sleep 3; exit 43) & p3=$!
+
+# Should wait for p2 (1s) and return 42
+wait -n $p1 $p2
+echo "First wait -n returned: $? (expects 42)"
+
+# p1 should still be running. wait -n for p1 or p3 should return when p1 finishes (after another 1s)
+wait -n $p1 $p3
+echo "Second wait -n returned: $? (expects 41)"
+
+# wait -n for p3 (still running)
+wait -n $p3
+echo "Third wait -n returned: $? (expects 43)"

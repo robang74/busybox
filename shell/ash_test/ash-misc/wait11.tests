@@ -1,0 +1,5 @@
+# Testing wait -n with a pipe
+# It should wait for the WHOLE job.
+(sleep 1; echo "P1 done" >&2) | (sleep 3; echo "P2 done" >&2) &
+wait -n
+echo "Wait returned: $?"
