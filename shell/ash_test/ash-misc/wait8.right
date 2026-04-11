@@ -2,3 +2,5 @@ Test1 (wait with zero exit status of bg process)
 Test2 (wait with non-zero exit status of bg process)
 Test3 (pipeline wait for whole job)
 Ok:0
+Test4 (wait exit code with signal)
+Test5 (wait -n exits 127 if nothing to wait for)
