@@ -1,0 +1,3 @@
+First wait -n returned: 42 (expects 42)
+Second wait -n returned: 41 (expects 41)
+Third wait -n returned: 43 (expects 43)
