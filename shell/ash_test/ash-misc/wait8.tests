@@ -1,0 +1,47 @@
+# wait -n tests
+
+# should never wait for this one
+sleep 5 && echo "Background1: BUG!" &
+bg=$!
+
+# normal process
+echo "Test1 (wait with zero exit status of bg process)"
+sleep 1 &
+wait -n
+rc=$?
+if [ "$rc" != 0 ]; then
+	echo "Test1 exit code was not 0: $rc"
+fi
+
+# non-zero return code
+echo "Test2 (wait with non-zero exit status of bg process)"
+sh -c 'sleep 1; false' &
+pid2=$!
+wait -n
+rc=$?
+if [ "$rc" != 1 ]; then
+	echo "Test2 exit code was not 1: $rc"
+fi
+
+wait $pid2
+rc=$?
+if [ "$rc" != 1 ]; then
+	echo "Test2 exit code was not 1 on recheck: $rc"
+fi
+
+# pipeline... not too fast
+echo "Test3 (pipeline wait for whole job)"
+d1=$(date +%s)
+sleep 2 | sleep 1 &
+wait -n
+rc=$?
+if [ "$rc" != 0 ]; then
+	echo "Test3 exit code was not 0: $rc"
+fi
+d2=$(date +%s)
+if [ "$d2" -lt "$((d1 + 2))" ]; then
+	echo "Test3 finished in less than 2s"
+fi
+
+kill $bg
+echo Ok:$?
