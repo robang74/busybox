@@ -4369,7 +4369,7 @@ waitproc(int block, int *status)
 	return err;
 }
 
-static int waitone(int block, struct job *job)
+static struct job *waitone(int block, struct job *job)
 {
 	int pid;
 	int status;
@@ -4400,7 +4400,7 @@ static int waitone(int block, struct job *job)
 	pid = waitproc(block, &status);
 	TRACE(("wait returns pid %d, status=%d\n", pid, status));
 	if (pid <= 0)
-		return pid;
+		return NULL;
 
 	for (jp = curjob; jp; jp = jp->prev_job) {
 		int jobstate;
@@ -4465,35 +4465,31 @@ static int waitone(int block, struct job *job)
 		}
 	}
 
-	status = INT_MAX;
-	if (thisjob && thisjob->state == JOBDONE)
-		status = thisjob->ps[thisjob->nprocs - 1].ps_status;
-
-	return status;
+	return thisjob;
 }
 
-static int dowait_status(void)
+static struct job *dowait_status(void)
 {
-	int status, rstatus = -ENOENT;
+	struct job *jp, *rjp = NULL;
 	int block = DOWAIT_CHILD_OR_SIG;
 
 	do {
-		status = waitone(block, NULL);
-		if (status >= 0 && status < INT_MAX) {
-			rstatus = status;
+		jp = waitone(block, NULL);
+		if (jp && jp->state == JOBDONE) {
+			rjp = jp;
 			block = DOWAIT_NONBLOCK;
 		}
 		if (pending_sig)
 			break;
-	} while (status >= 0);
+	} while (jp || !rjp);
 
-	return rstatus;
+	return rjp;
 }
 
 static void dowait(int block, struct job *jp)
 {
 	smallint gotchld = *(volatile smallint *)&gotsigchld;
-	int status;
+	struct job *rjp;
 
 	if (jp && jp->state != JOBRUNNING)
 		block = DOWAIT_NONBLOCK;
@@ -4502,11 +4498,11 @@ static void dowait(int block, struct job *jp)
 		return;
 
 	do {
-		status = waitone(block, jp);
+		rjp = waitone(block, jp);
 
-		if (!status || (jp && jp->state != JOBRUNNING))
+		if (!rjp || (jp && jp->state != JOBRUNNING))
 			block = DOWAIT_NONBLOCK;
-	} while (status >= 0);
+	} while (block != DOWAIT_NONBLOCK || rjp);
 }
 
 /*
@@ -4826,12 +4822,17 @@ waitcmd(int argc UNUSED_PARAM, char **argv)
 	if (!argv[0]) {
 		/* wait for all jobs / one job if -n */
 		for (;;) {
-			jp = curjob;
 #if BASH_WAIT_N
-			if (one && !jp)
+			if (one) {
+				for (jp = curjob; jp; jp = jp->prev_job) {
+					if (jp->state == JOBDONE && !jp->waited)
+						goto oneout;
+				}
 				/* exitcode of "wait -n" with nothing to wait for is 127, not 0 */
 				retval = 127;
+			}
 #endif
+			jp = curjob;
 			while (1) {
 				if (!jp) /* no running procs */
 					goto ret;
@@ -4848,7 +4849,7 @@ waitcmd(int argc UNUSED_PARAM, char **argv)
 	 * the trap is executed."
 	 */
 #if BASH_WAIT_N
-			status = dowait_status();
+			jp = dowait_status();
 #else
 			dowait(DOWAIT_CHILD_OR_SIG, NULL);
 #endif
@@ -4859,11 +4860,14 @@ waitcmd(int argc UNUSED_PARAM, char **argv)
 			if (pending_sig)
 				goto sigout;
 #if BASH_WAIT_N
-			if (one) {
+			if (one && jp) {
 				/* wait -n waits for one _job_, not one _process_.
 				 *  date; sleep 3 & sleep 2 | sleep 1 & wait -n; date
 				 * should wait for 2 seconds. Not 1 or 3.
 				 */
+oneout:
+				jp->waited = 1;
+				status = jp->ps[jp->nprocs - 1].ps_status;
 				if (status != -1 && !WIFSTOPPED(status)) {
 					retval = WEXITSTATUS(status);
 					if (WIFSIGNALED(status))
