@@ -728,8 +728,8 @@ typedef struct ioloop_state {
 	ioloop_state_t *io; \
 	int read_fd; \
 	int write_fd; \
-	int (*have_buffer_to_read_into)(void *this); \
-	int (*have_data_to_write)(void *this); \
+	int (*should_poll_read_fd)(void *this); \
+	int (*should_poll_write_fd)(void *this); \
 	int (*read)(void *this); \
 	int (*write)(void *this); \
 
