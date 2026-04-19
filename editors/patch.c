@@ -436,13 +436,6 @@ int patch_main(int argc UNUSED_PARAM, char **argv)
 		// Are we assembling a hunk?
 		if (state >= 2) {
 			switch (*patchline) {
-			case '\\':
-				// '\ No newline at end of file' detected, mark
-				// previous line, if it exists.
-				if (TT.current_hunk->prev)
-					TT.current_hunk->prev->no_newline = TRUE;
-				free(patchline);
-				continue;
 			case ' ':
 			case '+':
 			case '-':
@@ -471,10 +464,19 @@ int patch_main(int argc UNUSED_PARAM, char **argv)
 					}
 					state = apply_one_hunk();
 				}
-				continue;
+				break;
+			case '\\':
+				// '\ No newline at end of file' detected, mark
+				// previous line, if it exists.
+				if (TT.current_hunk->prev)
+					TT.current_hunk->prev->no_newline = TRUE;
+				free(patchline);
+				break;
+			default:
+				fail_hunk();
+				state = 0;
+				break;
 			}
-			fail_hunk();
-			state = 0;
 			continue;
 		}
 
