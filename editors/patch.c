@@ -57,6 +57,7 @@ struct double_list {
 	struct double_list *next;
 	struct double_list *prev;
 	char *data;
+	int no_newline;
 };
 
 // Free all the elements of a linked list
@@ -76,7 +77,7 @@ static void dlist_free(struct double_list *list, void (*freeit)(void *data))
 static struct double_list *dlist_add(struct double_list **list, char *data)
 {
 	struct double_list *llist;
-	struct double_list *line = xmalloc(sizeof(*line));
+	struct double_list *line = xzalloc(sizeof(*line));
 
 	line->data = data;
 	llist = *list;
@@ -140,7 +141,8 @@ static void do_line(void *data)
 
 	if (TT.state > 1 && *dlist->data != TT.state)
 		fdprintf(TT.state == 2 ? 2 : TT.fileout,
-			"%s\n", dlist->data + (TT.state > 3 ? 1 : 0));
+			dlist->no_newline && TT.state != 2 ? "%s" : "%s\n",
+			dlist->data + (TT.state > 3 ? 1 : 0));
 
 	if (PATCH_DEBUG) fdprintf(2, "DO %d: %s\n", TT.state, dlist->data);
 
@@ -433,7 +435,17 @@ int patch_main(int argc UNUSED_PARAM, char **argv)
 
 		// Are we assembling a hunk?
 		if (state >= 2) {
-			if (*patchline == ' ' || *patchline == '+' || *patchline == '-') {
+			switch (*patchline) {
+			case '\\':
+				// '\ No newline at end of file' detected, mark
+				// previous line, if it exists.
+				if (TT.current_hunk->prev)
+					TT.current_hunk->prev->no_newline = TRUE;
+				free(patchline);
+				continue;
+			case ' ':
+			case '+':
+			case '-':
 				dlist_add(&TT.current_hunk, patchline);
 
 				if (*patchline != '+') oldlen--;
@@ -445,7 +457,20 @@ int patch_main(int argc UNUSED_PARAM, char **argv)
 
 				// If we've consumed all expected hunk lines, apply the hunk.
 
-				if (!oldlen && !newlen) state = apply_one_hunk();
+				if (!oldlen && !newlen) {
+					// Peek ahead for '\ No newline at end of file', mark
+					// previous line, if it exists.
+					int c = getchar();
+					ungetc(c, stdin);
+					if (c == '\\') {
+						if (TT.current_hunk->prev)
+							TT.current_hunk->prev->no_newline = TRUE;
+						do {
+							c = getchar();
+						} while (c != EOF && c != '\n');
+					}
+					state = apply_one_hunk();
+				}
 				continue;
 			}
 			fail_hunk();
