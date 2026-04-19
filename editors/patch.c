@@ -454,7 +454,7 @@ int patch_main(int argc UNUSED_PARAM, char **argv)
 					// Peek ahead for '\ No newline at end of file', mark
 					// previous line, if it exists.
 					int c = getchar();
-					ungetc(c, stdin);
+					if (c != EOF) ungetc(c, stdin);
 					if (c == '\\') {
 						if (TT.current_hunk->prev)
 							TT.current_hunk->prev->no_newline = TRUE;
