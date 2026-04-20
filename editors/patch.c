@@ -148,7 +148,7 @@ static void do_line(void *data)
 	free(dlist);
 }
 
-static void finish_oldfile(void)
+static void finish_oldfile(char no_newline)
 {
 	if (TT.tempname) {
 		// Copy the rest of the data and replace the original with the copy.
@@ -157,6 +157,16 @@ static void finish_oldfile(void)
 		if (TT.filein != -1) {
 			bb_copyfd_eof(TT.filein, TT.fileout);
 			xclose(TT.filein);
+		}
+		if(no_newline){
+		    // All these checks are likely useless in this specific case because:
+		    // patch operates on a file in output, lseek can fails only if size=0
+		    // thus read would not change no_newline and truncate will not happen.
+		    // While xlseek would die but it shouldn't here, just skip & continue.
+		    off_t size = lseek(TT.fileout, -1, SEEK_CUR);
+		    read(TT.fileout, &no_newline, 1);
+		    if(no_newline == '\n')
+		        ftruncate(TT.fileout, size);
 		}
 		xclose(TT.fileout);
 
@@ -362,7 +372,7 @@ int patch_main(int argc UNUSED_PARAM, char **argv)
 	int opts;
 	int reverse, state = 0;
 	char *oldname = NULL, *newname = NULL;
-	char *opt_p, *opt_i;
+	char *opt_p, *opt_i, no_newline = FALSE;
 	long oldlen = oldlen; /* for compiler */
 	long newlen = newlen; /* for compiler */
 
@@ -429,7 +439,13 @@ int patch_main(int argc UNUSED_PARAM, char **argv)
 		if (!*patchline) {
 			free(patchline);
 			patchline = xstrdup(" ");
-		}
+		} else
+		if (*patchline == '\\') {
+			// '\ No newline at end of file' detected
+			no_newline = TRUE;
+			free(patchline);
+			continue;
+        }
 
 		// Are we assembling a hunk?
 		if (state >= 2) {
@@ -444,12 +460,12 @@ int patch_main(int argc UNUSED_PARAM, char **argv)
 				else state = 3;
 
 				// If we've consumed all expected hunk lines, apply the hunk.
-
-				if (!oldlen && !newlen) state = apply_one_hunk();
-				continue;
+				if (!oldlen && !newlen)
+					state = apply_one_hunk();
+			} else {
+				fail_hunk();
+				state = 0;
 			}
-			fail_hunk();
-			state = 0;
 			continue;
 		}
 
@@ -463,7 +479,8 @@ int patch_main(int argc UNUSED_PARAM, char **argv)
 				state = 1;
 			}
 
-			finish_oldfile();
+			finish_oldfile(no_newline);
+			no_newline = FALSE;
 
 			if (!argv[0]) {
 				free(*name);
@@ -605,7 +622,7 @@ int patch_main(int argc UNUSED_PARAM, char **argv)
 		free(patchline);
 	}
 
-	finish_oldfile();
+	finish_oldfile(no_newline);
 
 	if (ENABLE_FEATURE_CLEAN_UP) {
 		free(oldname);
