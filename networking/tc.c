@@ -16,7 +16,13 @@
 //config:	bool "Enable ingress"
 //config:	default y
 //config:	depends on TC
-
+//config:config FEATURE_TC_CBQ
+//config:	bool "CBQ qdisc support"
+//config:	default n
+//config:	depends on TC
+//config:	help
+//config:	Legacy support for CBQ (Class Based Queueing) qdisc output.
+ 
 //applet:IF_TC(APPLET(tc, BB_DIR_SBIN, BB_SUID_DROP))
 
 //kbuild:lib-$(CONFIG_TC) += tc.o
@@ -31,7 +37,7 @@
 //usage:	"qdisc [handle QHANDLE] [root|"IF_FEATURE_TC_INGRESS("ingress|")"parent CLASSID]\n"
 /* //usage: "[estimator INTERVAL TIME_CONSTANT]\n" */
 //usage:	"	[[QDISC_KIND] [help|OPTIONS]]\n"
-//usage:	"	QDISC_KIND := [p|b]fifo|tbf|prio|cbq|red|etc.\n"
+//usage:	"	QDISC_KIND := [p|b]fifo|tbf|prio"IF_FEATURE_TC_CBQ("|cbq")"|red|etc.\n"
 //usage:	"qdisc show [dev STRING]"IF_FEATURE_TC_INGRESS(" [ingress]")"\n"
 //usage:	"class [classid CLASSID] [root|parent CLASSID]\n"
 //usage:	"	[[QDISC_KIND] [help|OPTIONS] ]\n"
@@ -224,6 +230,7 @@ static int prio_print_opt(struct rtattr *opt)
 	return 0;
 }
 
+#if ENABLE_FEATURE_TC_CBQ
 #if 0
 /* Class Based Queue */
 static int cbq_parse_opt(int argc, char **argv, struct nlmsghdr *n)
@@ -322,6 +329,7 @@ static int cbq_print_opt(struct rtattr *opt)
  done:
 	return 0;
 }
+#endif /* ENABLE_FEATURE_TC_CBQ */
 
 static FAST_FUNC int print_qdisc(
 		const struct sockaddr_nl *who UNUSED_PARAM,
@@ -373,7 +381,9 @@ static FAST_FUNC int print_qdisc(
 		if (qqq == 0) { /* pfifo_fast aka prio */
 			prio_print_opt(tb[TCA_OPTIONS]);
 		} else if (qqq == 1) { /* class based queuing */
+#if ENABLE_FEATURE_TC_CBQ
 			cbq_print_opt(tb[TCA_OPTIONS]);
+#endif
 		} else {
 			/* don't know how to print options for this qdisc */
 			printf("(options for %s)", name);
@@ -444,7 +454,9 @@ static FAST_FUNC int print_class(
 			/* nothing. */ /*prio_print_opt(tb[TCA_OPTIONS]);*/
 		} else if (qqq == 1) { /* class based queuing */
 			/* cbq_print_copt() is identical to cbq_print_opt(). */
+#if ENABLE_FEATURE_TC_CBQ
 			cbq_print_opt(tb[TCA_OPTIONS]);
+#endif
 		} else {
 			/* don't know how to print options for this class */
 			printf("(options for %s)", name);
