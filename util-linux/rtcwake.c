@@ -131,6 +131,7 @@ int rtcwake_main(int argc UNUSED_PARAM, char **argv)
 	time_t sys_time;
 	time_t alarm_time = alarm_time;
 	unsigned seconds = seconds; /* for compiler */
+	char tbuf[CTIME_BUF_MAXLEN];
 	int utc = -1;
 	int fd;
 
