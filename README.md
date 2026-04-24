@@ -38,6 +38,14 @@ from `git.busybox.net` before it went down, at commit [#bee25205](https://github
 dated 2026-03-16. The change of the 'master' branch (the fork) happens on 2026-04-20,
 once realised that the `git.busybox.net` crysis could have not be nor short nor temporary.
 
+#### Legacy status
+
+Open potentially alerts by severity/class in branch `main`:
+
+- **security**: 103 critical, 96 high, 4 medium, **203 total**
+
+Alerts above are related to C-language code, none otherwise.
+
 <br>
 
 ### The fork
@@ -63,4 +71,4 @@ contributes are merged and it is dedicated to my personal project
 
 ### Maintainer
 
-Limited to this specific fork the maintainer is [Roberto A. Foglietta](mailto:roberto.foglietta@gmail.com)
+Limited to this specific fork, the maintainer is [Roberto A. Foglietta](mailto:roberto.foglietta@gmail.com)
