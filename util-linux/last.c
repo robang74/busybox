@@ -73,6 +73,7 @@ int last_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
 	int n, file = STDIN_FILENO;
 	time_t t_tmp;
 	off_t pos;
+	char tbuf[CTIME_BUF_MAXLEN];
 	static const char _ut_usr[] ALIGN1 =
 			"runlevel\0" "reboot\0" "shutdown\0";
 	static const char _ut_lin[] ALIGN1 =
@@ -154,7 +155,7 @@ int last_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
 		 * but some systems have it wrong */
 		t_tmp = (time_t)ut.ut_tv.tv_sec;
 		printf("%-10s %-14s %-18s %-12.12s\n",
-			ut.ut_user, ut.ut_line, ut.ut_host, ctime(&t_tmp) + 4);
+			ut.ut_user, ut.ut_line, ut.ut_host, ctime_r(&t_tmp,tbuf,tbuf) + 4);
  next:
 		pos -= sizeof(ut);
 		if (pos < 0)
