@@ -114,6 +114,7 @@ int who_main(int argc UNUSED_PARAM, char **argv)
 	struct utmpx *ut;
 	unsigned opt;
 	const char *fmt = "%s";
+	char tbuf[CTIME_BUF_MAXLEN];
 
 	opt = getopt32(argv, do_who ? "^" "aH" "\0" "=0": "^" "" "\0" "=0");
 	if ((opt & 2) || do_w) /* -H or we are w */
@@ -153,7 +154,7 @@ int who_main(int argc UNUSED_PARAM, char **argv)
 // TODO: with LANG=en_US.UTF-8, who from coreutils 8.25 shows
 // TIME col as "2017-04-06 18:47" (the default format is "Apr  6 18:47").
 // The former format looks saner to me. Switch to it unconditionally?
-						ctime(&seconds) + 4,
+						ctime_r(&seconds,tbuf) + 4,
 						(int)sizeof(ut->ut_host), ut->ut_host
 				);
 			} else {
