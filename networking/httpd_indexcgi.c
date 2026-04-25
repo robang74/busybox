@@ -348,7 +348,7 @@ int main(int argc, char **argv)
 	count_files = 0;
 	size_total = 0;
 	while (--dir_list_count >= 0) {
-		struct tm *ptm;
+		struct tm *ptm, tres;
 		time_t tt;
 
 		cdir = *dir_list++;
@@ -375,10 +375,10 @@ int main(int argc, char **argv)
 			dst = fmt_ull(dst, cdir->D_SIZE);
 		dst = fmt_str(dst, "<td class=dt>");
 		if (sizeof(cdir->D_MTIME) == sizeof(tt))
-			ptm = gmtime((time_t*)&cdir->D_MTIME);
+			ptm = gmtime_r((time_t*)&cdir->D_MTIME,&tres);
 		else {
 			tt = cdir->D_MTIME;
-			ptm = gmtime(&tt);
+			ptm = gmtime_r(&tt,&tres);
 		}
 		dst = fmt_04u(dst, 1900 + ptm->tm_year); *dst++ = '-';
 		dst = fmt_02u(dst, ptm->tm_mon + 1); *dst++ = '-';
