@@ -98,15 +98,17 @@ static void show_clock(const char **pp_rtcname, int utc)
 #if SHOW_HWCLOCK_DIFF
 	struct timeval sys_tv;
 #endif
+	char tbuf[CTIME_BUF_MAXLEN];
 	time_t t = read_rtc(pp_rtcname, &sys_tv, utc);
 
 #if ENABLE_LOCALE_SUPPORT
 	/* Standard hwclock uses locale-specific output format */
 	char cp[64];
-	struct tm *ptm = localtime(&t);
+	struct tm tres;
+	struct tm *ptm = localtime_r(&t,&tres);
 	strftime(cp, sizeof(cp), "%c", ptm);
 #else
-	char *cp = ctime(&t);
+	char *cp = ctime_r(&t,tbuf);
 	chomp(cp);
 #endif
 
@@ -168,6 +170,7 @@ static void set_kernel_tz(const struct timezone *tz)
 static void set_kernel_timezone_and_clock(int utc, const struct timeval *hctosys)
 {
 	time_t cur;
+	struct tm tres;
 	struct tm *broken;
 	struct timezone tz = { 0 };
 
@@ -180,7 +183,7 @@ static void set_kernel_timezone_and_clock(int utc, const struct timeval *hctosys
 //...but it does NOT include DST shift (IOW: it's WRONG, usually by one hour,
 //if DST is in effect!) Thus this ridiculous dance:
 	cur = time(NULL);
-	broken = localtime(&cur);
+	broken = localtime_r(&cur,&tres);
 	tz.tz_minuteswest = -broken->tm_gmtoff / 60;
 	/*tz.tz_dsttime = 0; already is */
 	set_kernel_tz(&tz); /* MIGHT warp_clock() if 1st call since boot */
