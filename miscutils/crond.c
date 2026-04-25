@@ -893,14 +893,14 @@ static void flag_starting_jobs(time_t t1, time_t t2)
 	/* Find jobs > t1 and <= t2 */
 
 	for (t = t1 - t1 % 60; t <= t2; t += 60) {
-		struct tm *ptm;
+		struct tm *ptm, tres;
 		CronFile *file;
 		CronLine *line;
 
 		if (t <= t1)
 			continue;
 
-		ptm = localtime(&t);
+		ptm = localtime_r(&t,&tres);
 		for (file = G.cron_files; file; file = file->cf_next) {
 			log5("file %s:", file->cf_username);
 			if (file->cf_deleted)
