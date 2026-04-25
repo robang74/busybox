@@ -152,13 +152,14 @@ static const char *file_type(const struct stat *st)
 static const char *human_time(struct timespec *ts)
 {
 	char fmt[sizeof("%Y-%m-%d %H:%M:%S.123456789 %z") + /*paranoia*/ 8];
+	struct tm tres;
 
 	/* coreutils 6.3 compat */
 #define buf bb_common_bufsiz1
 	setup_common_bufsiz();
 
 	sprintf(stpcpy(fmt, "%Y-%m-%d %H:%M:%S"), ".%09u %%z", (unsigned)ts->tv_nsec);
-	strftime(buf, COMMON_BUFSIZE, fmt, localtime(&ts->tv_sec));
+	strftime(buf, COMMON_BUFSIZE, fmt, localtime_r(&ts->tv_sec,&tres));
 	return buf;
 #undef buf
 }
