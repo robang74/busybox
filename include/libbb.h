@@ -192,6 +192,10 @@ int klogctl(int type, char *b, int len);
 # define BUFSIZ 4096
 #endif
 
+#ifndef CTIME_BUF_MAXLEN
+#define CTIME_BUF_MAXLEN 26
+#endif
+
 #if __GNUC_PREREQ(5,0)
 /* Since musl is apparently unable to get it right and would use
  * a function call to a single-instruction function of "bswap %eax",
