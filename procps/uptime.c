@@ -59,6 +59,7 @@ int uptime_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
 	struct sysinfo info;
 	struct tm *current_time;
 	time_t current_secs;
+	struct tm tres;
 
 	opts = getopt32(argv, "s");
 
@@ -68,7 +69,7 @@ int uptime_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
 	if (opts) // -s
 		current_secs -= info.uptime;
 
-	current_time = localtime(&current_secs);
+	current_time = localtime_r(&current_secs,&tres);
 
 	if (opts) { // -s
 		printf("%04u-%02u-%02u %02u:%02u:%02u\n",
