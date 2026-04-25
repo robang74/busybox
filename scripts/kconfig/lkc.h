@@ -37,6 +37,9 @@ extern "C" {
 #define _(text) gettext(text)
 #define N_(text) (text)
 
+#ifndef CTIME_BUF_MAXLEN
+#define CTIME_BUF_MAXLEN 26
+#endif
 
 #define TF_COMMAND	0x0001
 #define TF_PARAM	0x0002
