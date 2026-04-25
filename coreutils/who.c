@@ -114,6 +114,7 @@ int who_main(int argc UNUSED_PARAM, char **argv)
 	struct utmpx *ut;
 	unsigned opt;
 	const char *fmt = "%s";
+	char tbuf[CTIME_BUF_MAXLEN];
 
 	opt = getopt32(argv, do_who ? "^" "aH" "\0" "=0": "^" "" "\0" "=0");
 	if ((opt & 2) || do_w) /* -H or we are w */
