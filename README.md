@@ -46,6 +46,8 @@ Open potentially alerts by severity/class in branch `main`:
 
 Alerts above are related to C-language code, none otherwise.
 
+- **addressed**: 44, class: potentially dangerous function use
+
 <br>
 
 ### The fork
