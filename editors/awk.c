@@ -2721,6 +2721,7 @@ static NOINLINE var *exec_builtin(node *op, var *res)
 	node *an[4];
 	var *av[4];
 	const char *as[4];
+	struct tm tres;
 	node *spl;
 	uint32_t isr, info;
 	int nargs;
@@ -2866,7 +2867,7 @@ static NOINLINE var *exec_builtin(node *op, var *res)
 			time(&tt);
 		i = strftime(g_buf, MAXVARFMT,
 			((nargs > 0) ? as[0] : "%a %b %d %H:%M:%S %Z %Y"),
-			localtime(&tt));
+			localtime_r(&tt,&tres));
 		setvar_sn(res, g_buf, i);
 		break;
 
