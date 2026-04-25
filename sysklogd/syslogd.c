@@ -824,6 +824,7 @@ static void parse_fac_prio_20(int pri, char *res20)
 static void timestamp_and_log(int pri, char *msg, int len)
 {
 	char *timestamp = NULL;
+	char tbuf[CTIME_BUF_MAXLEN];
 	time_t now;
 
 	/* Jan 18 00:11:22 msg... */
@@ -844,7 +845,7 @@ static void timestamp_and_log(int pri, char *msg, int len)
 		struct timeval tv;
 		xgettimeofday(&tv);
 		now = tv.tv_sec;
-		timestamp = ctime(&now) + 4; /* skip day of week */
+		timestamp = ctime_r(&now,tbuf) + 4; /* skip day of week */
 		/* overwrite year by milliseconds, zero terminate */
 		sprintf(timestamp + 15, ".%03u", (unsigned)tv.tv_usec / 1000u);
 	} else {
@@ -853,7 +854,7 @@ static void timestamp_and_log(int pri, char *msg, int len)
 #else
 	if (!timestamp) {
 		time(&now);
-		timestamp = ctime(&now) + 4; /* skip day of week */
+		timestamp = ctime_r(&now,tbuf) + 4; /* skip day of week */
 	}
 	timestamp[15] = '\0';
 #endif
