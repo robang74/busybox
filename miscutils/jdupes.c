@@ -22,7 +22,7 @@
 
 //config:config JDUPES
 //config:	bool "jdupes (18.9 kb)"
-//config:	default y
+//config:	default n
 //config:	help
 //config:	A powerful duplicate file finder and manager
 //config:
