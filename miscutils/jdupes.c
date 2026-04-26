@@ -206,10 +206,10 @@
 
 #include "libbb.h"
 
-#define JODY_HASH_WIDTH 32
-typedef uint32_t jodyhash_t;
+#define JDUP_HASH_WIDTH 32
+typedef uint32_t jduphash_t;
 /* Set hash type (change this if swapping in a different hash function) */
-typedef jodyhash_t jdupes_hash_t;
+typedef jduphash_t jdupes_hash_t;
 
 typedef ino_t jdupes_ino_t;
 typedef mode_t jdupes_mode_t;
@@ -470,9 +470,9 @@ static void sighandler(const int signum)
  * Released under The MIT License
  */
 
-#define JODY_HASH_SHIFT 14
-#define JODY_HASH_CONSTANT 0x1f3d5b79U
-static const jodyhash_t tail_mask[] = {
+#define JDUP_HASH_SHIFT 14
+#define JDUP_HASH_CONSTANT 0x1f3d5b79U
+static const jduphash_t tail_mask[] = {
 	0x00000000,
 	0x000000ff,
 	0x0000ffff,
@@ -480,47 +480,47 @@ static const jodyhash_t tail_mask[] = {
 	0xffffffff,
 };
 
-static jodyhash_t jody_block_hash(const jodyhash_t * restrict data,
-		const jodyhash_t start_hash, const size_t count)
+static jduphash_t jdup_block_hash(const jduphash_t * restrict data,
+		const jduphash_t start_hash, const size_t count)
 {
-	jodyhash_t hash = start_hash;
-	jodyhash_t element;
-	jodyhash_t partial_salt;
+	jduphash_t hash = start_hash;
+	jduphash_t element;
+	jduphash_t partial_salt;
 	size_t len;
 
 	/* Don't bother trying to hash a zero-length block */
 	if (count == 0) return hash;
 
-	len = count / sizeof(jodyhash_t);
+	len = count / sizeof(jduphash_t);
 	for (; len > 0; len--) {
 		element = *data;
 		hash += element;
-		hash += JODY_HASH_CONSTANT;
-		hash = (hash << JODY_HASH_SHIFT) | hash >> (sizeof(jodyhash_t) * 8 - JODY_HASH_SHIFT); /* bit rotate left */
+		hash += JDUP_HASH_CONSTANT;
+		hash = (hash << JDUP_HASH_SHIFT) | hash >> (sizeof(jduphash_t) * 8 - JDUP_HASH_SHIFT); /* bit rotate left */
 		hash ^= element;
-		hash = (hash << JODY_HASH_SHIFT) | hash >> (sizeof(jodyhash_t) * 8 - JODY_HASH_SHIFT);
-		hash ^= JODY_HASH_CONSTANT;
+		hash = (hash << JDUP_HASH_SHIFT) | hash >> (sizeof(jduphash_t) * 8 - JDUP_HASH_SHIFT);
+		hash ^= JDUP_HASH_CONSTANT;
 		hash += element;
 		data++;
 	}
 
-	/* Handle data tail (for blocks indivisible by sizeof(jodyhash_t)) */
-	len = count & (sizeof(jodyhash_t) - 1);
+	/* Handle data tail (for blocks indivisible by sizeof(jduphash_t)) */
+	len = count & (sizeof(jduphash_t) - 1);
 	if (len) {
-		partial_salt = JODY_HASH_CONSTANT & tail_mask[len];
+		partial_salt = JDUP_HASH_CONSTANT & tail_mask[len];
 		element = *data & tail_mask[len];
 		hash += element;
 		hash += partial_salt;
-		hash = (hash << JODY_HASH_SHIFT) | hash >> (sizeof(jodyhash_t) * 8 - JODY_HASH_SHIFT);
+		hash = (hash << JDUP_HASH_SHIFT) | hash >> (sizeof(jduphash_t) * 8 - JDUP_HASH_SHIFT);
 		hash ^= element;
-		hash = (hash << JODY_HASH_SHIFT) | hash >> (sizeof(jodyhash_t) * 8 - JODY_HASH_SHIFT);
+		hash = (hash << JDUP_HASH_SHIFT) | hash >> (sizeof(jduphash_t) * 8 - JDUP_HASH_SHIFT);
 		hash ^= partial_salt;
 		hash += element;
 	}
 
 	return hash;
 }
-/* End jody_hash.c/.h */
+/* End jdup_hash.c/.h */
 
 
 /* Compare two hashes like memcmp() */
@@ -1781,7 +1781,7 @@ static jdupes_hash_t *get_filehash(const file_t * const restrict checkfile,
       return NULL;
     }
 
-    *hash = jody_block_hash(chunk, *hash, bytes_to_read);
+    *hash = jdup_block_hash(chunk, *hash, bytes_to_read);
     if ((off_t)bytes_to_read > fsize) break;
     else fsize -= (off_t)bytes_to_read;
 
