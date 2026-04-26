@@ -501,6 +501,20 @@ static jduphash_t jdup_block_hash(const jduphash_t * restrict data,
 	size_t len;
 
 	/* Don't bother trying to hash a zero-length block */
+	/* RAF: BUG-PRONE ALERT
+	 * In general case a hashing function should return the same value
+	 * for the same input and this happens here but returning zero is
+	 * a more strightforwad alternative if zero is a corner case.
+	 *
+	 * However, considering that every zero-size block has the same hash
+	 * this can create collisions among all zero-size blocks but their
+	 * position in a filesystem isn't equivalent, not necessarly a bug
+	 * but a bug-prone choice for further development / code adaptations.
+	 *
+	 * It is mandatory to explain WHY we should care about it, at least.
+	 * Moreover, speed hasing isn't the priority but collision rate is way
+	 * more important. Also this aspect should be evaluated and explained.
+	 */
 	if (count == 0) return hash;
 
 	len = getsize_in_jduphash(count);
