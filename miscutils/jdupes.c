@@ -213,7 +213,7 @@ typedef jduphash_t jdupes_hash_t;
 #define getsize_in_jduphash(a) ((a) >> 2) // 4 bytes for each 32bit jdup hash
 #define getrest_in_jduphash(a) ((a) &  3)
 #define jdup_left_bitrot(h) \
-  ((h << JDUP_HASH_SHIFT) | (h >> (JDUP_HASH_WIDTH-JDUP_HASH_SHIFT)))
+	((h << JDUP_HASH_SHIFT) | (h >> (JDUP_HASH_WIDTH-JDUP_HASH_SHIFT)))
 
 typedef ino_t jdupes_ino_t;
 typedef mode_t jdupes_mode_t;
@@ -317,20 +317,20 @@ struct exclude {
 };
 
 /* Exclude parameter flags */
-#define X_DIR			0x00000001U
-#define X_SIZE_EQ		0x00000002U
-#define X_SIZE_GT		0x00000004U
-#define X_SIZE_LT		0x00000008U
+#define X_DIR           0x00000001U
+#define X_SIZE_EQ       0x00000002U
+#define X_SIZE_GT       0x00000004U
+#define X_SIZE_LT       0x00000008U
 /* The X-than-or-equal are combination flags */
-#define X_SIZE_GTEQ		0x00000006U
-#define X_SIZE_LTEQ		0x0000000aU
+#define X_SIZE_GTEQ     0x00000006U
+#define X_SIZE_LTEQ     0x0000000aU
 
 /* Size specifier flags */
-#define XX_EXCL_SIZE		0x0000000eU
+#define XX_EXCL_SIZE    0x0000000eU
 /* Flags that use numeric offset instead of a string */
-#define XX_EXCL_OFFSET		0x0000000eU
+#define XX_EXCL_OFFSET  0x0000000eU
 /* Flags that require a data parameter */
-#define XX_EXCL_DATA		0x0000000fU
+#define XX_EXCL_DATA    0x0000000fU
 
 /* Exclude definition array */
 struct exclude_tags {
@@ -347,19 +347,19 @@ struct size_suffix {
 /* Size suffixes - this gets exported */
 static const struct size_suffix size_suffix[] = {
   /* Byte (someone may actually try to use this) */
-  { "b", 1 },
-  { "k", 1024 },
-  { "kib", 1024 },
-  { "m", 1048576 },
-  { "mib", 1048576 },
-  { "g", (uint64_t)1048576 * 1024 },
-  { "gib", (uint64_t)1048576 * 1024 },
-  { "t", (uint64_t)1048576 * 1048576 },
-  { "tib", (uint64_t)1048576 * 1048576 },
-  { "p", (uint64_t)1048576 * 1048576 * 1024},
-  { "pib", (uint64_t)1048576 * 1048576 * 1024},
-  { "e", (uint64_t)1048576 * 1048576 * 1048576},
-  { "eib", (uint64_t)1048576 * 1048576 * 1048576},
+  { "b",             1     },
+  { "k",   (uint64_t)1<<10 },
+  { "kib", (uint64_t)1<<10 },
+  { "m",   (uint64_t)1<<20 },
+  { "mib", (uint64_t)1<<20 },
+  { "g",   (uint64_t)1<<30 },
+  { "gib", (uint64_t)1<<30 },
+  { "t",   (uint64_t)1<<40 },
+  { "tib", (uint64_t)1<<40 },
+  { "p",   (uint64_t)1<<50 },
+  { "pib", (uint64_t)1<<50 },
+  { "e",   (uint64_t)1<<60 },
+  { "eib", (uint64_t)1<<60 },
   /* Decimal suffixes */
   { "kb", 1000 },
   { "mb", 1000000 },
@@ -373,12 +373,12 @@ static const struct size_suffix size_suffix[] = {
 /* Exclusion tree head and static tag list */
 static struct exclude *exclude_head = NULL;
 static const struct exclude_tags exclude_tags[] = {
-  { "dir",	X_DIR },
-  { "size+",	X_SIZE_GT },
-  { "size+=",	X_SIZE_GTEQ },
-  { "size-=",	X_SIZE_LTEQ },
-  { "size-",	X_SIZE_LT },
-  { "size=",	X_SIZE_EQ },
+  { "dir",    X_DIR },
+  { "size+",  X_SIZE_GT },
+  { "size+=", X_SIZE_GTEQ },
+  { "size-=", X_SIZE_LTEQ },
+  { "size-",  X_SIZE_LT },
+  { "size=",  X_SIZE_EQ },
   { NULL, 0 },
 };
 
@@ -484,6 +484,14 @@ static const jduphash_t tail_mask[] = {
 	0xffffffff,
 };
 
+/* RAF: BUG ALERT
+ * ***************************************************************************
+ * This function is reading data beyond its allocation in 2nd-if clause.
+ * It happens because its prototype is flawed in its declaration, count:
+ * - cont should indicate the number of items not the size in bytes
+ * - or viceversa count in bytes implies data as void* or char*
+ * ***************************************************************************
+ */
 static jduphash_t jdup_block_hash(const jduphash_t * restrict data,
 		const jduphash_t start_hash, const size_t count)
 {
@@ -1726,7 +1734,8 @@ static jdupes_hash_t *get_filehash(const file_t * const restrict checkfile,
   int check = 0;
 #endif
 
-  if (checkfile == NULL || checkfile->d_name == NULL) bb_error_msg_and_die("NULL -> get_filehash()");
+  if (checkfile == NULL || checkfile->d_name == NULL) {}
+  else bb_error_msg_and_die("NULL -> %s()", __func__);
 
   /* Allocate on first use */
   if (chunk == NULL) {
@@ -1811,7 +1820,8 @@ static void registerfile(filetree_t * restrict * const restrict nodeptr,
 {
   filetree_t * restrict branch;
 
-  if (nodeptr == NULL || file == NULL || (d != NONE && *nodeptr == NULL)) bb_error_msg_and_die("NULL -> registerfile()");
+  if (nodeptr && d != NONE && *nodeptr && file) {}
+  else bb_error_msg_and_die("NULL -> %s()", __func__);
 
   /* Allocate and initialize a new node for the file */
   branch = (filetree_t *)xmalloc(sizeof(filetree_t));
@@ -1833,13 +1843,15 @@ static void registerfile(filetree_t * restrict * const restrict nodeptr,
       break;
     default:
       /* This should never ever happen */
-      bb_error_msg_and_die("\ninternal error: invalid direction for registerfile(), report this\n");
+      bb_error_msg_and_die("\nBUG in %s() inverse direction, report1\n", __func__);
       break;
   }
 
   return;
 }
 
+#define print_matches(txt) printf("%s:\n\t%s\n\t%s\n\n",txt,\
+		file->d_name, tree->file->d_name);
 
 /* Check two files for a match */
 static file_t **checkmatch(filetree_t * restrict tree, file_t * const restrict file)
@@ -1847,17 +1859,20 @@ static file_t **checkmatch(filetree_t * restrict tree, file_t * const restrict f
   int cmpresult = 0;
   const jdupes_hash_t * restrict filehash;
 
-  if (tree == NULL || file == NULL || tree->file == NULL || tree->file->d_name == NULL || file->d_name == NULL) bb_error_msg_and_die("NULL -> checkmatch()");
+  if (tree && tree->file && tree->file->d_name && file && file->d_name) {}
+  else bb_error_msg_and_die("NULL -> %s()", __func__);
 
   /* If device and inode fields are equal one of the files is a
    * hard link to the other or the files have been listed twice
    * unintentionally. We don't want to flag these files as
-   * duplicates unless the user specifies otherwise. */
+   * duplicates unless the user specifies otherwise.
+   */
 
-/* If considering hard linked files as duplicates, they are
- * automatically duplicates without being read further since
- * they point to the exact same inode. If we aren't considering
- * hard links as duplicates, we just return NULL. */
+  /* If considering hard linked files as duplicates, they are
+   * automatically duplicates without being read further since
+   * they point to the exact same inode. If we aren't considering
+   * hard links as duplicates, we just return NULL.
+   */
 
   cmpresult = check_conditions(tree->file, file);
   switch (cmpresult) {
@@ -1867,7 +1882,8 @@ static file_t **checkmatch(filetree_t * restrict tree, file_t * const restrict f
   }
 
   /* Print pre-check (early) match candidates if requested */
-  if (ISFLAG(p_flags, P_EARLYMATCH)) printf("Early match check passed:\n   %s\n   %s\n\n", file->d_name, tree->file->d_name);
+  if (ISFLAG(p_flags, P_EARLYMATCH))
+    print_matches("Early match check passed");
 
   /* If preliminary matching succeeded, do main file data checks */
   if (cmpresult == 0) {
@@ -1892,7 +1908,7 @@ static file_t **checkmatch(filetree_t * restrict tree, file_t * const restrict f
 
     /* Print partial hash matching pairs if requested */
     if (cmpresult == 0 && ISFLAG(p_flags, P_PARTIAL))
-      printf("Partial hashes match:\n   %s\n   %s\n\n", file->d_name, tree->file->d_name);
+      print_matches("Partial hashes match");
 
     if (file->size <= PARTIAL_HASH_SIZE || ISFLAG(flags, F_PARTIALONLY)) {
       /* filehash_partial = filehash if file is small enough */
@@ -1943,12 +1959,14 @@ static file_t **checkmatch(filetree_t * restrict tree, file_t * const restrict f
     }
   } else {
     /* All compares matched */
-    if (ISFLAG(p_flags, P_FULLHASH)) printf("Full hashes match:\n   %s\n   %s\n\n", file->d_name, tree->file->d_name);
+    if (ISFLAG(p_flags, P_FULLHASH))
+      print_matches("Full hashes match");
     return &tree->file;
   }
   /* Fall through - should never be reached */
   return NULL;
 }
+
 
 
 /* Do a byte-by-byte comparison in case two different files produce the
@@ -1964,7 +1982,8 @@ static inline int confirmmatch(FILE * const restrict file1, FILE * const restric
   (void)size;
 #endif
 
-  if (file1 == NULL || file2 == NULL) bb_error_msg_and_die("NULL -> confirmmatch()");
+  if (file1 == NULL || file2 == NULL)
+      bb_error_msg_and_die("NULL -> %s()", __func__);
 
   /* Allocate on first use; OOM if either is ever NULLed */
   if (!c1) {
@@ -2005,7 +2024,8 @@ static inline int confirmmatch(FILE * const restrict file1, FILE * const restric
 static int sort_pairs_by_param_order(file_t *f1, file_t *f2)
 {
   if (!ISFLAG(flags, F_USEPARAMORDER)) return 0;
-  if (f1 == NULL || f2 == NULL) bb_error_msg_and_die("NULL -> sort_pairs_by_param_order()");
+  if (f1 == NULL || f2 == NULL)
+      bb_error_msg_and_die("NULL -> %s()", __func__);
   if (f1->user_order < f2->user_order) return -sort_direction;
   if (f1->user_order > f2->user_order) return sort_direction;
   return 0;
@@ -2019,15 +2039,19 @@ static int sort_pairs_by_mtime(file_t *f1, file_t *f2)
 #if ENABLE_FEATURE_JDUPES_USER_ORDER
   static int po;
 #endif
-  if (f1 == NULL || f2 == NULL) bb_error_msg_and_die("NULL -> sort_pairs_by_mtime()");
+  if (f1 == NULL || f2 == NULL)
+      bb_error_msg_and_die("NULL -> %s()", __func__);
 
 #if ENABLE_FEATURE_JDUPES_USER_ORDER
   po = sort_pairs_by_param_order(f1, f2);
   if (po != 0) return po;
 #endif
 
-  if (f1->mtime < f2->mtime) return -sort_direction;
-  else if (f1->mtime > f2->mtime) return sort_direction;
+  if (f1->mtime < f2->mtime)
+    return -sort_direction;
+  else
+  if (f1->mtime > f2->mtime)
+    return sort_direction;
 
   return 0;
 }
@@ -2213,7 +2237,7 @@ int jdupes_main(int argc, char **argv)
 #else
     case 'I':
     case 'O':
-      fprintf(stderr, "warning: -I and -O are disabled and ignored in this build\n");
+      fprintf(stderr, "warning: -I and -O unavailable\n");
       break;
 #endif
     case 'j':
@@ -2286,12 +2310,12 @@ int jdupes_main(int argc, char **argv)
 #if ENABLE_FEATURE_JDUPES_SOFTABORT
       SETFLAG(flags, F_SOFTABORT);
 #else
-      fprintf(stderr, "warning: -Z is disabled in this build; an abort will end the program\n");
+      fprintf(stderr, "warning: -Z unavailable\n");
 #endif
       break;
 #if ENABLE_FEATURE_JDUPES_EXCLUDE
     case 'x':
-      fprintf(stderr, "-x/--xsize is deprecated; use -X size[+-=]:size[suffix] instead\n");
+      fprintf(stderr, "-x deprecated, use -X\n");
       xs = xmalloc(8 + strlen(optarg));
       strcpy(xs, "size");
       if (*optarg == '+') {
@@ -2311,7 +2335,6 @@ int jdupes_main(int argc, char **argv)
     case 'v':
     case 'V':
       printf("jdupes %s (%s) for BusyBox", VER, VERDATE);
-      printf("\nCopyright (C) 2015-2019 by Jody Bruchon <jody@jodybruchon.com>\n");
       exit(EXIT_SUCCESS);
 #if ENABLE_FEATURE_JDUPES_MTIME
     case 'o':
@@ -2320,7 +2343,7 @@ int jdupes_main(int argc, char **argv)
       } else if (!strncasecmp("time", optarg, 5)) {
         ordertype = ORDER_TIME;
       } else {
-        bb_error_msg_and_die("invalid value for --order: '%s'\n", optarg);
+        bb_error_msg_and_die("invalid --order value: '%s'\n", optarg);
       }
 #endif /* ENABLE_FEATURE_JDUPES_MTIME */
       break;
@@ -2340,30 +2363,30 @@ int jdupes_main(int argc, char **argv)
   }
 
   if (optind >= argc) {
-    fprintf(stderr, "no files or directories specified\n\n");
+    fprintf(stderr, "not found\n\n");
     bb_show_usage();
     exit(EXIT_FAILURE);
   }
 
   if (partialonly_spec == 1) {
-    bb_error_msg_and_die("--partial-only specified only once (it's VERY DANGEROUS, read the manual!)\n");
+    bb_error_msg_and_die("--partial-only specified only once (VERY DANGEROUS)\n");
   }
 
   if (ISFLAG(flags, F_PARTIALONLY) && ISFLAG(flags, F_QUICKCOMPARE)) {
-    bb_error_msg_and_die("--partial-only overrides --quick and is even more dangerous (read the manual!)\n");
+    bb_error_msg_and_die("--partial-only overrides --quick (VERY DANGEROUS)\n");
   }
 
   if (ISFLAG(flags, F_RECURSE) && ISFLAG(flags, F_RECURSEAFTER)) {
-    bb_error_msg_and_die("options --recurse and --recurse: are not compatible\n");
+    bb_error_msg_and_die("--recurse conflicts with --recurse-after\n");
   }
 
   if (ISFLAG(flags, F_SUMMARIZEMATCHES) && ISFLAG(flags, F_DELETEFILES)) {
-    bb_error_msg_and_die("options --summarize and --delete are not compatible\n");
+    bb_error_msg_and_die("--summarize conflicts with --delete\n");
   }
 
 #if ENABLE_FEATURE_JDUPES_BTRFS
   if (ISFLAG(flags, F_CONSIDERHARDLINKS) && ISFLAG(flags, F_DEDUPEFILES))
-    fprintf(stderr, "warning: option --dedupe overrides the behavior of --hardlinks\n");
+    fprintf(stderr, "warning: --dedupe overrides --hardlinks\n");
 #endif
 
   /* If pm == 0, call printmatches() */
@@ -2374,7 +2397,7 @@ int jdupes_main(int argc, char **argv)
       !!ISFLAG(flags, F_DEDUPEFILES);
 
   if (pm > 1) {
-      bb_error_msg_and_die("error: only one final action may be specified.\n");
+      bb_error_msg_and_die("error: final action should be unique\n");
   }
   if (pm == 0) SETFLAG(flags, F_PRINTMATCHES);
 
@@ -2385,7 +2408,7 @@ int jdupes_main(int argc, char **argv)
       firstrecurse = nonoptafter("-R", argc, oldargv, argv);
 
     if (firstrecurse == argc) {
-      bb_error_msg_and_die("-R option must be isolated from other options\n");
+      bb_error_msg_and_die("-R must be isolated from other options\n");
     }
 
     /* F_RECURSE is not set for directories before --recurse: */
@@ -2437,7 +2460,7 @@ int jdupes_main(int argc, char **argv)
 
 #if ENABLE_FEATURE_JDUPES_SOFTABORT
     if (interrupt) {
-      fprintf(stderr, "\nStopping file scan due to user abort\n");
+      fprintf(stderr, "\nFile scan termination by user abort\n");
       if (!ISFLAG(flags, F_SOFTABORT)) exit(EXIT_FAILURE);
       interrupt = 0;  /* reset interrupt for re-use */
       goto skip_file_scan;
