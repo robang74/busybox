@@ -210,6 +210,10 @@
 typedef uint32_t jduphash_t;
 /* Set hash type (change this if swapping in a different hash function) */
 typedef jduphash_t jdupes_hash_t;
+#define getsize_in_jduphash(a) ((a) >> 2) // 4 bytes for each 32bit jdup hash
+#define getrest_in_jduphash(a) ((a) &  3)
+#define jdup_left_bitrot(h) \
+  ((h << JDUP_HASH_SHIFT) | (h >> (JDUP_HASH_WIDTH-JDUP_HASH_SHIFT)))
 
 typedef ino_t jdupes_ino_t;
 typedef mode_t jdupes_mode_t;
@@ -484,36 +488,36 @@ static jduphash_t jdup_block_hash(const jduphash_t * restrict data,
 		const jduphash_t start_hash, const size_t count)
 {
 	jduphash_t hash = start_hash;
-	jduphash_t element;
+	jduphash_t register element;
 	jduphash_t partial_salt;
 	size_t len;
 
 	/* Don't bother trying to hash a zero-length block */
 	if (count == 0) return hash;
 
-	len = count / sizeof(jduphash_t);
+	len = getsize_in_jduphash(count);
 	for (; len > 0; len--) {
-		element = *data;
+	  element = *data;
 		hash += element;
 		hash += JDUP_HASH_CONSTANT;
-		hash = (hash << JDUP_HASH_SHIFT) | hash >> (sizeof(jduphash_t) * 8 - JDUP_HASH_SHIFT); /* bit rotate left */
+		hash = jdup_left_bitrot(hash); /* bit rotate left */
 		hash ^= element;
-		hash = (hash << JDUP_HASH_SHIFT) | hash >> (sizeof(jduphash_t) * 8 - JDUP_HASH_SHIFT);
+		hash = jdup_left_bitrot(hash);
 		hash ^= JDUP_HASH_CONSTANT;
 		hash += element;
 		data++;
 	}
 
 	/* Handle data tail (for blocks indivisible by sizeof(jduphash_t)) */
-	len = count & (sizeof(jduphash_t) - 1);
+	len = getrest_in_jduphash(count);
 	if (len) {
 		partial_salt = JDUP_HASH_CONSTANT & tail_mask[len];
 		element = *data & tail_mask[len];
 		hash += element;
 		hash += partial_salt;
-		hash = (hash << JDUP_HASH_SHIFT) | hash >> (sizeof(jduphash_t) * 8 - JDUP_HASH_SHIFT);
+		hash = jdup_left_bitrot(hash);
 		hash ^= element;
-		hash = (hash << JDUP_HASH_SHIFT) | hash >> (sizeof(jduphash_t) * 8 - JDUP_HASH_SHIFT);
+		hash = jdup_left_bitrot(hash);
 		hash ^= partial_salt;
 		hash += element;
 	}
