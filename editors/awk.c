@@ -960,20 +960,30 @@ static double my_strtod_or_hexoct(char **pp)
 #endif
 
 /* -------- working with variables (set/get/copy/etc) -------- */
-
 static const char *fmt_num(const char *format, double n)
 {
 	if (n == (long long)n) {
 		snprintf(g_buf, MAXVARFMT, "%lld", (long long)n);
 	} else {
-		const char *s = format;
-		char c;
-
-		do { c = *s; } while (c && *++s);
-		if (strchr("diouxX", c)) {
-			snprintf(g_buf, MAXVARFMT, format, (int)n);
-		} else if (strchr("eEfFgGaA", c)) {
-			snprintf(g_buf, MAXVARFMT, format, n);
+		const char *s, *p = format;
+		char c = *p;
+/*
+ * RAF: as per minimalist approach only the last specifier is considered
+ * therefore printf() performs on garbage I/O principle without crashes
+ * and walking trough multiple parameters without related values in mem.
+ */
+		s = p;
+		while ((c = *s) && *++s)
+			if(c == '%' && *s != '%') { p = s-1; }
+		s = p+1;
+		if(*s == 'n') c = 0;
+		else
+			do { c = *s; } while (c && *++s);
+		if (c && strchr("diouxX", c)) {
+			snprintf(g_buf, MAXVARFMT, p, (int)n);
+		} else
+		if (c && strchr("eEfFgGaA", c)) {
+			snprintf(g_buf, MAXVARFMT, p, n);
 		} else {
 			syntax_error(EMSG_INV_FMT);
 		}
