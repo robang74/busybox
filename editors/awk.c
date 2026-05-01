@@ -960,7 +960,6 @@ static double my_strtod_or_hexoct(char **pp)
 #endif
 
 /* -------- working with variables (set/get/copy/etc) -------- */
-
 static const char *fmt_num(const char *format, double n)
 {
 	if (n == (long long)n) {
@@ -1066,12 +1065,18 @@ static const char *getvar_s(var *v)
 	/* if v is numeric and has no cached string, convert it to string */
 	if ((v->type & (VF_NUMBER | VF_CACHED)) == VF_NUMBER) {
 		const char *convfmt = str_percent_dot_6g; /* "%.6g" */
+		char *c = NULL;
 		/* Get CONVFMT, unless we already recursed on it:
 		 * someone might try to cause stack overflow by setting
 		 * CONVFMT=9 (a numeric, not string, value)
 		 */
 		if (v != intvar[CONVFMT])
 			convfmt = getvar_s(intvar[CONVFMT]);
+		/* OFMT isn't affected by %n issue, only CONVFMT */
+		if(c = strstr(convfmt, "%n"))
+		//if(c && strchr("diouxXeEfFgGaA", c[2]))
+		//	bb_simple_error_msg_and_die("*** %n in writable segment detected ***");
+			c[2]=0;
 		/* Convert the value */
 		v->string = xstrdup(fmt_num(convfmt, v->number));
 		v->type |= VF_CACHED;
