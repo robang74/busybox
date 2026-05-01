@@ -22,6 +22,7 @@ You can find an example of boot-strapping a basic Linux embedded system (footpri
 
 - [README.md](https://github.com/robang74/busybox/README.md): this page for presenting the fork
 - [FORK.md](FORK.md): vda-linux account hijacked crysis (**!!!**)
+- [TODO.md](TODO.md): extension of TODO list w/o altering original
 - [NEWS](NEWS): the changelog from busybox.net website
 
 Already present in the original git repository:
