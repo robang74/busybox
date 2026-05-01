@@ -971,19 +971,33 @@ static const char *fmt_num(const char *format, double n)
  * RAF: as per minimalist approach only the last specifier is considered
  * therefore printf() performs on garbage I/O principle without crashes
  * and walking trough multiple parameters without related values in mem.
+ *
+ * UPDATE: unfortunately this approach introduces a regression "val: %d".
+ * The p.2 is going to fix regression using the same loop but rejecting
+ * multiple specifiers and using the `format` parameter from users.
  */
 		s = p;
-		while ((c = *s) && *++s)
-			if(c == '%' && *s != '%') { p = s-1; }
-		s = p+1;
+		while ((c = *s) && *++s) {
+			if(c == '%' && *s != '%') {
+				if(p != format) {
+					// p.2: multiple specifiers rejected, bugfix
+					c = 0;
+					break;
+				}
+				p = s;
+			}
+		}
+		s = p;
+		if(!c) {}
+		else
 		if(*s == 'n') c = 0;
 		else
 			do { c = *s; } while (c && *++s);
 		if (c && strchr("diouxX", c)) {
-			snprintf(g_buf, MAXVARFMT, p, (int)n);
+			snprintf(g_buf, MAXVARFMT, format, (int)n);
 		} else
 		if (c && strchr("eEfFgGaA", c)) {
-			snprintf(g_buf, MAXVARFMT, p, n);
+			snprintf(g_buf, MAXVARFMT, format, n);
 		} else {
 			syntax_error(EMSG_INV_FMT);
 		}
