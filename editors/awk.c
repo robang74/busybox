@@ -989,9 +989,7 @@ static const char *fmt_num(const char *format, double n)
 			}
 		}
 		s = p;
-		if(!c) {}
-		else
-		if(*s == 'n') c = 0;
+		if(!c || *s == 'n') c = 0;
 		else
 			do { c = *s; } while (c && *++s);
 		if (c && strchr("diouxX", c)) {
