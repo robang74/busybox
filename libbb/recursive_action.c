@@ -112,10 +112,11 @@ static int recursive_action1(recursive_state_t *state)
 			return TRUE;
 	}
 
-	state->dirfd = openat(olddirfd, state->baseName, O_RDONLY | O_DIRECTORY | (follow ? 0 : O_NOFOLLOW));
-	if (state->dirfd < 0)
-		goto done_nak_warn;
-	dir = fdopendir(state->dirfd);
+	dir = 0;
+	state->dirfd = openat(olddirfd, state->baseName,
+		O_RDONLY | O_DIRECTORY | (follow ? 0 : O_NOFOLLOW));
+	if (state->dirfd >= 0)
+		dir = fdopendir(state->dirfd);
 	if (!dir) {
 		/* findutils-4.1.20 reports this */
 		/* (i.e. it doesn't silently return with exit code 1) */
