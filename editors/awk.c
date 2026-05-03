@@ -959,6 +959,9 @@ static double my_strtod_or_hexoct(char **pp)
 # define my_strtod_or_hexoct(p) my_strtod(p)
 #endif
 
+#define fmt_num_types_i "diouxX"
+#define fmt_num_types_f "eEfFgGaA"
+
 /* -------- working with variables (set/get/copy/etc) -------- */
 static const char *fmt_num(const char *format, double n)
 {
@@ -989,12 +992,16 @@ static const char *fmt_num(const char *format, double n)
 		}
 		s = p;
 		if(!c || *s == 'n') c = 0;
-		else
-			do { c = *s; } while (c && *++s && *s != ' ');
-		if (c && strchr("diouxX", c)) {
+		else do { c = *s; } while (c && *++s && *s != ' '
+#if ENABLE_EXTRA_COMPAT
+						&& !strchr(fmt_num_types_i, c)
+						&& !strchr(fmt_num_types_f, c)
+#endif
+		);
+		if (c && strchr(fmt_num_types_i, c)) {
 			snprintf(g_buf, MAXVARFMT, format, (int)n);
 		} else
-		if (c && strchr("eEfFgGaA", c)) {
+		if (c && strchr(fmt_num_types_f, c)) {
 			snprintf(g_buf, MAXVARFMT, format, n);
 		} else {
 			syntax_error(EMSG_INV_FMT);
