@@ -989,8 +989,11 @@ static const char *fmt_num(const char *format, double n)
 		}
 		s = p;
 		if(!c || *s == 'n') c = 0;
-		else
-			do { c = *s; } while (c && *++s && *s != ' ');
+		else do { c = *s; } while (c && *++s && *s != ' '
+#if ENABLE_EXTRA_COMPAT
+						&& !strchr("diouxXeEfFgGaA", c)
+#endif
+		);
 		if (c && strchr("diouxX", c)) {
 			snprintf(g_buf, MAXVARFMT, format, (int)n);
 		} else
