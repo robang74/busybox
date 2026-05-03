@@ -991,13 +991,20 @@ static const char *fmt_num(const char *format, double n)
 				p = s;
 			}
 		}
+/*
+ * RAF: with a generalisation of the approach coverage is extended with
+ * a very tiny extra footprint size increment: 12 bytes for which the
+ * ENABLE_EXTRA_COMPAT seems overkilling for this scenario (tot. +63b).
+ */
+#if 0
 		s = p;
+
 		if(!c || *s == 'n') c = 0;
 		else do { c = *s; } while (c && *++s && *s != ' '
-#if ENABLE_EXTRA_COMPAT
+				#if ENABLE_EXTRA_COMPAT
 						&& !strchr(fmt_num_types_i, c)
 						&& !strchr(fmt_num_types_f, c)
-#endif
+				#endif
 		);
 		if (c && strchr(fmt_num_types_i, c)) {
 			snprintf(g_buf, MAXVARFMT, format, (int)n);
@@ -1007,6 +1014,22 @@ static const char *fmt_num(const char *format, double n)
 		} else {
 			syntax_error(EMSG_INV_FMT);
 		}
+#else
+		while (1) {
+			c = *p++;
+			if (!c || c == ' ' || c == 'n') {
+				syntax_error(EMSG_INV_FMT);
+			} else
+			if (strchr(fmt_num_types_i, c)) {
+				snprintf(g_buf, MAXVARFMT, format, (int)n);
+				break;
+			} else
+			if (strchr(fmt_num_types_f, c)) {
+				snprintf(g_buf, MAXVARFMT, format, n);
+				break;
+			}
+		}
+#endif
 	}
 	return g_buf;
 }
