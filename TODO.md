@@ -104,3 +104,4 @@ Load average: 0.24 0.43 0.52 1/1037 731380
 And it is not the only displaying bug but also PID has longer values and breaks the vertical alignment. Despite the uptime being less than 1 day. Fortunately, `busybox top` never has been anything else than a gadget and rarely a last-resort or first-sight system debug tool.
 
 **Conclusion**: busybox top is obsolete as a tool, rather than broken or worse designed. The "campaign" to keep bring back to life started a few years ago 294881d2e (2022-05-10) and did not receive a lot of attention.
+
