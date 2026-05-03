@@ -22,6 +22,7 @@ You can find an example of boot-strapping a basic Linux embedded system (footpri
 
 - [README.md](https://github.com/robang74/busybox/README.md): this page for presenting the fork
 - [FORK.md](FORK.md): vda-linux account hijacked crysis (**!!!**)
+- [TODO.md](TODO.md): extension of TODO list w/o altering original
 - [NEWS](NEWS): the changelog from busybox.net website
 
 Already present in the original git repository:
@@ -51,6 +52,8 @@ Open potentially alerts by severity/class in branch `main`:
 
 Alerts above are related to C-language code, none otherwise.
 
+- **addressed**: 44, class: potentially dangerous function use
+
 <br>
 
 ### The fork
@@ -62,8 +65,8 @@ possibly to continue the development, just in case. At the moment, it can be con
 a back-up and a supplementary resource.
 
 BusyBox from last git.busybox.net master `HEAD`, saved in
-[codeberg.org](https://codeberg.org/robang74/busybox)
-is providing an US/EU manually synced backup. Relevant branches:
+[codeberg.org](https://codeberg.org/robang74/busybox) 
+is providing an US/EU manually synced backup. Relevant branches: 
 
 - [b:master](https://github.com/robang74/busybox/tree/master), [b:applets](https://github.com/robang74/busybox/tree/applets), [b:features](https://github.com/robang74/busybox/tree/features), [b:bugfixes](https://github.com/robang74/busybox/tree/bugfixes).
 
