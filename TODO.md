@@ -6,7 +6,33 @@
 
 ### awk
 
-To test against further regressions:
+To test against further regressions (downstreams):
+
++ [70172e793](https://github.com/robang74/busybox/commit/70172e793) - 2026-05-03 - awk: proper numeric specifier type reading, bugfix
+
+busybox awk seek for the last character in format and uses it for
+infering the numeric specifier type (interger or float) despite it
+sould be or not be related with the real specifier. This patch fixes
+this behaviour thanks to previous patches: it starts from the % and
+seek a '\0' or ' ' to find the type. Zero bytes footprint increase.
+
+before:
+```sh
+./busybox awk 'BEGIN { CONVFMT="Test PI: %.2f mf"; x=3.14; print x "" }'
+Test PI: 3.14 mf
+./busybox awk 'BEGIN { CONVFMT="Test PI: %.2f mx"; x=3.14; print x "" }'
+Test PI: 0.00 mx
+./busybox awk 'BEGIN { CONVFMT="Test PI: %.2f mm"; x=3.14; print x "" }'
+awk: cmd. line:1: Invalid format specifier
+```
+
+after:
+```sh
+./busybox awk 'BEGIN { CONVFMT="Test PI: %.2f mx"; x=3.14; print x "" }'
+Test PI: 3.14 mx
+```
+
+To test against further regressions (downstreams):
 
 + [75e5e57cf](https://github.com/robang74/busybox/commit/75e5e57cf) - 2026-05-01 - awk: minimalist approach to bugfixing some awk unsupported cases, p.2
 
