@@ -8,17 +8,18 @@
 
 To test against further regressions (downstreams):
 
-+ [479b41949](https://github.com/robang74/busybox/commit/479b41949) - 2026-05-03 - awk: numeric identifiers full recognition
++ [20a60c8f7](https://github.com/robang74/busybox/commit/20a60c8f7) - 2026-05-03 - awk: numeric identifiers full recognition, ext. in +63b total
 
-Requires ENABLE_EXTRA_COMPAT enabled:
 ```sh
 ./busybox awk 'BEGIN { CONVFMT="Test PI: %.2fmx"; x=3.14; print x "" }'
 Test PI: 3.14mx
 
-   text    data     bss     dec     hex filename
-  19389       0       0   19389    4bbd editors/awk.o
-  19432       0       0   19432    4be8 editors/awk.o
-Total                       +43
+      19338       0       0   19338    4b8a editors/awk.o
+    Fixing:                     +51
+      19389       0       0   19389    4bbd editors/awk.o
+    Extend:                     +12
+      19401       0       0   19401    4bc9 editors/awk.o
+    Total:                      +63
 ```
 
 + [70172e793](https://github.com/robang74/busybox/commit/70172e793) - 2026-05-03 - awk: proper numeric specifier type reading, bugfix
