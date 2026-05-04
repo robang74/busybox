@@ -105,7 +105,7 @@ enum {
 int cal_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int cal_main(int argc UNUSED_PARAM, char **argv)
 {
-	struct tm zero_tm, tres;
+	struct tm zero_tm;
 	time_t now;
 	unsigned month, year, flags, i, weekstart;
 	char *month_names[12];
@@ -127,7 +127,7 @@ int cal_main(int argc UNUSED_PARAM, char **argv)
 	argv += optind;
 
 	if (!argv[0]) {
-		struct tm *ptm;
+		struct tm *ptm, tres;
 
 		time(&now);
 		ptm = localtime_r(&now,&tres);

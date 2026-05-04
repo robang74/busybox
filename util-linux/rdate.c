@@ -78,7 +78,6 @@ static time_t askremotedate(const char *host)
 int rdate_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int rdate_main(int argc UNUSED_PARAM, char **argv)
 {
-	char tbuf[CTIME_BUF_MAXLEN];
 	time_t remote_time;
 	unsigned flags;
 
@@ -104,8 +103,10 @@ int rdate_main(int argc UNUSED_PARAM, char **argv)
 		}
 	}
 
-	if (flags != 1) /* not lone -s */
+	if (flags != 1) { /* not lone -s */
+		char tbuf[CTIME_BUF_MAXLEN];
 		printf("%s", ctime_r(&remote_time,tbuf));
+	}
 
 	return EXIT_SUCCESS;
 }

@@ -121,8 +121,9 @@ int rtcwake_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int rtcwake_main(int argc UNUSED_PARAM, char **argv)
 {
 	unsigned opt;
-	const char *rtcname = NULL;
+	char tbuf[CTIME_BUF_MAXLEN];
 	const char *suspend = "standby";
+	const char *rtcname = NULL;
 	const char *opt_seconds;
 	const char *opt_time;
 
@@ -130,7 +131,6 @@ int rtcwake_main(int argc UNUSED_PARAM, char **argv)
 	time_t sys_time;
 	time_t alarm_time = alarm_time;
 	unsigned seconds = seconds; /* for compiler */
-	char tbuf[CTIME_BUF_MAXLEN];
 	int utc = -1;
 	int fd;
 
