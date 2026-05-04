@@ -98,7 +98,6 @@ static void show_clock(const char **pp_rtcname, int utc)
 #if SHOW_HWCLOCK_DIFF
 	struct timeval sys_tv;
 #endif
-	char tbuf[CTIME_BUF_MAXLEN];
 	time_t t = read_rtc(pp_rtcname, &sys_tv, utc);
 
 #if ENABLE_LOCALE_SUPPORT
@@ -108,6 +107,7 @@ static void show_clock(const char **pp_rtcname, int utc)
 	struct tm *ptm = localtime_r(&t,&tres);
 	strftime(cp, sizeof(cp), "%c", ptm);
 #else
+	char tbuf[CTIME_BUF_MAXLEN];
 	char *cp = ctime_r(&t,tbuf);
 	chomp(cp);
 #endif
