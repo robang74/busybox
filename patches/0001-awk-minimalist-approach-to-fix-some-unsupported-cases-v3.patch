@@ -1,0 +1,260 @@
+From fb1a2d10c091376f10e5485fa2420b89b5a1fcc6 Mon Sep 17 00:00:00 2001
+From: "Roberto A. Foglietta" <roberto.foglietta@gmail.com>
+Date: Fri, 1 May 2026 23:51:38 +0200
+Subject: [PATCH] awk: minimalist approach to fix some unsupported cases v3
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+RAF: as per minimalist approach only the last specifier is considered
+therefore printf() performs on garbage I/O principle without crashes
+and walking trough multiple parameters without related values in mem.
+
+UPDATE: unfortunately this approach introduces a regression "val: %d".
+The p.2 is going to fix regression using the same loop but rejecting
+multiple specifiers and using the `format` parameter from users.
+
++:git-shell:uchaosys:busybox> size editors/awk.o
+   text    data     bss     dec     hex filename
+  19338       0       0   19338    4b8a editors/awk.o
+  19389       0       0   19389    4bbd editors/awk.o
+Difference:                 +51
+
+./busybox awk 'BEGIN { CONVFMT="Test PI: %.2f"; x=3.14; print x "" }'
+Test PI: 3.14
+
+This patch extend the previous ones
+
+--------------------------------------------------------------------------------
+
+awk: CONVFMT=%nf string format attack fix
+
+Acting on fmt_num() would impact on OFMT as well, just CONVFMT needs a fix
+and the shortest path is to redirect the troublesome case into already %n
+rejected because "Invalid format specifier"
+
+./busybox awk 'BEGIN { OFMT="%nf"; x=3.14; print x "" }'
+3.14
+
+./busybox awk 'BEGIN { CONVFMT="%nf"; x=3.14; print x "" }'
+awk: cmd. line:1: Invalid format specifier
+
+./busybox awk 'BEGIN { CONVFMT="%n"; x=3.14; print x "" }'
+awk: cmd. line:1: Invalid format specifier
+
++:git-shell:uchaosys:busybox> size ./editors/awk.o
+   text    data     bss     dec     hex filename
+  19436       0       0   19436    4bec ./editors/awk.o
+  19467       0       0   19467    4c0b ./editors/awk.o
+Difference:                 +31
+
+Bug reported by
+
+--------------------------------------------------------------------------------
+
+From: Atle Østrem Tøge <atleot@stud.ntnu.no>
+Cc: Sebastian Ellingsen <sebastian.ellingsen@ntnu.no>
+Subject: awk: CONVFMT format string causes crash
+To: Busybox <busybox@busybox.net>
+Date: Fri, 1 May 2026 at 13:11
+
+Package: busybox
+Version: 1.36.1 (also reproduced on current master)
+
+When I set CONVFMT to a multi-specifier format string ending in a valid
+float specifier and perform a float-to-string conversion, busybox awk crashes.
+
+With a standard CONVFMT I get:
+
+    $ busybox awk 'BEGIN { CONVFMT="%.6g"; x=3.14; print x "" }'
+    3.14
+
+But with the following input I get a segfault:
+
+    $ busybox awk 'BEGIN { CONVFMT="%nf"; x=3.14; print x "" }'
+    Segmentation fault
+
+Note that CONVFMT="%n" alone is correctly rejected with "Invalid format
+specifier", so the crash is specific to multi-specifier strings where the
+terminal character is otherwise valid.
+
+Tested on x86_64 Linux. Crash confirmed with AddressSanitizer (SEGV,
+WRITE access in fmt_num() -> getvar_s() -> evaluate()).
+
+To clarify: %n is a printf conversion specifier that writes the number of
+bytes written so far to the address of the next argument, it is unrelated
+to numeric width specifiers like %.2f.
+
+BusyBox awk validates only the last character of CONVFMT,  "%nf" passes
+(last char 'f' is valid) and the full string reaches snprintf. "%n" alone
+is correctly rejected.
+
+We reproduced the segfault by building current master (vda-linux/busybox_mirror)
+against musl libc (Alpine Linux container):
+
+    $ ./busybox awk 'BEGIN { CONVFMT="%nf"; x=3.14; print x "" }'
+    Segmentation fault
+
+The root cause is in fmt_num() in editors/awk.c.
+
+--------------------------------------------------------------------------------
+
+From: Atle Østrem Tøge <atleot@stud.ntnu.no>
+Date: Fri, 1 May 2026 at 18:34
+Subject: Sv: awk: CONVFMT format string causes crash
+To: Roberto A. Foglietta <roberto.foglietta@gmail.com>
+
+Proposed solution by    Atle Østrem Tøge <atleot@stud.ntnu.no>:
+
+> --- a/editors/awk.c
+> +++ b/editors/awk.c
+> @@ -963,7 +963,15 @@ static const char *fmt_num(const char *format, double n)
+>         } else {
+>                 const char *s = format;
+>                 char c;
+> -               do { c = *s; } while (c && *++s);
+> +               int spec_count = 0;
+> +               while (*s) {
+> +                       if (*s == '%' && *(s+1) != '%') {
+> +                               spec_count++;
+> +                               if (spec_count > 1) { syntax_error(EMSG_INV_FMT); return g_buf; }
+> +                               if (*(s+1) == 'n') { syntax_error(EMSG_INV_FMT); return g_buf; }
+> +                       }
+> +                       c = *s++;
+> +               }
+>                 if (strchr("diouxX", c)) {
+>
+
+--------------------------------------------------------------------------------
+
+RAF: unit test and comparison
+
+./busybox awk 'BEGIN { OFMT="%"; x=3.14; print x "" }';
+./busybox awk 'BEGIN { CONVFMT="%"; x=3.14; print x "" }';
+./busybox awk 'BEGIN { OFMT="%"; x=3.14; print x }';
+./busybox awk 'BEGIN { CONVFMT="%"; x=3.14; print x }'
+3.14
+awk: cmd. line:1: Invalid format specifier
+awk: cmd. line:1: Invalid format specifier
+3.14
+
+./busybox awk 'BEGIN { OFMT="%nf"; x=3.14; print x "" }';
+./busybox awk 'BEGIN { CONVFMT="%nf"; x=3.14; print x "" }';
+./busybox awk 'BEGIN { CONVFMT="%n"; x=3.14; print x "" }';
+./busybox awk 'BEGIN { OFMT="%nf"; x=3.14; print x }';
+./busybox awk 'BEGIN { CONVFMT="%nf"; x=3.14; print x }'
+3.14
+awk: cmd. line:1: Invalid format specifier
+awk: cmd. line:1: Invalid format specifier
+awk: cmd. line:1: Invalid format specifier
+3.14
+
+./busybox awk 'BEGIN { OFMT="%%nf"; x=3.14; print x "" }';
+./busybox awk 'BEGIN { CONVFMT="%%nf"; x=3.14; print x "" }';
+./busybox awk 'BEGIN { CONVFMT="%%n"; x=3.14; print x "" }';
+./busybox awk 'BEGIN { OFMT="%%nf"; x=3.14; print x }';
+./busybox awk 'BEGIN { CONVFMT="%%nf"; x=3.14; print x }'
+3.14
+awk: cmd. line:1: Invalid format specifier
+awk: cmd. line:1: Invalid format specifier
+awk: cmd. line:1: Invalid format specifier
+3.14
+
+./busybox awk 'BEGIN { CONVFMT="Test PI: %.2f"; x=3.14; print x "" }'
+Test PI: 3.14
+
+awk 'BEGIN { OFMT="%"; x=3.14; print x "" }';
+awk 'BEGIN { CONVFMT="%"; x=3.14; print x "" }';
+awk 'BEGIN { OFMT="%"; x=3.14; print x }';
+awk 'BEGIN { CONVFMT="%"; x=3.14; print x }'
+3.14
+%
+%
+3.14
+
+awk 'BEGIN { OFMT="%nf"; x=3.14; print x "" }';
+awk 'BEGIN { CONVFMT="%nf"; x=3.14; print x "" }';
+awk 'BEGIN { CONVFMT="%n"; x=3.14; print x "" }';
+awk 'BEGIN { OFMT="%nf"; x=3.14; print x }';
+awk 'BEGIN { CONVFMT="%nf"; x=3.14; print x }'
+3.14
+%nf
+%n
+%nf
+3.14
+
+awk 'BEGIN { OFMT="%%nf"; x=3.14; print x "" }';
+awk 'BEGIN { CONVFMT="%%nf"; x=3.14; print x "" }';
+awk 'BEGIN { CONVFMT="%%n"; x=3.14; print x "" }';
+awk 'BEGIN { OFMT="%%nf"; x=3.14; print x }';
+awk 'BEGIN { CONVFMT="%%nf"; x=3.14; print x }'
+3.14
+%nf
+%n
+%nf
+3.14
+
+awk 'BEGIN { CONVFMT="Test PI: %.2f"; x=3.14; print x "" }'
+Test PI: 3.14
+
+Signed-off-by: Roberto A. Foglietta <roberto.foglietta@gmail.com>
+---
+ editors/awk.c | 36 +++++++++++++++++++++++++++++-------
+ 1 file changed, 29 insertions(+), 7 deletions(-)
+
+diff --git a/editors/awk.c b/editors/awk.c
+index dd8f4ac42..c80b62e56 100644
+--- a/editors/awk.c
++++ b/editors/awk.c
+@@ -960,19 +960,41 @@ static double my_strtod_or_hexoct(char **pp)
+ #endif
+ 
+ /* -------- working with variables (set/get/copy/etc) -------- */
+-
+ static const char *fmt_num(const char *format, double n)
+ {
+ 	if (n == (long long)n) {
+ 		snprintf(g_buf, MAXVARFMT, "%lld", (long long)n);
+ 	} else {
+-		const char *s = format;
+-		char c;
+-
+-		do { c = *s; } while (c && *++s);
+-		if (strchr("diouxX", c)) {
++		const char *s, *p = format;
++		char c = *p;
++/*
++ * RAF: as per minimalist approach only the last specifier is considered
++ * therefore printf() performs on garbage I/O principle without crashes
++ * and walking trough multiple parameters without related values in mem.
++ *
++ * UPDATE: unfortunately this approach introduces a regression "val: %d".
++ * The p.2 is going to fix regression using the same loop but rejecting
++ * multiple specifiers and using the `format` parameter from users.
++ */
++		s = p;
++		while ((c = *s) && *++s) {
++			if(c == '%' && *s != '%') {
++				if(p != format) {
++					// p.2: multiple specifiers rejected, bugfix
++					c = 0;
++					break;
++				}
++				p = s;
++			}
++		}
++		s = p;
++		if(!c || *s == 'n') c = 0;
++		else
++			do { c = *s; } while (c && *++s);
++		if (c && strchr("diouxX", c)) {
+ 			snprintf(g_buf, MAXVARFMT, format, (int)n);
+-		} else if (strchr("eEfFgGaA", c)) {
++		} else
++		if (c && strchr("eEfFgGaA", c)) {
+ 			snprintf(g_buf, MAXVARFMT, format, n);
+ 		} else {
+ 			syntax_error(EMSG_INV_FMT);
+-- 
+2.34.1
+
