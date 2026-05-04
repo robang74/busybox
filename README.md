@@ -52,6 +52,18 @@ Open potentially alerts by severity/class in branch `main`:
 
 Alerts above are related to C-language code, none otherwise.
 
+- **addressed**: 44, class: potentially dangerous function use
+
+#### Patches folder
+
+This fork is offering `patches` folder collection for supporting downstream testing:
+
+- [patches](https://github.com/robang74/busybox/tree/master/patches): for collecting patchsets, each in a single file.
+
+All patches are independently based on `master`branch, and collisions might be happen.
+
+Note that patches numeric indexing is made for chronologic order by lexicographic order.
+
 <br>
 
 ### The fork
@@ -77,4 +89,4 @@ contributes are merged and it is dedicated to my personal project
 
 ### Maintainer
 
-Limited to this specific fork, the maintainer is [Roberto A. Foglietta](mailto:roberto.foglietta@gmail.com)
+Limited to this fork, the maintainer is [Roberto A. Foglietta](mailto:roberto.foglietta@gmail.com)
