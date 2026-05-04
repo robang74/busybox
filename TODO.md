@@ -7,20 +7,33 @@
 ### awk
 
 To test against further regressions (downstreams):
++ [8b52c08a4](https://github.com/robang74/busybox/commit/8b52c08a4) - 2026-05-04 - awk: numeric identifiers full recognition, fixed in +65b total
 
-+ [20a60c8f7](https://github.com/robang74/busybox/commit/20a60c8f7) - 2026-05-03 - awk: numeric identifiers full recognition, ext. in +63b total
+Fixing: two major issues like walking %016llx and writing %n
+Extend: support for "%fpx", keep "pi:%f" and earn "pi: %f deg"
+Testing: editors/awk_printx_tests.sh added new (only visual)
+Advantage: see all-and-only-the-OKs approach when viable (3 OKs)
+- `test $(./run_3oks_test 2>&1 | grep OK | wc -l) -eq 3`
 
-```sh
-./busybox awk 'BEGIN { CONVFMT="Test PI: %.2fmx"; x=3.14; print x "" }'
-Test PI: 3.14mx
+```sh 
+./busybox awk 'BEGIN { CONVFMT="%nf"; x=3.14; print x "" }';
+./busybox awk 'BEGIN { CONVFMT="%.2f OK f"; x=3.14; print x "" }';
+./busybox awk 'BEGIN { CONVFMT="%.2fpi %016llx f"; x=3.14; print x "" }';
+./busybox awk 'BEGIN { CONVFMT="walk: %.2fpi %016llx "; x=3.14; print x "" }'
+./busybox awk 'BEGIN { CONVFMT="OK pi: %.2fx"; x=3.14; print x "" }'
+./busybox awk 'BEGIN { CONVFMT="%.2fOKpi"; x=3.14; print x "" }'
 
-      19338       0       0   19338    4b8a editors/awk.o
-    Fixing:                     +51
-      19389       0       0   19389    4bbd editors/awk.o
-    Extend:                     +12
-      19401       0       0   19401    4bc9 editors/awk.o
-    Total:                      +63
+   text    data     bss     dec     hex filename
+  19338       0       0   19338    4b8a editors/awk.o
+Fixing:                     +51
+  19389       0       0   19389    4bbd editors/awk.o
+Extend:                     +16
+  19405       0       0   19405    4bcd editors/awk.o
+Coding:                      -2
+  19403       0       0   19403    4bcb editors/awk.o
 ```
+
+
 
 + [70172e793](https://github.com/robang74/busybox/commit/70172e793) - 2026-05-03 - awk: proper numeric specifier type reading, bugfix
 
