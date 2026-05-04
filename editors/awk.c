@@ -969,8 +969,8 @@ static const char *fmt_num(const char *format, double n)
 	if (n == (long long)n) {
 		snprintf(g_buf, MAXVARFMT, "%lld", (long long)n);
 	} else {
-		const char *s, *p = format;
-		char c = *p;
+		const char *s = format, *p = NULL;
+		char c;
 /*
  * RAF: as per minimalist approach only the last specifier is considered
  * therefore printf() performs on garbage I/O principle without crashes
@@ -980,17 +980,18 @@ static const char *fmt_num(const char *format, double n)
  * The p.2 is going to fix regression using the same loop but rejecting
  * multiple specifiers and using the `format` parameter from users.
  */
-		s = p;
 		while ((c = *s) && *++s) {
 			if(c == '%' && *s != '%') {
-				if(p != format) {
-					// p.2: multiple specifiers rejected, bugfix
-					c = 0;
-					break;
+				if(p != NULL) {
+				// p.2: multiple specifiers rejected, bugfix
+					syntax_error(EMSG_INV_FMT);
+				// clearer and same size of
+				//	p = 0; break;
 				}
 				p = s;
 			}
 		}
+		// !p here? it means no valid identifier
 /*
  * RAF: with a generalisation of the approach coverage is extended with
  * a very tiny extra footprint size increment: 12 bytes for which the
@@ -1016,8 +1017,7 @@ static const char *fmt_num(const char *format, double n)
 		}
 #else
 		while (1) {
-			c = *p++;
-			if (!c || c == ' ' || c == 'n') {
+			if (!p || !(c = *p++) || c == ' ' || c == 'n') {
 				syntax_error(EMSG_INV_FMT);
 			} else
 			if (strchr(fmt_num_types_i, c)) {
