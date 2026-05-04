@@ -337,7 +337,6 @@ int conf_write(const char *name)
 	char dirname[128];
 	char tmpname[256];
 	char newname[256];
-	char tbuf[CTIME_BUF_MAXLEN];
 	int type, l;
 	const char *str;
 	time_t now;
@@ -395,15 +394,17 @@ int conf_write(const char *name)
 	env = getenv("KCONFIG_NOTIMESTAMP");
 	if (env && *env)
 		use_timestamp = 0;
-
-	fprintf(out, _("#\n"
-		       "# Automatically generated make config: don't edit\n"
-		       "# Busybox version: %s\n"
-		       "%s%s"
-		       "#\n"),
-		     sym_get_string_value(sym),
-		     use_timestamp ? "# " : "",
-		     use_timestamp ? ctime_r(&now,tbuf) : "");
+	{ // RAF: explicit scope limitation
+		char tbuf[CTIME_BUF_MAXLEN];
+		fprintf(out, _("#\n"
+				   "# Automatically generated make config: don't edit\n"
+				   "# Busybox version: %s\n"
+				   "%s%s"
+				   "#\n"),
+				 sym_get_string_value(sym),
+				 use_timestamp ? "# " : "",
+				 use_timestamp ? ctime_r(&now,tbuf) : "");
+	}
 	if (out_h) {
 		char buf[sizeof("#define AUTOCONF_TIMESTAMP "
 				"\"YYYY-MM-DD HH:MM:SS some_timezone\"\n")];

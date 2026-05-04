@@ -114,7 +114,6 @@ int who_main(int argc UNUSED_PARAM, char **argv)
 	struct utmpx *ut;
 	unsigned opt;
 	const char *fmt = "%s";
-	char tbuf[CTIME_BUF_MAXLEN];
 
 	opt = getopt32(argv, do_who ? "^" "aH" "\0" "=0": "^" "" "\0" "=0");
 	if ((opt & 2) || do_w) /* -H or we are w */
@@ -127,6 +126,7 @@ int who_main(int argc UNUSED_PARAM, char **argv)
 		) {
 			if (!do_users) {
 				char str6[6];
+				char tbuf[CTIME_BUF_MAXLEN];
 				char name[sizeof("/dev/") + sizeof(ut->ut_line) + 1];
 				struct stat st;
 				time_t seconds;

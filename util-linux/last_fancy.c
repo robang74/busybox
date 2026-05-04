@@ -47,19 +47,22 @@ static void show_entry(struct utmpx *ut, int state, time_t dur_secs)
 {
 	unsigned days, hours, mins;
 	char duration[sizeof("(%u+02:02)") + sizeof(int)*3];
-	char tbuf[CTIME_BUF_MAXLEN];
 	char login_time[17];
 	char logout_time[8];
 	const char *logout_str;
 	const char *duration_str;
-	time_t tmp;
 
-	/* manpages say ut_tv.tv_sec *is* time_t,
-	 * but some systems have it wrong */
-	tmp = ut->ut_tv.tv_sec;
-	safe_strncpy(login_time, ctime_r(&tmp,tbuf), 17);
-	tmp = dur_secs;
-	snprintf(logout_time, 8, "- %s", ctime_r(&tmp,tbuf) + 11);
+	{ // RAF: explicit variable scope limitation
+		char tbuf[CTIME_BUF_MAXLEN];
+		time_t tmp;
+
+		/* manpages say ut_tv.tv_sec *is* time_t,
+		 * but some systems have it wrong */
+		tmp = ut->ut_tv.tv_sec;
+		safe_strncpy(login_time, ctime_r(&tmp,tbuf), 17);
+		tmp = dur_secs;
+		snprintf(logout_time, 8, "- %s", ctime_r(&tmp,tbuf) + 11);
+	}
 
 	dur_secs = MAX(dur_secs - (time_t)ut->ut_tv.tv_sec, (time_t)0);
 	/* unsigned int is easier to divide than time_t (which may be signed long) */
