@@ -2775,16 +2775,12 @@ static NOINLINE var *exec_builtin(node *op, var *res)
 {
 #define tspl (G.exec_builtin__tspl)
 
-	var *tmpvars;
-	node *an[4];
-	var *av[4];
+	var *tmpvars, *av[4];
+	node *spl, *an[4];
 	const char *as[4];
-	struct tm tres;
-	node *spl;
 	uint32_t isr, info;
-	int nargs;
+	int nargs, i, l, ll, n;
 	time_t tt;
-	int i, l, ll, n;
 
 	tmpvars = nvalloc(4);
 #define TMPVAR0 (tmpvars)
@@ -2923,10 +2919,13 @@ static NOINLINE var *exec_builtin(node *op, var *res)
 			tt = getvar_i(av[1]);
 		else
 			time(&tt);
-		i = strftime(g_buf, MAXVARFMT,
-			((nargs > 0) ? as[0] : "%a %b %d %H:%M:%S %Z %Y"),
-			localtime_r(&tt,&tres));
-		setvar_sn(res, g_buf, i);
+		{ // RAF: scope limitation of tres + code if/else clarity
+			struct tm tres;
+			i = strftime(g_buf, MAXVARFMT,
+				((nargs > 0) ? as[0] : "%a %b %d %H:%M:%S %Z %Y"),
+				localtime_r(&tt,&tres));
+			setvar_sn(res, g_buf, i);
+		}
 		break;
 
 	case B_mt:
