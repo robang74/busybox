@@ -982,16 +982,16 @@ static const char *fmt_num(const char *format, double n)
  */
 		while ((c = *s) && *++s) {
 			if(c == '%' && *s != '%') {
-				if(p != NULL) {
+				if(p) {
 				// p.2: multiple specifiers rejected, bugfix
-					syntax_error(EMSG_INV_FMT);
-				// clearer and same size of
-				//	p = 0; break;
+					p = 0; break;
 				}
 				p = s;
 			}
 		}
-		// !p here? it means no valid identifier
+		// still (!p) here? it means no numeric identifier
+		// printf("c: %c, p: %s\n", c?c:'0', p?p:"(null)");
+		if(!p) syntax_error(EMSG_INV_FMT);
 /*
  * RAF: with a generalisation of the approach coverage is extended with
  * a very tiny extra footprint size increment: 12 bytes for which the
@@ -1017,7 +1017,7 @@ static const char *fmt_num(const char *format, double n)
 		}
 #else
 		while (1) {
-			if (!p || !(c = *p++) || c == ' ' || c == 'n') {
+			if (!(c = *p++) || c == ' ' || c == 'n') {
 				syntax_error(EMSG_INV_FMT);
 			} else
 			if (strchr(fmt_num_types_i, c)) {
