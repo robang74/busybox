@@ -961,6 +961,8 @@ static double my_strtod_or_hexoct(char **pp)
 
 #define fmt_num_types_i "diouxXp"
 #define fmt_num_types_f "eEfFgGaA"
+#define fmt_num_types_d "0123456789"
+#define fmt_num_types_l "hjlLtz.-+*#"
 
 /* -------- working with variables (set/get/copy/etc) -------- */
 static const char *fmt_num(const char *format, double n)
@@ -999,15 +1001,18 @@ static const char *fmt_num(const char *format, double n)
 				p = s;
 			}
 		}
-		// still (!p) here? it means no numeric identifier
 		// printf("c: %c, p: %s\n", c?c:'0', p?p:"(null)");
+#if ENABLE_DESKTOP
+		// still (!p) here? it means no numeric identifier
 		if(!p) syntax_error(EMSG_INV_FMT);
+		// a single space after the % is allowed, skip
+		if(*p == ' ') p++;
+#endif
 /*
  * RAF: with a generalisation of the approach coverage is extended with
  * a very tiny extra footprint size increment: 12 bytes for which the
  * ENABLE_EXTRA_COMPAT seems overkilling for this scenario (tot. +63b).
- */
-#if 0
+ *
 		s = p;
 
 		if(!c || *s == 'n') c = 0;
@@ -1025,9 +1030,9 @@ static const char *fmt_num(const char *format, double n)
 		} else {
 			syntax_error(EMSG_INV_FMT);
 		}
-#else
-		while (1) {
-			if (!(c = *p++) || c == ' ' || c == 'n') {
+*/
+		do {
+			if (!p || !(c = *p++)) {
 				syntax_error(EMSG_INV_FMT);
 			} else
 			if (strchr(fmt_num_types_i, c)) {
@@ -1038,8 +1043,12 @@ static const char *fmt_num(const char *format, double n)
 				snprintf(g_buf, MAXVARFMT, format, n);
 				break;
 			}
-		}
-#endif
+			else
+			if (strchr(fmt_num_types_l""fmt_num_types_d, c)) {
+				continue;
+			} else
+				syntax_error(EMSG_INV_FMT);
+		} while(1);
 	}
 	return g_buf;
 }
