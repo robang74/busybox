@@ -959,15 +959,23 @@ static double my_strtod_or_hexoct(char **pp)
 # define my_strtod_or_hexoct(p) my_strtod(p)
 #endif
 
-#define fmt_num_types_i "diouxX"
+#define fmt_num_types_i "diouxXp"
 #define fmt_num_types_f "eEfFgGaA"
 
 /* -------- working with variables (set/get/copy/etc) -------- */
 static const char *fmt_num(const char *format, double n)
 {
+/*
+ * 		WARNING -- BACK COMPATIBILITY CORNER CASES BROKEN -- WARNING
+ */
+#if 0 // RAF: '1' breaks with printing a string with a single integer
+	  // properly formated identifier. While '0' breaks back-compatibility
+	  // with previous use of a wrong/void format with an integer number.
 	if (n == (long long)n) {
 		snprintf(g_buf, MAXVARFMT, "%lld", (long long)n);
-	} else {
+	} else
+#endif
+	{
 		const char *s = format, *p = NULL;
 		char c;
 /*
@@ -1020,7 +1028,7 @@ static const char *fmt_num(const char *format, double n)
 				syntax_error(EMSG_INV_FMT);
 			} else
 			if (strchr(fmt_num_types_i, c)) {
-				snprintf(g_buf, MAXVARFMT, format, (int)n);
+				snprintf(g_buf, MAXVARFMT, format, (long long)n);
 				break;
 			} else
 			if (strchr(fmt_num_types_f, c)) {
