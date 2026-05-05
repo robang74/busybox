@@ -1,9 +1,18 @@
 /*
  * (c) 2026, Roberto A. Foglietta <roberto.foglietta@gmail.com>, GPLv2 license
+ *
+ *  size check: before vs after:
+ *     text	   data	    bss	    dec	    hex	filename
+ *  1155508	  18124	   2056	1175688	 11f088	busybox
+ *  1156166	  18144	   2056	1176366	 11f32e	busybox
+ *  Total:                     +678
+ *
+ *  how to apply:
+ *    copy this file into in miscutils/unbuffer.
  */
 
 //config:config UNBUFFER
-//config:	bool "unbuffer (0.8kb)"
+//config:	bool "unbuffer (0.7kb)"
 //config:	default n
 //config:	help
 //config:	  Run a command in a PTY to disable buffering.
@@ -16,17 +25,6 @@
 //usage: "CMD [ARGS]"
 //usage:#define unbuffer_full_usage "\n\n"
 //usage: "Run a command in a PTY to disable buffering."
-
-/*
-  size check: before vs after:
-     text	   data	    bss	    dec	    hex	filename
-  1096595	  16691	   1656	1114942	 11033e	busybox
-     text	   data	    bss	    dec	    hex	filename
-  1097330	  16707	   1664	1115701	 11062c	busybox
-
-  how to apply:
-  copy this file into in miscutils/unbuffer.
-*/
 // how to activate:
 // make oldconfig && sed "s/^# *\(CONFIG_UNBUFFER\).*/\\1=y/" -i .config
 
@@ -84,11 +82,20 @@ int unbuffer_main(int argc, char **argv)
 	sigprocmask(SIG_SETMASK, &oldset, NULL);
 	sigwinch_handler(0);
 
+// RAF: there is a good chance to find a bb function also for signals
+// TODO: check previous commits with the keyword 'unbuffer' can help.
+#if 0
 	if (tcgetattr(ptyfd, &tios) == 0) {
 		cfmakeraw(&tios);
 		tios.c_oflag |= ONLCR;
 		tcsetattr(ptyfd, TCSANOW, &tios);
 	}
+#else
+//   text	   data	    bss	    dec	    hex	filename
+//    619	      4	      4	    627	    273	miscutils/unbuffer.o
+//    580	      4	      4	    588	    24c	miscutils/unbuffer.o
+	set_termios_to_raw(ptyfd, &tios, 0);
+#endif
 
 	while ((n = read(ptyfd, &ch, 1)) == 1) {
 		if(full_write(STDOUT_FILENO, &ch, 1) != 1) {
