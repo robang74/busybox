@@ -965,6 +965,9 @@ static double my_strtod_or_hexoct(char **pp)
 /* -------- working with variables (set/get/copy/etc) -------- */
 
 static const char *fmt_num(const char *format, double n)
+// RAF: the intrinsic limitation by "double" as "n" type parameter
+// remains for integers which are going to lose precision outside
+// the (-2^53, 2^53) range supported by IEEE 754.
 {
 /*
  * 		WARNING -- BACK COMPATIBILITY CORNER CASES BROKEN -- WARNING
@@ -1150,7 +1153,8 @@ static double getvar_i(var *v)
 		if (s && *s) {
 			debug_printf_eval("getvar_i: '%s'->", s);
 			v->number = my_strtod(&s);
-			/* ^^^ hex/oct NOT allowed here! */
+			/* ^^^ hex/oct NOT allowed in _input_ (POSIX) */
+			/* awk only allows hex/oct consts in _program_ */
 			debug_printf_eval("%f (s:'%s')\n", v->number, s);
 			if (v->type & VF_USER) {
 //TODO: skip_spaces() also skips backslash+newline, is it intended here?
