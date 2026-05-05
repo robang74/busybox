@@ -996,16 +996,18 @@ static const char *fmt_num(const char *format, double n)
 			if(c == '%' && *s != '%') {
 				if(p) {
 				// p.2: multiple specifiers rejected, bugfix
-					p = 0; break;
+					p = 0;
+					break;
 				}
 				p = s;
 			}
-		}
-		// printf("c: %c, p: %s\n", c?c:'0', p?p:"(null)");
-#if ENABLE_DESKTOP
+		} 
 		// still (!p) here? it means no numeric identifier
-		if(!p) syntax_error(EMSG_INV_FMT);
+		debug_printf_eval("c: '%c', p: '%s', s: '%s'\n",
+			c?c:'0', s?s:"(null)", p?p:"(null)");
+#if ENABLE_DESKTOP
 		// a single space after the % is allowed, skip
+		if(!p) syntax_error(EMSG_INV_FMT);
 		if(*p == ' ') p++;
 #endif
 /*
@@ -1046,8 +1048,24 @@ static const char *fmt_num(const char *format, double n)
 			else
 			if (strchr(fmt_num_types_l""fmt_num_types_d, c)) {
 				continue;
-			} else
-				syntax_error(EMSG_INV_FMT);
+			} else {
+#if ENABLE_DESKTOP
+/* Info by Schindler, Dietmar <dietmar.schindler@manrolandgoss.com>
+ * according to
+ * - https://pubs.opengroup.org/onlinepubs/9799919799/utilities/awk.html
+ * - https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap05.html
+ * If any character sequence in the format string begins with a '%' character,
+ * but does not form a valid conversion specification, the behavior is unspecified
+ *
+ * RAF: for helping users with a quick debug, it prints the format as-is given.
+ * Adding a trivial prefix "E?:" helps to catch these cases immediately.
+ */
+				snprintf(g_buf, MAXVARFMT, "E?:%s", format);
+				break;
+#else
+				p = 0; // syntax_error(EMSG_INV_FMT);
+#endif
+			}
 		} while(1);
 	}
 	return g_buf;
