@@ -1007,15 +1007,14 @@ static const char *fmt_num(const char *format, double n)
 			c?c:'0', s?s:"(null)", p?p:"(null)");
 #if ENABLE_DESKTOP
 		// a single space after the % is allowed, skip
-		if(!p) syntax_error(EMSG_INV_FMT);
-		if(*p == ' ') p++;
+		if(p && *p == ' ') p++;
 		do {
-			if (!(c = *p++)) {
+			if (!p || !(c = *p++)) {
 #else
 		do {
 			if (!p || !(c = *p++) || c == ' ' || c == 'n') {
 #endif
-				syntax_error(EMSG_INV_FMT);
+				syntax_error(EMSG_INV_FMT); // invalid, only here
 				break; // just to inform cc that it is a end-case
 			} else
 			if (strchr(fmt_num_types_i, c)) {
