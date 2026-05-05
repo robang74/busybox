@@ -994,8 +994,7 @@ static const char *fmt_num(const char *format, double n)
  */
 		while ((c = *s) && *++s) {
 			if(c == '%' && *s != '%') {
-				if(p) {
-				// p.2: multiple specifiers rejected, bugfix
+				if(p) { // multiple specifiers rejected, bugfix
 					p = 0;
 					break;
 				}
@@ -1009,33 +1008,14 @@ static const char *fmt_num(const char *format, double n)
 		// a single space after the % is allowed, skip
 		if(!p) syntax_error(EMSG_INV_FMT);
 		if(*p == ' ') p++;
-#endif
-/*
- * RAF: with a generalisation of the approach coverage is extended with
- * a very tiny extra footprint size increment: 12 bytes for which the
- * ENABLE_EXTRA_COMPAT seems overkilling for this scenario (tot. +63b).
- *
-		s = p;
-
-		if(!c || *s == 'n') c = 0;
-		else do { c = *s; } while (c && *++s && *s != ' '
-				#if ENABLE_EXTRA_COMPAT
-						&& !strchr(fmt_num_types_i, c)
-						&& !strchr(fmt_num_types_f, c)
-				#endif
-		);
-		if (c && strchr(fmt_num_types_i, c)) {
-			snprintf(g_buf, MAXVARFMT, format, (int)n);
-		} else
-		if (c && strchr(fmt_num_types_f, c)) {
-			snprintf(g_buf, MAXVARFMT, format, n);
-		} else {
-			syntax_error(EMSG_INV_FMT);
-		}
-*/
 		do {
-			if (!p || !(c = *p++)) {
+			if (!(c = *p++)) {
+#else
+		do {
+			if (!p || !(c = *p++) || c == ' ' || c == 'n') {
+#endif
 				syntax_error(EMSG_INV_FMT);
+				break; // just to inform cc that it is a end-case
 			} else
 			if (strchr(fmt_num_types_i, c)) {
 				snprintf(g_buf, MAXVARFMT, format, (long long)n);
@@ -1045,11 +1025,15 @@ static const char *fmt_num(const char *format, double n)
 				snprintf(g_buf, MAXVARFMT, format, n);
 				break;
 			}
+#if ENABLE_DESKTOP
+/*
+ * RAF: with a generalisation of the approach the coverage is extended with
+ * a tiny extra footprint size increment by ENABLE_DESKTOP for quick debug
+ */
 			else
 			if (strchr(fmt_num_types_l""fmt_num_types_d, c)) {
 				continue;
 			} else {
-#if ENABLE_DESKTOP
 /* Info by Schindler, Dietmar <dietmar.schindler@manrolandgoss.com>
  * according to
  * - https://pubs.opengroup.org/onlinepubs/9799919799/utilities/awk.html
@@ -1062,10 +1046,8 @@ static const char *fmt_num(const char *format, double n)
  */
 				snprintf(g_buf, MAXVARFMT, "E?:%s", format);
 				break;
-#else
-				p = 0; // syntax_error(EMSG_INV_FMT);
-#endif
 			}
+#endif
 		} while(1);
 	}
 	return g_buf;
