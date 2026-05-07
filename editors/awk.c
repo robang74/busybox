@@ -1037,18 +1037,18 @@ static const char *fmt_num(const char *format, double n)
 				 * not fit into minimalistic garbage I/O principle
 				 *
 				_IF_FEATURE_AWK_LIBM(n += (n>0) ? +0.5 : -0.5);
+				 *
+				 * RAF: the big endian 64 bit is troublesome in
+				 * dealing with "%d" when the cast is (long) while
+				 * %hd isn't because short are autopromoted (int)
 				 */
-				// RAF: code with "long" is shorter than "int" but:
-//				#if BYTE_ORDER == BIG_ENDIAN && ULONG_MAX > 0xFFFFFFFFU
-/*
-				#if __BYTE_ORDER == __BIG_ENDIAN && __SIZEOF_LONG__ == 8
-				# define _ftol_ (*(p-2) == 'l' ? (long)n : ((long)n) << 32)
-				#else
-				# define _ftol_ (                (long)n                  )
-				#endif
-*/	
-				snprintf(g_buf, MAXVARFMT, format,
-					*(p-2) == 'l' ? (long)n : ((int)n));
+#if __BYTE_ORDER == __BIG_ENDIAN && __SIZEOF_LONG__ == 8
+//#if BYTE_ORDER == BIG_ENDIAN && ULONG_MAX > 0xFFFFFFFFU
+				if(*(p-2) != 'l')
+				snprintf(g_buf, MAXVARFMT, format, (int)n);
+				else
+#endif
+				snprintf(g_buf, MAXVARFMT, format, (long)n);
 				break;
 			} else
 			if (strchr(fmt_num_types_f, c)) {
