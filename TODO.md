@@ -6,96 +6,73 @@
 
 ### awk
 
+Regressions expected are those already warned about moving that part of awk
+from a simpler to a more compliant way of operating regarding printf format.
+The larger desktop version (cfr. .config options) supports users to debug
+their awk scripts. A support usually welcomed in a transitional phase.
+
 To test against further regressions (downstreams):
-+ [8b52c08a4](https://github.com/robang74/busybox/commit/8b52c08a4) - 2026-05-04 - awk: numeric identifiers full recognition, fixed in +65b total
 
-Fixing: two major issues like walking %016llx and writing %n
-Extend: support for "%fpx", keep "pi:%f" and earn "pi: %f deg"
-Testing: editors/awk_printx_tests.sh added new (only visual)
-Advantage: see all-and-only-the-OKs approach when viable (3 OKs)
-- `test $(./run_3oks_test 2>&1 | grep OK | wc -l) -eq 3`
++ [patches/0008-awk-minimalist-approach-to-fix-some-unsupported-cases-v6.patch](patches/0008-awk-minimalist-approach-to-fix-some-unsupported-cases-v6.patch)
 
-```sh 
-./busybox awk 'BEGIN { CONVFMT="%nf"; x=3.14; print x "" }';
-./busybox awk 'BEGIN { CONVFMT="%.2f OK f"; x=3.14; print x "" }';
-./busybox awk 'BEGIN { CONVFMT="%.2fpi %016llx f"; x=3.14; print x "" }';
-./busybox awk 'BEGIN { CONVFMT="walk: %.2fpi %016llx "; x=3.14; print x "" }'
-./busybox awk 'BEGIN { CONVFMT="OK pi: %.2fx"; x=3.14; print x "" }'
-./busybox awk 'BEGIN { CONVFMT="%.2fOKpi"; x=3.14; print x "" }'
+BusyBox awk seeks for the last character in format and uses it for
+inferring the numeric specifier type (integer or float) despite it
+sould be or not be related with the real specifier. This patch fixes
+this misbehaviour thanks to previous patches: it starts from the %
+and seeks a '\0' or ' ' to find the type.
 
-   text    data     bss     dec     hex filename
+- Fixing: two major issues like walking %016llx and writing %n
+- Extend: support for "%fpx", keep "pi:%f" and earn "pi: %f deg"
+- Testing: editors/awk_printx_tests.sh added new (only visual)
+
+This patch disables the integer check beforehand which was probably the only
+initial supported case which remained for back compatibility and moves forward
+a full format support including the "%p" case. This emerging novel awk requires
+no size increase (+3 bytes in total) but it breaks with the past for the better.
+
+Acting on fmt_num() would impact on OFMT as well, just CONVFMT needs a fix
+and the shortest path is to redirect the troublesome case into already %n
+rejected because "Invalid format specifier"
+
+The intrinsic limitation by "double" (IEEE 754) as type parameter remains for
+integers which are going to lose precision outside the (-2^53, 2^53) range.
+
+```
+   text	   data	    bss	    dec	    hex	filename
+  19352	      0	      0	  19352	   4b98	editors/awk.o
+Total:                      +14
+
+ENABLE_DESKTOP:
+   text	   data	    bss	    dec	    hex	filename
   19338       0       0   19338    4b8a editors/awk.o
 Fixing:                     +51
   19389       0       0   19389    4bbd editors/awk.o
 Extend:                     +16
-  19405       0       0   19405    4bcd editors/awk.o
+  19405	      0	      0	  19405	   4bcd	editors/awk.o
 Coding:                      -2
-  19403       0       0   19403    4bcb editors/awk.o
+  19403	      0	      0	  19403	   4bcb	editors/awk.o
+Pointers:                   -62
+  19341	      0	      0	  19341	   4b8d	editors/awk.o
+Total:                       +3
+
+Stricter:                   +38
+  19379       0       0   19379    4bb3 editors/awk.o
+Debugger:                   +38
+  19408       0       0   19408    4bd9 editors/awk.o
+Total:                      +70
 ```
 
+Undefined behaviour isn't necessarily a failure (exit 1) and printing
+the format as-is received by the users helps them to debug faster.
+Adding a trivial prefix "E?:" helps to catch these cases immediately.
 
+Info by Dietmar Schindler, according to:
+- pubs.opengroup.org/onlinepubs/9799919799/utilities/awk.html
+- pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap05.html
 
-+ [70172e793](https://github.com/robang74/busybox/commit/70172e793) - 2026-05-03 - awk: proper numeric specifier type reading, bugfix
-
-busybox awk seek for the last character in format and uses it for
-infering the numeric specifier type (interger or float) despite it
-sould be or not be related with the real specifier. This patch fixes
-this behaviour thanks to previous patches: it starts from the % and
-seek a '\0' or ' ' to find the type. Zero bytes footprint increase.
-
-before:
-```sh
-./busybox awk 'BEGIN { CONVFMT="Test PI: %.2f mf"; x=3.14; print x "" }'
-Test PI: 3.14 mf
-./busybox awk 'BEGIN { CONVFMT="Test PI: %.2f mx"; x=3.14; print x "" }'
-Test PI: 0.00 mx
-./busybox awk 'BEGIN { CONVFMT="Test PI: %.2f mm"; x=3.14; print x "" }'
-awk: cmd. line:1: Invalid format specifier
-```
-
-after:
-```sh
-./busybox awk 'BEGIN { CONVFMT="Test PI: %.2f mx"; x=3.14; print x "" }'
-Test PI: 3.14 mx
-```
-
-+ [75e5e57cf](https://github.com/robang74/busybox/commit/75e5e57cf) - 2026-05-01 - awk: minimalist approach to bugfixing some awk unsupported cases, p.2
-
-```sh
-+:git-shell:uchaosys:busybox> size editors/awk.o
-   text    data     bss     dec     hex filename
-  19338	      0	      0	  19338	   4b8a	editors/awk.o
-  19389       0       0   19389    4bbd editors/awk.o
-Difference:                 +51
-
-./busybox awk 'BEGIN { CONVFMT="Test PI: %.2f"; x=3.14; print x "" }'
-Test PI: 3.14
-```
-
-Regression in printouts that can break tests or scripts:
-
-+ [770fdda9b](https://github.com/robang74/busybox/commit/770fdda9b) - 2026-05-01 - awk: minimalist approach to bugfixing some awk unsupported cases
-
-```sh
-./busybox awk 'BEGIN { CONVFMT="Test PI: %.2f"; x=3.14; print x "" }'
-3.14
-
-awk 'BEGIN { CONVFMT="Test PI: %.2f"; x=3.14; print x "" }'
-Test PI: 3.14
-```
-
-Uncovered case in `OFMT` and functional case in `CONVFMT`:
-
-+ [428aa1e6](https://github.com/robang74/busybox/commit/428aa1e6) - 2026-05-01 - awk:  CONVFMT=%nf string format attack fix
-
-```sh
-./busybox awk 'BEGIN { OFMT="%nf"; x=3.14; print x }'
-*** %n in writable segment detected ***
-Aborted (core dumped)
-
-./busybox awk 'BEGIN { CONVFMT="%nf"; x=3.14; print x }'
-3.14
-```
+quoting this:
+> If any character sequence in the format string begins with a '%' character,<br>
+> but does not form a valid conversion specification, the behavior is unspecified
 
 ---
 
