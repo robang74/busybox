@@ -963,8 +963,18 @@ static double my_strtod_or_hexoct(char **pp)
 #define fmt_num_types_f "eEfFgGaA"
 #define fmt_num_types_d "0123456789"
 #define fmt_num_types_l "hjltz.-+*#"
-// RAF: %Lf isn't acceptable because on 128 arch it creates a reading
-// beyond the 64 bit double limit and the same happens accepting %lld
+/*
+ * 		WARNING -- BACK COMPATIBILITY CORNER CASES BROKEN -- WARNING
+ *
+ * RAF: %Lf isn't acceptable because on 128 arch it creates a reading
+ * beyond the 64 bit double limit and the same happens accepting %lld,
+ * while big endian 128 bit is a super-computer arena, thus ignored.
+ * Finally, the best choice is to unsopport all 128 bit arch and keep
+ * the code minimal for 32 and 64 bit architectures.
+ */
+#if __SIZEOF_LONG__ > 8
+#warning "This architecture is at risk becase %ll and %L read beyond var"
+#endif
 
 #if 0 // RAF: set '1' to check the minimum size, '0' by .config
 #define _ENABLE_DESKTOP      0
@@ -1044,7 +1054,7 @@ static const char *fmt_num(const char *format, double n)
 				 */
 #if __BYTE_ORDER == __BIG_ENDIAN && __SIZEOF_LONG__ == 8
 //#if BYTE_ORDER == BIG_ENDIAN && ULONG_MAX > 0xFFFFFFFFU
-				if(*(p-2) != 'l')
+				if(*(p-2) != 'l' || c == 'p')
 				snprintf(g_buf, MAXVARFMT, format, (int)n);
 				else
 #endif
