@@ -962,7 +962,9 @@ static double my_strtod_or_hexoct(char **pp)
 #define fmt_num_types_i "diouxXp"
 #define fmt_num_types_f "eEfFgGaA"
 #define fmt_num_types_d "0123456789"
-#define fmt_num_types_l "hjlLtz.-+*#"
+#define fmt_num_types_l "hjltz.-+*#"
+// RAF: %Lf isn't acceptable because on 128 arch it creates a reading
+// beyond the 64bit double limit and the same happens accepting %lld
 
 /* -------- working with variables (set/get/copy/etc) -------- */
 
