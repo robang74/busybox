@@ -1041,12 +1041,15 @@ static const char *fmt_num(const char *format, double n)
 				 */
 				// RAF: code with "long" is shorter than "int" but:
 //				#if BYTE_ORDER == BIG_ENDIAN && ULONG_MAX > 0xFFFFFFFFU
+/*
 				#if __BYTE_ORDER == __BIG_ENDIAN && __SIZEOF_LONG__ == 8
 				# define _ftol_ (*(p-2) == 'l' ? (long)n : ((long)n) << 32)
 				#else
 				# define _ftol_ (                (long)n                  )
 				#endif
-				snprintf(g_buf, MAXVARFMT, format, _ftol_);
+*/	
+				snprintf(g_buf, MAXVARFMT, format,
+					*(p-2) == 'l' ? (long)n : ((int)n));
 				break;
 			} else
 			if (strchr(fmt_num_types_f, c)) {
