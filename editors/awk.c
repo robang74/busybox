@@ -964,7 +964,7 @@ static double my_strtod_or_hexoct(char **pp)
 #define fmt_num_types_d "0123456789"
 #define fmt_num_types_l "hjltz.-+*#"
 /*
- * 		WARNING -- BACK COMPATIBILITY CORNER CASES BROKEN -- WARNING
+ * WARNING -- BACK COMPATIBILITY CORNER CASES BROKEN -- WARNING
  *
  * RAF: %Lf isn't acceptable because on 128 arch it creates a reading
  * beyond the 64 bit double limit and the same happens accepting %lld,
@@ -992,7 +992,7 @@ static const char *fmt_num(const char *format, double n)
 // the (-2^53, 2^53) range supported by IEEE 754.
 {
 /*
- * 		WARNING -- BACK COMPATIBILITY CORNER CASES BROKEN -- WARNING
+ * 	WARNING -- BACK COMPATIBILITY CORNER CASES BROKEN -- WARNING
  */
 #if 0 // RAF: '1' breaks with printing a string with a single integer
 	  // properly formated identifier. While '0' breaks back-compatibility
@@ -1020,23 +1020,19 @@ static const char *fmt_num(const char *format, double n)
 					break;
 				}
 				p = s;
+				// a single space after the % is allowed, skip
+				if(*p == ' ') p++;
 			}
 		} 
 		// still (!p) here? it means no numeric identifier
 		debug_printf_eval("c: '%c', p: '%s', s: '%s'\n",
 			c?:'0', s?:"(null)", p?:"(null)");
-#if _ENABLE_DESKTOP
-		// a single space after the % is allowed, skip
-		if(p && *p == ' ') p++;
-#endif
 		do {
-			if (
+			if (!p || !(c = *p++)
 #if _ENABLE_DESKTOP
-				      !(c = *p++)
 #else
-				!p || !(c = *p++) || c == ' ' || c == 'n'
+			|| c == ' ' || c == 'n'
 #endif
-				   ||  (c == 'l' && *p == 'l')
 			) {
 				syntax_error(EMSG_INV_FMT); // invalid, only here
 				break; // just to inform cc that it is a end-case
@@ -1052,17 +1048,27 @@ static const char *fmt_num(const char *format, double n)
 				 * RAF: the big endian 64 bit is troublesome in
 				 * dealing with "%d" when the cast is (long) while
 				 * %hd isn't because short are autopromoted (int)
+				 *
+#if BYTE_ORDER == BIG_ENDIAN && ULONG_MAX > 0xFFFFFFFFU
 				 */
 #if __BYTE_ORDER == __BIG_ENDIAN && __SIZEOF_LONG__ == 8
-//#if BYTE_ORDER == BIG_ENDIAN && ULONG_MAX > 0xFFFFFFFFU
 				if(*(p-2) != 'l' || c == 'p')
 				snprintf(g_buf, MAXVARFMT, format, (int)n);
 				else
-#endif
 				snprintf(g_buf, MAXVARFMT, format, (long)n);
+#else
+				snprintf(g_buf, MAXVARFMT, format, (long long)n);
+#endif
 				break;
 			} else
 			if (strchr(fmt_num_types_f, c)) {
+#if 0 // RAF: %llf isn't a valid format, printf will take care of it
+				if(*(p-2) == 'l' && *(p-3) == 'l')
+					goto llf_format_handle;
+#endif
+				// RAF: some implementations might recognise %llf as %Lf
+				// in that cases padding the printf would not help much
+				// because 128bit are on the stack not in the registry.
 				snprintf(g_buf, MAXVARFMT, format, n);
 				break;
 			}
@@ -1076,14 +1082,17 @@ static const char *fmt_num(const char *format, double n)
 				continue;
 			} else {
 /* Info by Schindler, Dietmar <dietmar.schindler@manrolandgoss.com>
- * according to
- * - https://pubs.opengroup.org/onlinepubs/9799919799/utilities/awk.html
- * - https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap05.html
- * If any character sequence in the format string begins with a '%' character,
- * but does not form a valid conversion specification, the behavior is unspecified
+ * according to:
+ * - pubs.opengroup.org/onlinepubs/9799919799/utilities/awk.html
+ * - pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap05.html
+ * quoting this:
+ *   If any character sequence in the format string begins with a '%'
+ *   character, but does not form a valid conversion specification,
+ *   the behavior is unspecified
  *
- * RAF: for helping users with a quick debug, it prints the format as-is given.
- * Adding a trivial prefix "E?:" helps to catch these cases immediately.
+ * RAF:
+ * For helping users debug their awk scripts, print the format
+ * given adding a short prefix "E?:" which to grep these cases
  */
 				snprintf(g_buf, MAXVARFMT, "E?:%s", format);
 				break;
