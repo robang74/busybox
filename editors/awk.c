@@ -962,9 +962,17 @@ static double my_strtod_or_hexoct(char **pp)
 #define fmt_num_types_i "diouxXp"
 #define fmt_num_types_f "eEfFgGaA"
 #define fmt_num_types_d "0123456789"
-#define fmt_num_types_l "hjltz.-+*#"
+#define fmt_num_types_l "hjtz.-+*#"
 // RAF: %Lf isn't acceptable because on 128 arch it creates a reading
-// beyond the 64bit double limit and the same happens accepting %lld
+// beyond the 64 bit double limit and the same happens accepting %lld
+
+#if 0 // RAF: set '1' to check the minimum size, '0' by .config
+#define _ENABLE_DESKTOP      0
+#define _IF_FEATURE_AWK_LIBM(x) if(0){}
+#else
+#define _ENABLE_DESKTOP      ENABLE_DESKTOP
+#define _IF_FEATURE_AWK_LIBM IF_FEATURE_AWK_LIBM
+#endif
 
 /* -------- working with variables (set/get/copy/etc) -------- */
 static const char *fmt_num(const char *format, double n)
@@ -1005,28 +1013,40 @@ static const char *fmt_num(const char *format, double n)
 		} 
 		// still (!p) here? it means no numeric identifier
 		debug_printf_eval("c: '%c', p: '%s', s: '%s'\n",
-			c?c:'0', s?s:"(null)", p?p:"(null)");
-#if ENABLE_DESKTOP
+			c?:'0', s?:"(null)", p?:"(null)");
+#if _ENABLE_DESKTOP
 		// a single space after the % is allowed, skip
 		if(p && *p == ' ') p++;
-		do {
-			if (!p || !(c = *p++)) {
-#else
-		do {
-			if (!p || !(c = *p++) || c == ' ' || c == 'n') {
 #endif
+		do {
+			if (
+#if _ENABLE_DESKTOP
+				      !(c = *p++)
+#else
+				!p || !(c = *p++) || strchr(" nlL", c)
+#endif
+			) {
 				syntax_error(EMSG_INV_FMT); // invalid, only here
 				break; // just to inform cc that it is a end-case
 			} else
 			if (strchr(fmt_num_types_i, c)) {
-				snprintf(g_buf, MAXVARFMT, format, (long long)n);
+				// RAF: almost lke round(n) but smaller elf
+				_IF_FEATURE_AWK_LIBM(n += (n>0) ? +0.5 : -0.5);
+				// RAF: code with "long" is shorter than "int" but:
+//				#if BYTE_ORDER == BIG_ENDIAN && ULONG_MAX > 0xFFFFFFFFU
+				#if __BYTE_ORDER == __BIG_ENDIAN && __SIZEOF_LONG__ == 8
+				# define VAL_TO_INT(x) (((long)x) << 32)
+				#else
+				# define VAL_TO_INT(x)  ((long)x)
+				#endif
+				snprintf(g_buf, MAXVARFMT, format, VAL_TO_INT(n));
 				break;
 			} else
 			if (strchr(fmt_num_types_f, c)) {
 				snprintf(g_buf, MAXVARFMT, format, n);
 				break;
 			}
-#if ENABLE_DESKTOP
+#if _ENABLE_DESKTOP
 /*
  * RAF: with a generalisation of the approach the coverage is extended with
  * a tiny extra footprint size increment by ENABLE_DESKTOP for quick debug
