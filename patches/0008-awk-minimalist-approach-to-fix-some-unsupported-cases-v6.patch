@@ -1,0 +1,439 @@
+From 44096463f5641ebd2d97253ebdd5401d9a4ee11a Mon Sep 17 00:00:00 2001
+From: "Roberto A. Foglietta" <roberto.foglietta@gmail.com>
+Date: Fri, 1 May 2026 21:03:35 +0200
+Subject: [PATCH] awk: invalid conversion handling for a quick debug, +14/+70b
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+BusyBox awk seeks for the last character in format and uses it for
+inferring the numeric specifier type (integer or float) despite it
+sould be or not be related with the real specifier. This patch fixes
+this misbehaviour thanks to previous patches: it starts from the %
+and seeks a '\0' or ' ' to find the type.
+
+  - Fixing: two major issues like walking %016llx and writing %n
+  - Extend: support for "%fpx", keep "pi:%f" and earn "pi: %f deg"
+  - Testing: editors/awk_printx_tests.sh added new (only visual)
+
+This patch disables the integer check beforehand which was probably the only
+initial supported case which remained for back compatibility and moves forward
+a full format support including the "%p" case. This emerging novel awk requires
+no size increase (+3 bytes in total) but it breaks with the past for the better.
+
+Acting on fmt_num() would impact on OFMT as well, just CONVFMT needs a fix
+and the shortest path is to redirect the troublesome case into already %n
+rejected because "Invalid format specifier"
+
+The intrinsic limitation by "double" (IEEE 754) as type parameter remains for
+integers which are going to lose precision outside the (-2^53, 2^53) range.
+
+     text	   data	    bss	    dec	    hex	filename
+    19352	      0	      0	  19352	   4b98	editors/awk.o
+  Total:                      +14
+
+  ENABLE_DESKTOP:
+     text	   data	    bss	    dec	    hex	filename
+    19338       0       0   19338    4b8a editors/awk.o
+  Fixing:                     +51
+    19389       0       0   19389    4bbd editors/awk.o
+  Extend:                     +16
+    19405	      0	      0	  19405	   4bcd	editors/awk.o
+  Coding:                      -2
+    19403	      0	      0	  19403	   4bcb	editors/awk.o
+  Pointers:                   -62
+    19341	      0	      0	  19341	   4b8d	editors/awk.o
+  Total:                       +3
+     text	   data	    bss	    dec	    hex	filename
+  Stricter:                   +38
+    19379       0       0   19379    4bb3 editors/awk.o
+  Debugger:                   +38
+    19408       0       0   19408    4bd9 editors/awk.o
+  Total:                      +70
+
+Undefined behaviour isn't necessarily a failure (exit 1) and printing
+the format as-is received by the users helps them to debug faster.
+Adding a trivial prefix "E?:" helps to catch these cases immediately.
+
+Info by Dietmar Schindler, according to:
+  - pubs.opengroup.org/onlinepubs/9799919799/utilities/awk.html
+  - pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap05.html
+quote:
+  > If any character sequence in the format string begins with a '%'
+  > character,   > but does not form a valid conversion specification,
+  > the behavior is unspecified
+
+based on:
+-------------------------------------------------------------------------------
+awk: invalid conversion handling for a quick debug, +14/+70b
+awk: invalid conversion handling for a quick debug, +16/+80b, p.3
+awk: invalid conversion handling for a quick debug, +16/+80b, p.2
+awk: invalid conversion handling for a quick debug, +32/+98b
+awk: invalid conversion handling for a quick debug, +16/+80b
+awk: invalid conversion handling for a quick debug, +7/+123b
+awk: invalid conversion handling for a quick debug, +5/+71b, p.2
+awk: invalid conversion handling for a quick debug, +5/+71b tot.
+awk: invalid conversion handling for a quick debug, +5/+70b tot.
+awk: invalid conversion handling for a quick debug, +35/+70b tot.
+awk: numeric identifiers full recognition w/ %p, stricter +41b tot.
+awk: numeric identifiers full recognition w/ %p in +3b total, p.2
+awk: numeric identifiers full recognition, +65b (patchset v4)
+awk: numeric identifiers full recognition, fixed in +67b total
+awk: numeric identifiers full recognition, size shrunk (-6b)
+awk: numeric identifiers full recognition, ENABLE_EXTRA_COMPAT (+43b)
+awk: proper numeric specifier type reading, bugfix
+awk: code janitoring, just aesthetic
+awk: minimalist approach to bugfixing some awk unsupported cases, p.2
+awk: minimalist approach to bugfixing some awk unsupported cases
+awk: CONVFMT=%nf string format attack fix
+
+bug reported by:
+--------------------------------------------------------------------------------
+
+From: Atle Østrem Tøge <atleot@stud.ntnu.no>
+Cc: Sebastian Ellingsen <sebastian.ellingsen@ntnu.no>
+Subject: awk: CONVFMT format string causes crash
+To: Busybox <busybox@busybox.net>
+Date: Fri, 1 May 2026 at 13:11
+
+Package: busybox
+Version: 1.36.1 (also reproduced on current master)
+
+When I set CONVFMT to a multi-specifier format string ending in a valid
+float specifier and perform a float-to-string conversion, busybox awk crashes.
+
+With a standard CONVFMT I get:
+
+    $ busybox awk 'BEGIN { CONVFMT="%.6g"; x=3.14; print x "" }'
+    3.14
+
+But with the following input I get a segfault:
+
+    $ busybox awk 'BEGIN { CONVFMT="%nf"; x=3.14; print x "" }'
+    Segmentation fault
+
+Note that CONVFMT="%n" alone is correctly rejected with "Invalid format
+specifier", so the crash is specific to multi-specifier strings where the
+terminal character is otherwise valid.
+
+Tested on x86_64 Linux. Crash confirmed with AddressSanitizer (SEGV,
+WRITE access in fmt_num() -> getvar_s() -> evaluate()).
+
+To clarify: %n is a printf conversion specifier that writes the number of
+bytes written so far to the address of the next argument, it is unrelated
+to numeric width specifiers like %.2f.
+
+BusyBox awk validates only the last character of CONVFMT,  "%nf" passes
+(last char 'f' is valid) and the full string reaches snprintf. "%n" alone
+is correctly rejected.
+
+We reproduced the segfault by building current master (vda-linux/busybox_mirror)
+against musl libc (Alpine Linux container):
+
+    $ ./busybox awk 'BEGIN { CONVFMT="%nf"; x=3.14; print x "" }'
+    Segmentation fault
+
+The root cause is in fmt_num() in editors/awk.c.
+
+--------------------------------------------------------------------------------
+
+From: Atle Østrem Tøge <atleot@stud.ntnu.no>
+Date: Fri, 1 May 2026 at 18:34
+Subject: Sv: awk: CONVFMT format string causes crash
+To: Roberto A. Foglietta <roberto.foglietta@gmail.com>
+
+Proposed solution by 	Atle Østrem Tøge <atleot@stud.ntnu.no>:
+
+> --- a/editors/awk.c
+> +++ b/editors/awk.c
+> @@ -963,7 +963,15 @@ static const char *fmt_num(const char *format, double n)
+>    } else {
+>       const char *s = format;
+>       char c;
+> -     do { c = *s; } while (c && *++s);
+> +       int spec_count = 0;
+> +       while (*s) {
+> +         if (*s == '%' && *(s+1) != '%') {
+> +           spec_count++;
+> +           if (spec_count > 1) { syntax_error(EMSG_INV_FMT); return g_buf; }
+> +           if (*(s+1) == 'n') { syntax_error(EMSG_INV_FMT); return g_buf; }
+> +         }
+> +         c = *s++;
+> +       }
+>         if (strchr("diouxX", c)) {
+>
+
+--------------------------------------------------------------------------------
+
+Signed-off-by: Roberto A. Foglietta <roberto.foglietta@gmail.com>
+---
+ editors/awk.c               | 146 +++++++++++++++++++++++++++++++++---
+ editors/awk_printx_tests.sh |  85 +++++++++++++++++++++
+ 2 files changed, 219 insertions(+), 12 deletions(-)
+ create mode 100644 editors/awk_printx_tests.sh
+
+diff --git a/editors/awk.c b/editors/awk.c
+index dd8f4ac42..91c73efc1 100644
+--- a/editors/awk.c
++++ b/editors/awk.c
+@@ -959,24 +959,145 @@ static double my_strtod_or_hexoct(char **pp)
+ # define my_strtod_or_hexoct(p) my_strtod(p)
+ #endif
+ 
+-/* -------- working with variables (set/get/copy/etc) -------- */
++#define fmt_num_types_i "diouxXp"
++#define fmt_num_types_f "eEfFgGaA"
++#define fmt_num_types_d "0123456789"
++#define fmt_num_types_l "hjltz.-+*#"
++/*
++ * WARNING -- BACK COMPATIBILITY CORNER CASES BROKEN -- WARNING
++ *
++ * RAF: %Lf isn't acceptable because on 128 arch it creates a reading
++ * beyond the 64 bit double limit and the same happens accepting %lld,
++ * while big endian 128 bit is a super-computer arena, thus ignored.
++ * Finally, the best choice is to unsopport all 128 bit arch and keep
++ * the code minimal for 32 and 64 bit architectures.
++ */
++#if __SIZEOF_LONG__ > 8
++#warning "This architecture is at risk becase %ll and %L read beyond var"
++#endif
+ 
++#if 0 // RAF: set '1' to check the minimum size, '0' by .config
++#define _ENABLE_DESKTOP      0
++#define _IF_FEATURE_AWK_LIBM(x) if(0){}
++#else
++#define _ENABLE_DESKTOP      ENABLE_DESKTOP
++#define _IF_FEATURE_AWK_LIBM IF_FEATURE_AWK_LIBM
++#endif
++
++/* -------- working with variables (set/get/copy/etc) -------- */
+ static const char *fmt_num(const char *format, double n)
++// RAF: the intrinsic limitation by "double" as "n" type parameter
++// remains for integers which are going to lose precision outside
++// the (-2^53, 2^53) range supported by IEEE 754.
+ {
++/*
++ * 	WARNING -- BACK COMPATIBILITY CORNER CASES BROKEN -- WARNING
++ */
++#if 0 // RAF: '1' breaks with printing a string with a single integer
++	  // properly formated identifier. While '0' breaks back-compatibility
++	  // with previous use of a wrong/void format with an integer number.
+ 	if (n == (long long)n) {
+ 		snprintf(g_buf, MAXVARFMT, "%lld", (long long)n);
+-	} else {
+-		const char *s = format;
++	} else
++#endif
++	{
++		const char *s = format, *p = NULL;
+ 		char c;
+-
+-		do { c = *s; } while (c && *++s);
+-		if (strchr("diouxX", c)) {
+-			snprintf(g_buf, MAXVARFMT, format, (int)n);
+-		} else if (strchr("eEfFgGaA", c)) {
+-			snprintf(g_buf, MAXVARFMT, format, n);
+-		} else {
+-			syntax_error(EMSG_INV_FMT);
++/*
++ * RAF: as per minimalist approach only the last specifier is considered
++ * therefore printf() performs on garbage I/O principle without crashes
++ * and walking trough multiple parameters without related values in mem.
++ *
++ * UPDATE: unfortunately this approach introduces a regression "val: %d".
++ * The p.2 is going to fix regression using the same loop but rejecting
++ * multiple specifiers and using the `format` parameter from users.
++ */
++		while ((c = *s) && *++s) {
++			if(c == '%' && *s != '%') {
++				if(p) { // multiple specifiers rejected, bugfix
++					p = 0;
++					break;
++				}
++				p = s;
++				// a single space after the % is allowed, skip
++				if(*p == ' ') p++;
++			}
+ 		}
++		// still (!p) here? it means no numeric identifier
++		debug_printf_eval("c: '%c', p: '%s', s: '%s'\n",
++			c?:'0', s?:"(null)", p?:"(null)");
++		do {
++			if (!p || !(c = *p++)
++#if _ENABLE_DESKTOP
++#else
++			|| c == ' ' || c == 'n'
++#endif
++			) {
++				syntax_error(EMSG_INV_FMT); // invalid, only here
++				break; // just to inform cc that it is a end-case
++			} else
++			if (strchr(fmt_num_types_i, c)) {
++				/*
++				 * RAF: almost lke round(n) but smaller elf however
++				 * correcting users using %d and giving a float do
++				 * not fit into minimalistic garbage I/O principle
++				 *
++				_IF_FEATURE_AWK_LIBM(n += (n>0) ? +0.5 : -0.5);
++				 *
++				 * RAF: the big endian 64 bit is troublesome in
++				 * dealing with "%d" when the cast is (long) while
++				 * %hd isn't because short are autopromoted (int)
++				 *
++#if BYTE_ORDER == BIG_ENDIAN && ULONG_MAX > 0xFFFFFFFFU
++				 */
++#if __BYTE_ORDER == __BIG_ENDIAN && __SIZEOF_LONG__ == 8
++				if(*(p-2) != 'l' || c == 'p')
++				snprintf(g_buf, MAXVARFMT, format, (int)n);
++				else
++				snprintf(g_buf, MAXVARFMT, format, (long)n);
++#else
++				snprintf(g_buf, MAXVARFMT, format, (long long)n);
++#endif
++				break;
++			} else
++			if (strchr(fmt_num_types_f, c)) {
++#if 0 // RAF: %llf isn't a valid format, printf will take care of it
++				if(*(p-2) == 'l' && *(p-3) == 'l')
++					goto llf_format_handle;
++#endif
++				// RAF: some implementations might recognise %llf as %Lf
++				// in that cases padding the printf would not help much
++				// because 128bit are on the stack not in the registry.
++				snprintf(g_buf, MAXVARFMT, format, n);
++				break;
++			}
++#if _ENABLE_DESKTOP
++/*
++ * RAF: with a generalisation of the approach the coverage is extended with
++ * a tiny extra footprint size increment by ENABLE_DESKTOP for quick debug
++ */
++			else
++			if (strchr(fmt_num_types_l""fmt_num_types_d, c)) {
++				continue;
++			} else {
++/* Info by Schindler, Dietmar <dietmar.schindler@manrolandgoss.com>
++ * according to:
++ * - pubs.opengroup.org/onlinepubs/9799919799/utilities/awk.html
++ * - pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap05.html
++ * quoting this:
++ *   If any character sequence in the format string begins with a '%'
++ *   character, but does not form a valid conversion specification,
++ *   the behavior is unspecified
++ *
++ * RAF:
++ * For helping users debug their awk scripts, print the format
++ * given adding a short prefix "E?:" which to grep these cases
++ */
++				snprintf(g_buf, MAXVARFMT, "E?:%s", format);
++				break;
++			}
++#endif
++		} while(1);
+ 	}
+ 	return g_buf;
+ }
+@@ -1089,7 +1210,8 @@ static double getvar_i(var *v)
+ 		if (s && *s) {
+ 			debug_printf_eval("getvar_i: '%s'->", s);
+ 			v->number = my_strtod(&s);
+-			/* ^^^ hex/oct NOT allowed here! */
++			/* ^^^ hex/oct NOT allowed in _input_ (POSIX) */
++			/* awk only allows hex/oct consts in _program_ */
+ 			debug_printf_eval("%f (s:'%s')\n", v->number, s);
+ 			if (v->type & VF_USER) {
+ //TODO: skip_spaces() also skips backslash+newline, is it intended here?
+diff --git a/editors/awk_printx_tests.sh b/editors/awk_printx_tests.sh
+new file mode 100644
+index 000000000..c135bc69d
+--- /dev/null
++++ b/editors/awk_printx_tests.sh
+@@ -0,0 +1,85 @@
++#!/bin/sh
++
++runbin=${1:-./busybox}
++
++echo
++echo "Running 'awk' test unit:"
++echo "  script: $0"
++echo "  binary: $runbin"
++
++# Unit test: 3.14 ko...ko 3.14
++echo
++echo 'Unit test: 3.14 ko...ko 3.14'
++$runbin awk 'BEGIN { OFMT="%"; x=3.14; print x "" }'
++$runbin awk 'BEGIN { CONVFMT="%"; x=3.14; print x "" }'
++$runbin awk 'BEGIN { OFMT="%"; x=3.14; print x }'
++$runbin awk 'BEGIN { CONVFMT="%"; x=3.14; print x }'
++echo '    ---- == 4 == -----'
++$runbin awk 'BEGIN { OFMT="%nf"; x=3.14; print x "" }'
++$runbin awk 'BEGIN { CONVFMT="%nf"; x=3.14; print x "" }'
++$runbin awk 'BEGIN { CONVFMT="%n"; x=3.14; print x "" }'
++$runbin awk 'BEGIN { OFMT="%nf"; x=3.14; print x }'
++$runbin awk 'BEGIN { CONVFMT="%nf"; x=3.14; print x }'
++echo '    ---- == 5 == -----'
++$runbin awk 'BEGIN { OFMT="%%nf"; x=3.14; print x "" }'
++$runbin awk 'BEGIN { CONVFMT="%%nf"; x=3.14; print x "" }'
++$runbin awk 'BEGIN { CONVFMT="%%n"; x=3.14; print x "" }'
++$runbin awk 'BEGIN { OFMT="%%nf"; x=3.14; print x }'
++$runbin awk 'BEGIN { CONVFMT="%%nf"; x=3.14; print x }'
++echo '    ---- == 5 == -----'
++
++# Unit test: 3.14 ??
++echo
++echo 'Unit test: 3.14 ??'
++echo
++$runbin awk 'BEGIN { CONVFMT="Test PI: %.2f"; x=3.14; print x "" }'
++$runbin awk 'BEGIN { CONVFMT="Test PI: %.2f mf"; x=3.14; print x "" }'
++$runbin awk 'BEGIN { CONVFMT="Test PI: %.2f mx"; x=3.14; print x "" }'
++$runbin awk 'BEGIN { CONVFMT="Test PI: %.2f mm"; x=3.14; print x "" }'
++echo '    ---- == 4 == -----'
++
++# Unit test: see all-and-only the OKs, it is passed otherwise not
++echo
++echo 'Unit test: only 4 OKs expected'
++echo
++$runbin awk 'BEGIN { CONVFMT="%nf"; x=3.14; print x "" }'
++$runbin awk 'BEGIN { CONVFMT="%.2fpi %016llx f"; x=3.14; print x "" }'
++$runbin awk 'BEGIN { CONVFMT="walk: %.2fpi %016llx "; x=3.14; print x "" }'
++$runbin awk 'BEGIN { CONVFMT="%  d"; x=3.14; print x "" }'
++echo '    ---- == 4 == -----'
++$runbin awk 'BEGIN { CONVFMT="%.2f OK f"; x=3.14; print x "" }'
++$runbin awk 'BEGIN { CONVFMT="OK pi: %.2fx"; x=3.14; print x "" }'
++$runbin awk 'BEGIN { CONVFMT="%.2fOKpi"; x=3.14; print x "" }'
++$runbin awk 'BEGIN { CONVFMT="%f OK p"; x=3.14; print x "" }'
++echo '    ---- == 4 == -----'
++
++# Unit test: printing an integer despite invalid format is not supported anymore
++echo
++echo 'Unit test: back compatibility broken/check'
++echo
++$runbin awk 'BEGIN { CONVFMT="%d"; x=-1.5; print x "" }'
++$runbin awk 'BEGIN { CONVFMT=" % f PC?"; x=3.14; print x "" }'
++$runbin awk 'BEGIN { CONVFMT="%n"; x=314; print x "" }'
++$runbin awk 'BEGIN { CONVFMT=""; x=314; print x "" }'
++echo '    ---- == 4 == -----'
++$runbin awk 'BEGIN { CONVFMT="%hn  f"; x=-2.5; print x "" }'
++$runbin awk 'BEGIN { CONVFMT="%ln  f"; x=-2.5; print x "" }'
++$runbin awk 'BEGIN { CONVFMT="%lln f"; x=-2.5; print x "" }'
++$runbin awk 'BEGIN { CONVFMT="% n  f"; x=-2.5; print x "" }'
++echo '    ---- == 4 == -----'
++
++# Unit test: support for int 53 bits + sign and pointers added to awk
++echo
++echo 'Unit test: how integers and pointers display'
++echo
++$runbin awk 'BEGIN { CONVFMT="%d"; x=-1; print x "" }'
++$runbin awk 'BEGIN { CONVFMT="%u"; x=-1; print x "" }'
++$runbin awk 'BEGIN { CONVFMT="0x%x"; x=-1; print x "" }'
++$runbin awk 'BEGIN { CONVFMT="%p"; x=-1; print x "" }'
++echo '    ---- == 4 == -----'
++$runbin awk 'BEGIN { CONVFMT="%p"; x=11; print x "" }'
++$runbin awk 'BEGIN { CONVFMT="%x"; x=4294967296; print x "" }'
++$runbin awk 'BEGIN { CONVFMT="%lx"; x=4294967296; print x "" }'
++$runbin awk 'BEGIN { CONVFMT="%llx"; x=8589934592; print x "" }'
++echo '    ---- == 4 == -----'
++echo
+-- 
+2.34.1
+
