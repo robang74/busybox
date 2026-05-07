@@ -962,7 +962,7 @@ static double my_strtod_or_hexoct(char **pp)
 #define fmt_num_types_i "diouxXp"
 #define fmt_num_types_f "eEfFgGaA"
 #define fmt_num_types_d "0123456789"
-#define fmt_num_types_l "hjtz.-+*#"
+#define fmt_num_types_l "hjltz.-+*#"
 // RAF: %Lf isn't acceptable because on 128 arch it creates a reading
 // beyond the 64 bit double limit and the same happens accepting %lld
 
@@ -1023,23 +1023,29 @@ static const char *fmt_num(const char *format, double n)
 #if _ENABLE_DESKTOP
 				      !(c = *p++)
 #else
-				!p || !(c = *p++) || strchr(" nlL", c)
+				!p || !(c = *p++) || c == ' ' || c == 'n'
 #endif
+				   ||  (c == 'l' && *p == 'l')
 			) {
 				syntax_error(EMSG_INV_FMT); // invalid, only here
 				break; // just to inform cc that it is a end-case
 			} else
 			if (strchr(fmt_num_types_i, c)) {
-				// RAF: almost lke round(n) but smaller elf
+				/*
+				 * RAF: almost lke round(n) but smaller elf however
+				 * correcting users using %d and giving a float do
+				 * not fit into minimalistic garbage I/O principle
+				 *
 				_IF_FEATURE_AWK_LIBM(n += (n>0) ? +0.5 : -0.5);
+				 */
 				// RAF: code with "long" is shorter than "int" but:
 //				#if BYTE_ORDER == BIG_ENDIAN && ULONG_MAX > 0xFFFFFFFFU
 				#if __BYTE_ORDER == __BIG_ENDIAN && __SIZEOF_LONG__ == 8
-				# define VAL_TO_INT(x) (((long)x) << 32)
+				# define _ftol_ (*(p-2) == 'l' ? (long)n : ((long)n) << 32)
 				#else
-				# define VAL_TO_INT(x)  ((long)x)
+				# define _ftol_ (                (long)n                  )
 				#endif
-				snprintf(g_buf, MAXVARFMT, format, VAL_TO_INT(n));
+				snprintf(g_buf, MAXVARFMT, format, _ftol_);
 				break;
 			} else
 			if (strchr(fmt_num_types_f, c)) {

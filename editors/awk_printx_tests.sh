@@ -55,12 +55,13 @@ echo '    ---- == 4 == -----'
 
 # Unit test: printing an integer despite invalid format is not supported anymore
 echo
-echo 'Unit test: back compatibility broken'
+echo 'Unit test: back compatibility broken/check'
 echo
+$runbin awk 'BEGIN { CONVFMT="%d"; x=-1.5; print x "" }'
 $runbin awk 'BEGIN { CONVFMT=" % f PC?"; x=3.14; print x "" }'
 $runbin awk 'BEGIN { CONVFMT="%n"; x=314; print x "" }'
 $runbin awk 'BEGIN { CONVFMT=""; x=314; print x "" }'
-echo '    ---- == 3 == -----'
+echo '    ---- == 4 == -----'
 
 # Unit test: support for int 53 bits + sign and pointers added to awk
 echo
