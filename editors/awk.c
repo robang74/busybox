@@ -1012,16 +1012,16 @@ static const char *fmt_num(const char *format, double n)
  * The p.2 is going to fix regression using the same loop but rejecting
  * multiple specifiers and using the `format` parameter from users.
  */
-		while ((c = *s) && *++s) {
-			if(c == '%' && *s != '%') {
-				if(p) { // multiple specifiers rejected, bugfix
-					p = 0;
-					break;
-				}
-				p = s;
-				// a single space after the % is allowed, skip
-				if(*p == ' ') p++;
-			}
+		while ((c = *s++)) {
+			// find % but skip %%, Claude AI bugfix
+			if (c != '%') continue;
+			if (*s == '%') { s++; continue; }
+			// multiple specifiers rejected, bugfix for busybox
+			if(p) { p = 0; 	break; }
+			// set the pointer to a %-field to validate later
+			p = s;
+			// a single space after the % is allowed, skip it
+			if(*p == ' ') p++;
 		} 
 		// still (!p) here? it means no numeric identifier
 		debug_printf_eval("c: '%c', p: '%s', s: '%s'\n",
@@ -1093,7 +1093,11 @@ static const char *fmt_num(const char *format, double n)
  * For helping users debug their awk scripts, print the format
  * given adding a short prefix "E?:" which to grep these cases
  */
+#if 0 // RAF: using strncpy saves 3b, just "E?:", in footprint
+				strncpy(g_buf, format, MAXVARFMT);
+#else
 				snprintf(g_buf, MAXVARFMT, "E?:%s", format);
+#endif
 				break;
 			}
 #endif
