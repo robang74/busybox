@@ -976,12 +976,14 @@ static double my_strtod_or_hexoct(char **pp)
 #warning "This architecture is at risk becase %ll and %L read beyond var"
 #endif
 
-#if 0 // RAF: set '1' to check the minimum size, '0' by .config
-#define _ENABLE_DESKTOP      0
-#define _IF_FEATURE_AWK_LIBM(x) if(0){}
+#if 0 // RAF: set '0' to check the alternative codebase
+#define _ENABLE_DESKTOP 0 // ENABLE_DESKTOP
 #else
-#define _ENABLE_DESKTOP      ENABLE_DESKTOP
-#define _IF_FEATURE_AWK_LIBM IF_FEATURE_AWK_LIBM
+#define _ENABLE_DESKTOP 1 // is always more convient here
+#endif
+
+#ifndef bb_isdigit
+#define bb_isdigit(c) ((uint8_t)(c) - '0' < (uint8_t)10)
 #endif
 
 /* -------- working with variables (set/get/copy/etc) -------- */
@@ -1013,30 +1015,31 @@ static const char *fmt_num(const char *format, double n)
  * The p.2 is going to fix regression using the same loop but rejecting
  * multiple specifiers and using the `format` parameter from users.
  */
-		while ((c = *s++)) {
-			// find % but skip %%, Claude AI bugfix
+	   while ((c = *s++)) {
 			if (c != '%') continue;
-			if (*s == '%') { s++; continue; }
-			// multiple specifiers rejected, bugfix for busybox
-			if(p) { p = 0; 	break; }
-			// set the pointer to a %-field to validate later
+			if (*s == '%') { s++; continue; }  // skip literal %%
+			if (p) { p = NULL; break; }  // 2nd specifier: reject
 			p = s;
-			// a single space after the % is allowed, skip it
-			if(*p == ' ') p++;
-		} 
-		// still (!p) here? it means no numeric identifier
+			if (*p == ' ') p++;        // allow one space after %
+		}
+		// RAF: when !p here, it means not only one %-field found
 		debug_printf_eval("c: '%c', p: '%s', s: '%s'\n",
 			c?:'0', s?:"(null)", p?:"(null)");
 		do {
-			if (!p || !(c = *p++)
-#if _ENABLE_DESKTOP
-#else
-			|| c == ' ' || c == 'n'
-#endif
-			) {
+			if (!p || !(c = *p++)) {
 				syntax_error(EMSG_INV_FMT); // invalid, only here
 				break; // just to inform cc that it is a end-case
-			} else
+			}
+#if _ENABLE_DESKTOP
+			// RAF: skip format chars among those allowed
+			if (bb_isdigit(c) || strchr(fmt_num_types_l, c))
+				continue;
+#else
+			// RAF: a trailing space is the end of invalid %-field,
+			// while '%n' is the troblesome unsupported specifier.
+			if (c == ' ' || c == 'n')
+				p = 0; //syntax_error(EMSG_INV_FMT);
+#endif
 			if (strchr(fmt_num_types_i, c)) {
 				/*
 				 * RAF: almost lke round(n) but smaller elf however
@@ -1060,7 +1063,7 @@ static const char *fmt_num(const char *format, double n)
 				snprintf(g_buf, MAXVARFMT, format, (long long)n);
 #endif
 				break;
-			} else
+			}
 			if (strchr(fmt_num_types_f, c)) {
 #if 0 // RAF: %llf isn't a valid format, printf will take care of it
 				if(*(p-2) == 'l' && *(p-3) == 'l')
@@ -1074,15 +1077,7 @@ static const char *fmt_num(const char *format, double n)
 			}
 #if _ENABLE_DESKTOP
 /*
- * RAF: with a generalisation of the approach the coverage is extended with
- * a tiny extra footprint size increment by ENABLE_DESKTOP for quick debug
- */
-			else
-			if (strchr(fmt_num_types_l""fmt_num_types_d, c)) {
-				continue;
-			} else {
-/* Info by Schindler, Dietmar <dietmar.schindler@manrolandgoss.com>
- * according to:
+ * Info by Dietmar Schindler, according to:
  * - pubs.opengroup.org/onlinepubs/9799919799/utilities/awk.html
  * - pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap05.html
  * quoting this:
@@ -1094,13 +1089,12 @@ static const char *fmt_num(const char *format, double n)
  * For helping users debug their awk scripts, print the format
  * given adding a short prefix "E?:" which to grep these cases
  */
-#if 0 // RAF: using strncpy saves 3b, just "E?:", in footprint
-				strncpy(g_buf, format, MAXVARFMT);
-#else
-				snprintf(g_buf, MAXVARFMT, "E?:%s", format);
-#endif
-				break;
-			}
+			#if 0 // RAF: using strncpy saves 3b, just "E?:", in footprint
+			strncpy(g_buf, format, MAXVARFMT);
+			#else
+			snprintf(g_buf, MAXVARFMT, "E?:%s", format);
+			#endif
+			break;
 #endif
 		} while(1);
 	}
