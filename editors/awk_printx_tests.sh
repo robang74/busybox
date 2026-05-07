@@ -3,9 +3,9 @@
 runbin=${1:-./busybox}
 
 echo
-echo "Running $0 testing script with:"
-echo "  $runbin"
-echo
+echo "Running 'awk' test unit:"
+echo "  script: $0"
+echo "  binary: $runbin"
 
 # Unit test: 3.14 ko...ko 3.14
 echo
@@ -61,6 +61,11 @@ $runbin awk 'BEGIN { CONVFMT="%d"; x=-1.5; print x "" }'
 $runbin awk 'BEGIN { CONVFMT=" % f PC?"; x=3.14; print x "" }'
 $runbin awk 'BEGIN { CONVFMT="%n"; x=314; print x "" }'
 $runbin awk 'BEGIN { CONVFMT=""; x=314; print x "" }'
+echo '    ---- == 4 == -----'
+$runbin awk 'BEGIN { CONVFMT="%hn  f"; x=-2.5; print x "" }'
+$runbin awk 'BEGIN { CONVFMT="%ln  f"; x=-2.5; print x "" }'
+$runbin awk 'BEGIN { CONVFMT="%lln f"; x=-2.5; print x "" }'
+$runbin awk 'BEGIN { CONVFMT="% n  f"; x=-2.5; print x "" }'
 echo '    ---- == 4 == -----'
 
 # Unit test: support for int 53 bits + sign and pointers added to awk
