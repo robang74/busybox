@@ -982,10 +982,6 @@ static double my_strtod_or_hexoct(char **pp)
 #define _ENABLE_DESKTOP 1 // is always more convient here
 #endif
 
-#ifndef bb_isdigit
-#define bb_isdigit(c) ((uint8_t)(c) - '0' < (uint8_t)10)
-#endif
-
 /* -------- working with variables (set/get/copy/etc) -------- */
 
 static const char *fmt_num(const char *format, double n)
@@ -1005,7 +1001,7 @@ static const char *fmt_num(const char *format, double n)
 #endif
 	{
 		const char *s = format, *p = NULL;
-		char c;
+		unsigned char c;
 /*
  * RAF: as per minimalist approach only the last specifier is considered
  * therefore printf() performs on garbage I/O principle without crashes
@@ -1031,8 +1027,10 @@ static const char *fmt_num(const char *format, double n)
 				break; // just to inform cc that it is a end-case
 			}
 #if _ENABLE_DESKTOP
+			// RAF: isdigit() is already size optimised in BusyBox
+			// but here s/char c/undigned &/ is enough to check(c)
+			if (c-'0' < 10 || strchr(fmt_num_types_l, c))
 			// RAF: skip format chars among those allowed
-			if (bb_isdigit(c) || strchr(fmt_num_types_l, c))
 				continue;
 #else
 			// RAF: a trailing space is the end of invalid %-field,
