@@ -230,7 +230,7 @@ static int order(char x)
 {
 	return (x == '~' ? -1
 		: x == '\0' ? 0
-		: isdigit(x) ? 0
+		: bb_isdigit(x) ? 0
 		: isalpha(x) ? x
 		: (unsigned char)x + 256
 	);
@@ -245,7 +245,7 @@ static int version_compare_part(const char *val, const char *ref)
 	while (*val || *ref) {
 		int first_diff;
 
-		while ((*val && !isdigit(*val)) || (*ref && !isdigit(*ref))) {
+		while ((*val && !bb_isdigit(*val)) || (*ref && !isdigit(*ref))) {
 			int vc = order(*val);
 			int rc = order(*ref);
 			if (vc != rc)
@@ -260,15 +260,15 @@ static int version_compare_part(const char *val, const char *ref)
 			ref++;
 
 		first_diff = 0;
-		while (isdigit(*val) && isdigit(*ref)) {
+		while (bb_isdigit(*val) && isdigit(*ref)) {
 			if (first_diff == 0)
 				first_diff = *val - *ref;
 			val++;
 			ref++;
 		}
-		if (isdigit(*val))
+		if (bb_isdigit(*val))
 			return 1;
-		if (isdigit(*ref))
+		if (bb_isdigit(*ref))
 			return -1;
 		if (first_diff)
 			return first_diff;

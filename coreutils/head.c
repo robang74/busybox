@@ -186,7 +186,7 @@ int head_main(int argc, char **argv)
 #if ENABLE_INCLUDE_SUSv2 || ENABLE_FEATURE_FANCY_HEAD
 	/* Allow legacy syntax of an initial numeric option without -n. */
 	if (argv[1] && argv[1][0] == '-'
-	 && isdigit(argv[1][1])
+	 && bb_isdigit(argv[1][1])
 	) {
 		--argc;
 		++argv;

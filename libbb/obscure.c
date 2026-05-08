@@ -129,7 +129,7 @@ static const char *obscure_msg(const char *old_p, const char *new_p, const struc
 			mixed |= LOWERCASE;
 		} else if (isupper(new_p[i])) { /* A-Z */
 			mixed |= UPPERCASE;
-		} else if (isdigit(new_p[i])) { /* 0-9 */
+		} else if (bb_isdigit(new_p[i])) { /* 0-9 */
 			mixed |= NUMBERS;
 		} else  {                       /* special characters */
 			mixed |= SPECIAL;

@@ -146,7 +146,7 @@ int kill_main(int argc UNUSED_PARAM, char **argv)
 		}
 		/* -l <sig list> */
 		do {
-			if (isdigit(arg[0])) {
+			if (bb_isdigit(arg[0])) {
 				signo = bb_strtou(arg, NULL, 10);
 				if (errno) {
 					bb_error_msg("unknown signal '%s'", arg);

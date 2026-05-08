@@ -63,7 +63,7 @@ int lsscsi_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
 		const char *rev;
 		unsigned type;
 
-		if (!isdigit(de->d_name[0]))
+		if (!bb_isdigit(de->d_name[0]))
 			continue;
 		if (!strchr(de->d_name, ':'))
 			continue;

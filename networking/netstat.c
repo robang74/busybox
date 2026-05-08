@@ -306,7 +306,7 @@ static int FAST_FUNC dir_act(struct recursive_state *state,
 		return TRUE; /* continue looking one level below /proc */
 
 	pid = fileName + sizeof("/proc/")-1; /* point after "/proc/" */
-	if (!isdigit(pid[0])) /* skip /proc entries which aren't processes */
+	if (!bb_isdigit(pid[0])) /* skip /proc entries which aren't processes */
 		return SKIP;
 
 	len = snprintf(proc_pid_fname, sizeof(proc_pid_fname), "%s/cmdline", fileName);

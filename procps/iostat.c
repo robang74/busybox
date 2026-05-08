@@ -291,7 +291,7 @@ static void print_devstat_header(void)
 static int is_partition(const char *dev)
 {
 	/* Ok, this is naive... */
-	return ((dev[0] - 's') | (dev[1] - 'd') | (dev[2] - 'a')) == 0 && isdigit(dev[3]);
+	return ((dev[0] - 's') | (dev[1] - 'd') | (dev[2] - 'a')) == 0 && bb_isdigit(dev[3]);
 }
 
 static stats_dev_t *stats_dev_find_or_new(const char *dev_name)
@@ -425,7 +425,7 @@ int iostat_main(int argc UNUSED_PARAM, char **argv)
 	argv += optind;
 
 	/* Store device names into device list */
-	while (*argv && !isdigit(*argv[0])) {
+	while (*argv && !bb_isdigit(*argv[0])) {
 		if (strcmp(*argv, "ALL") != 0) {
 			/* If not ALL, save device name */
 			char *dev_name = skip_dev_pfx(*argv);

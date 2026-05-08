@@ -323,7 +323,7 @@ static char **print_formatted(char *f, char **argv, int *conv_err)
 				if (*argv)
 					field_width = get_width_prec(*argv++);
 			} else {
-				while (isdigit(*f)) {
+				while (bb_isdigit(*f)) {
 					++f;
 					++direc_length;
 				}
@@ -337,7 +337,7 @@ static char **print_formatted(char *f, char **argv, int *conv_err)
 					if (*argv)
 						precision = get_width_prec(*argv++);
 				} else {
-					while (isdigit(*f)) {
+					while (bb_isdigit(*f)) {
 						++f;
 						++direc_length;
 					}

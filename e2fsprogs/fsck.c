@@ -222,8 +222,8 @@ static char *base_device(const char *device)
 	/* Handle DAC 960 devices */
 	if (is_prefixed_with(cp, "rd/")) {
 		cp += 3;
-		if (cp[0] != 'c' || !isdigit(cp[1])
-		 || cp[2] != 'd' || !isdigit(cp[3]))
+		if (cp[0] != 'c' || !bb_isdigit(cp[1])
+		 || cp[2] != 'd' || !bb_isdigit(cp[3]))
 			goto errout;
 		cp[4] = 0;
 		return str;
@@ -233,7 +233,7 @@ static char *base_device(const char *device)
 	if ((cp[0] == 'h' || cp[0] == 's') && cp[1] == 'd') {
 		cp += 2;
 		/* If there's a single number after /dev/hd, skip it */
-		if (isdigit(*cp))
+		if (bb_isdigit(*cp))
 			cp++;
 		/* What follows must be an alpha char, or give up */
 		if (!isalpha(*cp))
@@ -262,7 +262,7 @@ static char *base_device(const char *device)
 			if (!cp)
 				goto errout;
 			while (*cp != '/' && *cp != '\0') {
-				if (!isdigit(*cp))
+				if (!bb_isdigit(*cp))
 					goto errout;
 				cp++;
 			}
@@ -285,7 +285,7 @@ static char *base_device(const char *device)
 		if (!cp)
 			goto errout;
 		while (*cp != '/' && *cp != '\0') {
-			if (!isdigit(*cp))
+			if (!bb_isdigit(*cp))
 				goto errout;
 			cp++;
 		}

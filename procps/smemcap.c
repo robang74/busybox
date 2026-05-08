@@ -103,7 +103,7 @@ int smemcap_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
 	archivefile("meminfo");
 	archivefile("version");
 	while ((de = readdir(d)) != NULL) {
-		if (isdigit(de->d_name[0])) {
+		if (bb_isdigit(de->d_name[0])) {
 			struct stat s;
 			memset(&s, 0, sizeof(s));
 			s.st_mode = 0555;

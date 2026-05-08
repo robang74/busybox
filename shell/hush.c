@@ -4630,7 +4630,7 @@ static int parse_redir_right_fd(o_string *as_string, struct in_str *input)
 	}
 	d = 0;
 	ok = 0;
-	while (/*ch != EOF &&*/ isdigit(ch)) {
+	while (/*ch != EOF &&*/ bb_isdigit(ch)) {
 		d = d*10 + (ch-'0');
 		ok = 1;
 		ch = i_getch(input);
@@ -5393,7 +5393,7 @@ static int parse_dollar(o_string *as_string,
 			nommu_addchr(as_string, ch);
 		}
 		o_addchr(dest, SPECIAL_VAR_SYMBOL);
-	} else if (isdigit(ch)) {
+	} else if (bb_isdigit(ch)) {
  make_one_char_var:
 		ch = i_getch(input);
 		nommu_addchr(as_string, ch);
@@ -5440,8 +5440,8 @@ static int parse_dollar(o_string *as_string,
 		 * which check invalid constructs like ${%}.
 		 * Oh well... let's check that the var name part is fine... */
 
-		if (isdigit(len_single_ch)
-		 || (len_single_ch == '#' && isdigit(i_peek_and_eat_bkslash_nl(input)))
+		if (bb_isdigit(len_single_ch)
+		 || (len_single_ch == '#' && bb_isdigit(i_peek_and_eat_bkslash_nl(input)))
 		) {
 			/* Execution engine uses plain xatoi_positive()
 			 * to interpret ${NNN} and {#NNN},
@@ -5462,7 +5462,7 @@ static int parse_dollar(o_string *as_string,
 				if (len_single_ch != '#' && strchr(VAR_SUBST_OPS, ch))
 					/* ${NN<op>...} is valid */
 					goto eat_until_closing;
-				if (!isdigit(ch))
+				if (!bb_isdigit(ch))
 					goto bad_dollar_syntax;
 			}
 		} else
@@ -7236,7 +7236,7 @@ static NOINLINE int expand_one_var(o_string *output, int n, char *arg, char **pp
 	}
 
 	/* Look up the variable in question */
-	if (isdigit(var[0])) {
+	if (bb_isdigit(var[0])) {
 		/* parse_dollar should have vetted var for us */
 		int nn = xatoi_positive(var);
 		if (nn < G.global_argc)
@@ -7558,7 +7558,7 @@ static NOINLINE int expand_one_var(o_string *output, int n, char *arg, char **pp
 					}
 					if (exp_op == '=') {
 						/* ${var=[word]} or ${var:=[word]} */
-						if (isdigit(var[0]) || var[0] == '#') {
+						if (bb_isdigit(var[0]) || var[0] == '#') {
 							/* mimic bash message */
 							msg_and_die_if_script("$%s: cannot assign in this way", var);
 							val = NULL;
@@ -11785,10 +11785,10 @@ static int FAST_FUNC builtin_umask(char **argv)
 
 		/* numeric umasks are taken as-is */
 		/* symbolic umasks are inverted: "umask a=rx" calls umask(222) */
-		if (!isdigit(argv[0][0]))
+		if (!bb_isdigit(argv[0][0]))
 			mask ^= 0777;
 		mask = bb_parse_mode(argv[0], mask);
-		if (!isdigit(argv[0][0]))
+		if (!bb_isdigit(argv[0][0]))
 			mask ^= 0777;
 		if ((unsigned)mask > 0777) {
 			mask = old_mask;

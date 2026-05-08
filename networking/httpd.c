@@ -2240,7 +2240,7 @@ static int check_user_passwd(const char *path, char *user_and_passwd)
 			}
 			/* Else: passwd is from httpd.conf, it is either plaintext or encrypted */
 
-			if (passwd[0] == '$' && isdigit(passwd[1])) {
+			if (passwd[0] == '$' && bb_isdigit(passwd[1])) {
 				char *encrypted;
 # if !ENABLE_PAM
  check_encrypted:
@@ -2731,7 +2731,7 @@ static void handle_incoming_and_exit(const len_and_sockaddr *fromAddr)
 					*cp++ = c;
 					continue;
 				}
-				if (!isdigit(*cp))
+				if (!bb_isdigit(*cp))
 					*cp = '_';
 				cp++;
 			}

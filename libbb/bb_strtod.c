@@ -79,7 +79,7 @@ char* FAST_FUNC bb_str_to_ts(struct timespec *ts, const char *arg)
 			ndigits++;
 			ts->tv_nsec *= 10;
 		}
-		while (isdigit(*arg)) /* skip possible 10th plus digits */
+		while (bb_isdigit(*arg)) /* skip possible 10th plus digits */
 			arg++;
 	}
 	return arg;

@@ -2029,7 +2029,7 @@ static void process_dev(char *devname)
 #if ENABLE_FEATURE_HDPARM_GET_IDENTITY
 static int fromhex(unsigned char c)
 {
-	if (isdigit(c))
+	if (bb_isdigit(c))
 		return (c - '0');
 	if (c >= 'a' && c <= 'f')
 		return (c - ('a' - 10));

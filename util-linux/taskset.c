@@ -256,7 +256,7 @@ static int process_pid_str(const char *pid_str, unsigned opts, char *aff)
 
 			last_char--;
 			c = *last_char;
-			if (isdigit(c))
+			if (bb_isdigit(c))
 				val = c - '0';
 			else if ((c|0x20) >= 'a' && (c|0x20) <= 'f')
 				val = (c|0x20) - ('a' - 10);
@@ -294,7 +294,7 @@ static int process_pid_str(const char *pid_str, unsigned opts, char *aff)
 
 static int FAST_FUNC iter(const char *dn UNUSED_PARAM, struct dirent *ent, void *aff)
 {
-	if (isdigit(ent->d_name[0]))
+	if (bb_isdigit(ent->d_name[0]))
 		return process_pid_str(ent->d_name, option_mask32, aff);
 	return 0;
 }

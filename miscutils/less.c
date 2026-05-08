@@ -552,7 +552,7 @@ static void read_lines(void)
 				if (c == '\033')
 					goto discard;
 				if (G.in_escape) {
-					if (isdigit(c)
+					if (bb_isdigit(c)
 					 || c == '['
 					 || c == ';'
 					 || c == 'm'
@@ -1451,7 +1451,7 @@ static void number_process(int first_digit)
 	i = 1;
 	while (i < sizeof(num_input)-1) {
 		keypress = less_getch(i + 1);
-		if ((unsigned)keypress > 255 || !isdigit(keypress))
+		if ((unsigned)keypress > 255 || !bb_isdigit(keypress))
 			break;
 		num_input[i] = keypress;
 		bb_putchar(keypress);
@@ -1817,7 +1817,7 @@ static void keypress_process(int keypress)
 		break;
 	}
 
-	if (isdigit(keypress))
+	if (bb_isdigit(keypress))
 		number_process(keypress);
 }
 

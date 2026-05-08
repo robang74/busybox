@@ -128,7 +128,7 @@ int shuf_main(int argc, char **argv)
 			if (padding_width > 5 && padding_width == strlen(b)) {
 				/* How long is it? */
 				pfx = a;
-				while (isdigit(*a) && *a == *b
+				while (bb_isdigit(*a) && *a == *b
 				 && a[1] /* "111111-111111" case: avoid xatoull("") */
 				) {
 					a++;

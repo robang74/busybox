@@ -418,7 +418,7 @@ static int ctoi(char *s)
 		s[0] = '0';
 		s[1] = 'x';
 	}
-	if (!isdigit(s[0]))
+	if (!bb_isdigit(s[0]))
 		return -1;
 	return xstrtoul(s, 0);
 }

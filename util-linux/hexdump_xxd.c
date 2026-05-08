@@ -144,7 +144,7 @@ static void reverse(unsigned opt, const char *filename, char *opt_s)
 			if (opt & OPT_p)
 				p = skip_whitespace(p);
 			c = *p++;
-			if (isdigit(c))
+			if (bb_isdigit(c))
 				val = c - '0';
 			else if ((c|0x20) >= 'a' && (c|0x20) <= 'f')
 				val = (c|0x20) - ('a' - 10);
@@ -180,7 +180,7 @@ static void reverse(unsigned opt, const char *filename, char *opt_s)
 			}
 
 			c = *p++;
-			if (isdigit(c))
+			if (bb_isdigit(c))
 				val |= c - '0';
 			else if ((c|0x20) >= 'a' && (c|0x20) <= 'f')
 				val |= (c|0x20) - ('a' - 10);
@@ -221,7 +221,7 @@ static void reverse(unsigned opt, const char *filename, char *opt_s)
 
 static void print_C_style(const char *p, const char *hdr)
 {
-	printf(hdr, isdigit(p[0]) ? "__" : "");
+	printf(hdr, bb_isdigit(p[0]) ? "__" : "");
 	while (*p) {
 		bb_putchar(isalnum(*p) ? *p : '_');
 		p++;

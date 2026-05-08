@@ -616,7 +616,7 @@ static void get_irqs_from_interrupts(const char *fname,
 			irq_i = &G.st_irq[current][cpu_index[cpu] + 1];
 			ic->interrupts = strtoul(cp, &next, 10);
 			/* Count only numerical IRQs */
-			if (isdigit(last_char)) {
+			if (bb_isdigit(last_char)) {
 				irq_i->irq_nr += ic->interrupts;
 				//bb_error_msg("G.st_irq[%u][%u].irq_nr + %u = %lld",
 				// current, cpu_index[cpu] + 1, ic->interrupts, irq_i->irq_nr);

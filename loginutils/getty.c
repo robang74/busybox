@@ -194,7 +194,7 @@ static void parse_args(char **argv)
 	/* We loosen up a bit and accept both "baudrate tty" and "tty baudrate" */
 	G.tty_name = argv[0];
 	ts = argv[1];            /* baud rate(s) */
-	if (isdigit(argv[0][0])) {
+	if (bb_isdigit(argv[0][0])) {
 		/* A number first, assume it's a speed (BSD style) */
 		G.tty_name = ts; /* tty name is in argv[1] */
 		ts = argv[0];    /* baud rate(s) */
@@ -441,7 +441,7 @@ static void auto_baud(void)
 		char *bp;
 		G.line_buf[nread] = '\0';
 		for (bp = G.line_buf; bp < G.line_buf + nread; bp++) {
-			if (isdigit(*bp)) {
+			if (bb_isdigit(*bp)) {
 				speed = bcode(bp);
 				if (speed > 0)
 					cfsetspeed(&G.tty_attrs, speed);

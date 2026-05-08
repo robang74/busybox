@@ -379,7 +379,7 @@ static int get_address(const char *my_str, int *linenum, regex_t ** regex)
 {
 	const char *pos = my_str;
 
-	if (isdigit(*my_str)) {
+	if (bb_isdigit(*my_str)) {
 		*linenum = strtol(my_str, (char**)&pos, 10);
 		/* endstr shouldn't ever equal NULL */
 	} else if (*my_str == '$') {
@@ -460,7 +460,7 @@ static int parse_subst_cmd(sed_cmd_t *sed_cmd, const char *substr)
 	while (substr[++idx]) {
 		dbg("s flag:'%c'", substr[idx]);
 		/* Parse match number */
-		if (isdigit(substr[idx])) {
+		if (bb_isdigit(substr[idx])) {
 			if (match[0] != '^') {
 				/* Match 0 treated as all, multiple matches we take the last one. */
 				const char *pos = substr + idx;
@@ -707,14 +707,14 @@ static void add_cmd(const char *cmdstr)
 			int idx;
 
 			cmdstr++;
-			if (*cmdstr == '+' && isdigit(cmdstr[1])) {
+			if (*cmdstr == '+' && bb_isdigit(cmdstr[1])) {
 				/* http://sed.sourceforge.net/sedfaq3.html#s3.3
 				 * Under GNU sed 3.02+, ssed, and sed15+, <address2>
 				 * may also be a notation of the form +num,
 				 * indicating the next num lines after <address1> is
 				 * matched.
 				 * GNU sed 4.2.1 accepts even "+" (meaning "+0").
-				 * We don't (we check for isdigit, see above), think
+				 * We don't (we check for bb_isdigit, see above), think
 				 * about the "+-3" case.
 				 */
 				char *end;

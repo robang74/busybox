@@ -637,7 +637,7 @@ edit_int(int def, const char *mesg)
 	do {
 		if (!read_line(mesg))
 			goto ret;
-	} while (!isdigit(*line_ptr));
+	} while (!bb_isdigit(*line_ptr));
 	def = atoi(line_ptr);
  ret:
 	free((char*)mesg);

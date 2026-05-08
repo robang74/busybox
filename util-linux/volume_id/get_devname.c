@@ -191,7 +191,7 @@ get_spec_by_x(int n, const char *t, int *majorPtr, int *minorPtr)
 static unsigned char
 fromhex(char c)
 {
-	if (isdigit(c))
+	if (bb_isdigit(c))
 		return (c - '0');
 	return ((c|0x20) - 'a' + 10);
 }

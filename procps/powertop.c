@@ -257,7 +257,7 @@ static int is_hpet_irq(const char *name)
 			if (!p)
 				continue;
 			p += sizeof("Clock Event Device: hpet")-1;
-			if (!isdigit(*p))
+			if (!bb_isdigit(*p))
 				continue;
 			hpet_chan = xatoi_positive(p);
 			if (hpet_chan < G.percpu_hpet_start)
@@ -273,7 +273,7 @@ static int is_hpet_irq(const char *name)
 	if (!p)
 		return 0;
 	p += 4;
-	if (!isdigit(*p))
+	if (!bb_isdigit(*p))
 		return 0;
 # if BLOATY_HPET_IRQ_NUM_DETECTION
 	hpet_chan = xatoi_positive(p);
@@ -351,7 +351,7 @@ static void process_irq_counts(void)
 		while (1) {
 			char *tmp;
 			p = skip_whitespace(p);
-			if (!isdigit(*p))
+			if (!bb_isdigit(*p))
 				break;
 			count += bb_strtoull(p, &tmp, 10);
 			p = tmp;
@@ -532,7 +532,7 @@ static NOINLINE void print_intel_cstates(void)
 		if (len < 3 || len > BIG_SYSNAME_LEN)
 			continue;
 
-		if (!isdigit(d->d_name[3]))
+		if (!bb_isdigit(d->d_name[3]))
 			continue;
 
 		len = sprintf(fname, "%s/%s/cpuidle", "/sys/devices/system/cpu", d->d_name);

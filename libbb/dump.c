@@ -85,9 +85,9 @@ static NOINLINE int bb_dump_size(FS *fs)
 			 */
 			while (strchr(dot_flags_width_chars + 1, *++fmt))
 				continue;
-			if (*fmt == '.' && isdigit(*++fmt)) {
+			if (*fmt == '.' && bb_isdigit(*++fmt)) {
 				prec = atoi(fmt);
-				while (isdigit(*++fmt))
+				while (bb_isdigit(*++fmt))
 					continue;
 			}
 			p = strchr(size_conv_str + SCS_OFS, *fmt);
@@ -154,9 +154,9 @@ static NOINLINE void rewrite(priv_dumper_t *dumper, FS *fs)
 				/* skip any special chars, field width */
 				while (strchr(dot_flags_width_chars + 1, *++p1))
 					continue;
-				if (*p1 == '.' && isdigit(*++p1)) {
+				if (*p1 == '.' && bb_isdigit(*++p1)) {
 					prec = p1;
-					while (isdigit(*++p1))
+					while (bb_isdigit(*++p1))
 						continue;
 				}
 			}
@@ -809,8 +809,8 @@ void FAST_FUNC bb_dump_add(dumper_t* pub_dumper, const char *fmt)
 		tfu->reps = 1;
 
 		/* if leading digit, repetition count */
-		if (isdigit(*p)) {
-			for (savep = p; isdigit(*p); ++p)
+		if (bb_isdigit(*p)) {
+			for (savep = p; bb_isdigit(*p); ++p)
 				continue;
 			if (!isspace(*p) && *p != '/') {
 				bb_error_msg_and_die("bad format {%s}", fmt);
@@ -828,10 +828,10 @@ void FAST_FUNC bb_dump_add(dumper_t* pub_dumper, const char *fmt)
 		}
 
 		/* byte count */
-		if (isdigit(*p)) {
+		if (bb_isdigit(*p)) {
 // TODO: use bb_strtou
 			savep = p;
-			while (isdigit(*++p))
+			while (bb_isdigit(*++p))
 				continue;
 			if (!isspace(*p)) {
 				bb_error_msg_and_die("bad format {%s}", fmt);

@@ -90,7 +90,7 @@ int fold_main(int argc UNUSED_PARAM, char **argv)
 				a++;
 				if (*a == '-' && !a[1]) /* "--" */
 					break;
-				if (isdigit(*a))
+				if (bb_isdigit(*a))
 					argv[i] = xasprintf("-w%s", a);
 			}
 		}

@@ -113,7 +113,7 @@ static int ftpcmd(const char *s1, const char *s2)
 		if (fgets(buf, BUFSZ - 2, control_stream) == NULL) {
 			ftp_die(NULL);
 		}
-	} while (!isdigit(buf[0]) || buf[3] != ' ');
+	} while (!bb_isdigit(buf[0]) || buf[3] != ' ');
 
 	buf[3] = '\0';
 	n = xatou(buf);

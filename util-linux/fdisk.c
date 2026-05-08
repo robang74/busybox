@@ -623,7 +623,7 @@ partname(const char *dev, int pno, int lth)
 	w = strlen(dev);
 	p = "";
 
-	if (isdigit(dev[w-1]))
+	if (bb_isdigit(dev[w-1]))
 		p = "p";
 
 	/* devfs kludge - note: fdisk partition names are not supposed
@@ -1627,7 +1627,7 @@ read_int(sector_t low, sector_t dflt, sector_t high, sector_t base, const char *
 		do {
 			printf(fmt, mesg, low, high, dflt);
 			read_maybe_empty("");
-		} while (*line_ptr != '\n' && !isdigit(*line_ptr)
+		} while (*line_ptr != '\n' && !bb_isdigit(*line_ptr)
 		 && *line_ptr != '-' && *line_ptr != '+');
 
 		if (*line_ptr == '+' || *line_ptr == '-') {
@@ -1642,7 +1642,7 @@ read_int(sector_t low, sector_t dflt, sector_t high, sector_t base, const char *
 			/* (1) if 2nd char is digit, use_default = 0.
 			 * (2) move line_ptr to first non-digit.
 			 */
-			while (isdigit(*++line_ptr))
+			while (bb_isdigit(*++line_ptr))
 				use_default = 0;
 
 			scale_shift = 0;
@@ -1700,7 +1700,7 @@ read_int(sector_t low, sector_t dflt, sector_t high, sector_t base, const char *
 				value = strtoul(line_ptr, NULL, 10);
 			else
 				value = strtoull(line_ptr, NULL, 10);
-			while (isdigit(*line_ptr)) {
+			while (bb_isdigit(*line_ptr)) {
 				line_ptr++;
 				use_default = 0;
 			}
@@ -2256,7 +2256,7 @@ list_table(int xtra)
 	 * then the partition is called /dev/foo1p3.
 	 */
 	w = strlen(disk_device);
-	if (w && isdigit(disk_device[w-1]))
+	if (w && bb_isdigit(disk_device[w-1]))
 		w++;
 	if (w < 7)
 		w = 7;
@@ -3012,7 +3012,7 @@ static int is_whole_disk(const char *disk)
 	/* Treat "nameN" as a partition name, not whole disk */
 	/* note: mmcblk0 should work from the geometry check above */
 	len = strlen(disk);
-	if (len != 0 && isdigit(disk[len - 1]))
+	if (len != 0 && bb_isdigit(disk[len - 1]))
 		return 0;
 
 	return 1;

@@ -179,6 +179,7 @@
 # define STRERROR_ERRNO  ,strerror(errno)
 #endif
 
+#define bb_isdigit(c) ({ uint8_t _c = (c); (_c-'0' < 10); })
 
 /* Some libc's forget to declare these, do it ourself */
 

@@ -258,13 +258,13 @@ static const char* getNum(const char *cp, smallint *retHaveNum, int *retNum)
 				break;
 
 			default:
-				if (!isdigit(*cp)) {
+				if (!bb_isdigit(*cp)) {
 					*retHaveNum = haveNum;
 					*retNum = value;
 					return cp;
 				}
 				num = 0;
-				while (isdigit(*cp))
+				while (bb_isdigit(*cp))
 					num = num * 10 + *cp++ - '0';
 				haveNum = TRUE;
 				break;

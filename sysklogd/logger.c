@@ -50,7 +50,7 @@ static int decode(char *name, const CODE *codetab)
 {
 	const CODE *c;
 
-	if (isdigit(*name))
+	if (bb_isdigit(*name))
 		return atoi(name);
 	for (c = codetab; c->c_name; c++) {
 		if (!strcasecmp(name, c->c_name)) {
