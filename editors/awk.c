@@ -983,7 +983,7 @@ static double my_strtod_or_hexoct(char **pp)
 #endif
 
 #ifndef bb_isdigit
-#define bb_isdigit(c) ((uint8_t)(c) - '0' < (uint8_t)10)
+#define bb_isdigit(c) ({ uint8_t _c = (c); (_c-'0' < 10); })
 #endif
 
 /* -------- working with variables (set/get/copy/etc) -------- */
