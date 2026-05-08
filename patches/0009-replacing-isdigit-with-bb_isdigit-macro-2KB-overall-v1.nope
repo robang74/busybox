@@ -1,0 +1,1347 @@
+From 447608b73faf433d5d227d79a84cc0a18c043bea Mon Sep 17 00:00:00 2001
+From: "Roberto A. Foglietta" <roberto.foglietta@gmail.com>
+Date: Fri, 8 May 2026 02:49:07 +0200
+Subject: [PATCH] Replacing isdigit() with bb_isdigit() macro: -2KB
+ all-yes-config
+
+define bb_isdigit(c) ({ uint8_t _c = (c); (_c-'0' < 10); })
+
+   text	   data	    bss	    dec	    hex	filename
+  19329	      0	      0	  19329	   4b81	editors/awk.o
+1153518	  18124	   2056	1173698	 11e8c2	busybox
+
+   text	   data	    bss	    dec	    hex	filename
+  19353	      0	      0	  19353	   4b99	editors/awk.o
+1155521	  18124	   2056	1175701	 11f095	busybox
+
+Signed-off-by: Roberto A. Foglietta <roberto.foglietta@gmail.com>
+---
+ archival/dpkg.c                    | 10 +++++-----
+ console-tools/loadfont.c           |  2 +-
+ coreutils/date.c                   |  4 ++--
+ coreutils/fold.c                   |  2 +-
+ coreutils/head.c                   |  2 +-
+ coreutils/nproc.c                  |  2 +-
+ coreutils/od.c                     |  4 ++--
+ coreutils/od_bloaty.c              |  6 +++---
+ coreutils/printf.c                 |  4 ++--
+ coreutils/shuf.c                   |  2 +-
+ coreutils/sort.c                   |  2 +-
+ coreutils/tail.c                   |  2 +-
+ e2fsprogs/fsck.c                   | 10 +++++-----
+ editors/awk.c                      |  6 +++---
+ editors/ed.c                       |  4 ++--
+ editors/sed.c                      |  8 ++++----
+ editors/vi.c                       | 10 +++++-----
+ include/libbb.h                    |  1 +
+ init/bootchartd.c                  |  2 +-
+ libbb/bb_strtod.c                  |  2 +-
+ libbb/dump.c                       | 16 ++++++++--------
+ libbb/obscure.c                    |  2 +-
+ libbb/read_key.c                   |  4 ++--
+ libbb/xfuncs.c                     |  4 ++--
+ loginutils/getty.c                 |  4 ++--
+ miscutils/bc.c                     |  8 ++++----
+ miscutils/crond.c                  |  2 +-
+ miscutils/devfsd.c                 |  4 ++--
+ miscutils/devmem.c                 |  2 +-
+ miscutils/fbsplash.c               |  2 +-
+ miscutils/hdparm.c                 |  2 +-
+ miscutils/less.c                   |  6 +++---
+ miscutils/lsscsi.c                 |  2 +-
+ modutils/modutils-24.c             |  4 ++--
+ networking/ftpgetput.c             |  2 +-
+ networking/httpd.c                 |  4 ++--
+ networking/interface.c             |  8 ++++----
+ networking/netstat.c               |  2 +-
+ networking/wget.c                  |  2 +-
+ procps/iostat.c                    |  4 ++--
+ procps/kill.c                      |  2 +-
+ procps/mpstat.c                    |  2 +-
+ procps/nmeter.c                    |  2 +-
+ procps/powertop.c                  |  8 ++++----
+ procps/smemcap.c                   |  2 +-
+ shell/ash.c                        | 18 +++++++++---------
+ shell/hush.c                       | 18 +++++++++---------
+ shell/math.c                       |  4 ++--
+ sysklogd/logger.c                  |  2 +-
+ util-linux/fdisk.c                 | 12 ++++++------
+ util-linux/fdisk_osf.c             |  2 +-
+ util-linux/hexdump_xxd.c           |  6 +++---
+ util-linux/taskset.c               |  4 ++--
+ util-linux/volume_id/get_devname.c |  2 +-
+ 54 files changed, 127 insertions(+), 126 deletions(-)
+
+diff --git a/archival/dpkg.c b/archival/dpkg.c
+index c4a0f0c94..d8ac7f094 100644
+--- a/archival/dpkg.c
++++ b/archival/dpkg.c
+@@ -230,7 +230,7 @@ static int order(char x)
+ {
+ 	return (x == '~' ? -1
+ 		: x == '\0' ? 0
+-		: isdigit(x) ? 0
++		: bb_isdigit(x) ? 0
+ 		: isalpha(x) ? x
+ 		: (unsigned char)x + 256
+ 	);
+@@ -245,7 +245,7 @@ static int version_compare_part(const char *val, const char *ref)
+ 	while (*val || *ref) {
+ 		int first_diff;
+ 
+-		while ((*val && !isdigit(*val)) || (*ref && !isdigit(*ref))) {
++		while ((*val && !bb_isdigit(*val)) || (*ref && !isdigit(*ref))) {
+ 			int vc = order(*val);
+ 			int rc = order(*ref);
+ 			if (vc != rc)
+@@ -260,15 +260,15 @@ static int version_compare_part(const char *val, const char *ref)
+ 			ref++;
+ 
+ 		first_diff = 0;
+-		while (isdigit(*val) && isdigit(*ref)) {
++		while (bb_isdigit(*val) && isdigit(*ref)) {
+ 			if (first_diff == 0)
+ 				first_diff = *val - *ref;
+ 			val++;
+ 			ref++;
+ 		}
+-		if (isdigit(*val))
++		if (bb_isdigit(*val))
+ 			return 1;
+-		if (isdigit(*ref))
++		if (bb_isdigit(*ref))
+ 			return -1;
+ 		if (first_diff)
+ 			return first_diff;
+diff --git a/console-tools/loadfont.c b/console-tools/loadfont.c
+index cec5e19cd..a0f00ebbb 100644
+--- a/console-tools/loadfont.c
++++ b/console-tools/loadfont.c
+@@ -418,7 +418,7 @@ static int ctoi(char *s)
+ 		s[0] = '0';
+ 		s[1] = 'x';
+ 	}
+-	if (!isdigit(s[0]))
++	if (!bb_isdigit(s[0]))
+ 		return -1;
+ 	return xstrtoul(s, 0);
+ }
+diff --git a/coreutils/date.c b/coreutils/date.c
+index ef482af1b..afa34cf2c 100644
+--- a/coreutils/date.c
++++ b/coreutils/date.c
+@@ -212,8 +212,8 @@ int date_main(int argc UNUSED_PARAM, char **argv)
+ 			int len = strspn(date_str, "0123456789");
+ 			if (date_str[len] == '\0'
+ 			 || (date_str[len] == '.'
+-			    && isdigit(date_str[len+1])
+-			    && isdigit(date_str[len+2])
++			    && bb_isdigit(date_str[len+1])
++			    && bb_isdigit(date_str[len+2])
+ 			    && date_str[len+3] == '\0'
+ 			    )
+ 			) {
+diff --git a/coreutils/fold.c b/coreutils/fold.c
+index 8112fe911..5b0bc959b 100644
+--- a/coreutils/fold.c
++++ b/coreutils/fold.c
+@@ -90,7 +90,7 @@ int fold_main(int argc UNUSED_PARAM, char **argv)
+ 				a++;
+ 				if (*a == '-' && !a[1]) /* "--" */
+ 					break;
+-				if (isdigit(*a))
++				if (bb_isdigit(*a))
+ 					argv[i] = xasprintf("-w%s", a);
+ 			}
+ 		}
+diff --git a/coreutils/head.c b/coreutils/head.c
+index ec83a284a..ad7a6b158 100644
+--- a/coreutils/head.c
++++ b/coreutils/head.c
+@@ -186,7 +186,7 @@ int head_main(int argc, char **argv)
+ #if ENABLE_INCLUDE_SUSv2 || ENABLE_FEATURE_FANCY_HEAD
+ 	/* Allow legacy syntax of an initial numeric option without -n. */
+ 	if (argv[1] && argv[1][0] == '-'
+-	 && isdigit(argv[1][1])
++	 && bb_isdigit(argv[1][1])
+ 	) {
+ 		--argc;
+ 		++argv;
+diff --git a/coreutils/nproc.c b/coreutils/nproc.c
+index df63bf57a..389f8e492 100644
+--- a/coreutils/nproc.c
++++ b/coreutils/nproc.c
+@@ -43,7 +43,7 @@ int nproc_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ 			struct dirent *de;
+ 			while (NULL != (de = readdir(cpusd))) {
+ 				char *cpuid = strstr(de->d_name, "cpu");
+-				if (cpuid && isdigit(cpuid[strlen(cpuid) - 1]))
++				if (cpuid && bb_isdigit(cpuid[strlen(cpuid) - 1]))
+ 					count++;
+ 			}
+ 			IF_FEATURE_CLEAN_UP(closedir(cpusd);)
+diff --git a/coreutils/od.c b/coreutils/od.c
+index a7b1ba444..4deb5c7c6 100644
+--- a/coreutils/od.c
++++ b/coreutils/od.c
+@@ -65,7 +65,7 @@ odoffset(dumper_t *dumper, int argc, char ***argvp)
+ 
+ 	if ((*p != '+')
+ 		&& (argc < 2
+-			|| (!isdigit(p[0])
++			|| (!bb_isdigit(p[0])
+ 				&& ((p[0] != 'x') || !isxdigit(p[1])))))
+ 		return;
+ 
+@@ -89,7 +89,7 @@ odoffset(dumper_t *dumper, int argc, char ***argvp)
+ 		for (num = p; isxdigit(*p); ++p)
+ 			continue;
+ 	else
+-		for (num = p; isdigit(*p); ++p)
++		for (num = p; bb_isdigit(*p); ++p)
+ 			continue;
+ 
+ 	/* check for no number */
+diff --git a/coreutils/od_bloaty.c b/coreutils/od_bloaty.c
+index c0e6681f2..180a2c087 100644
+--- a/coreutils/od_bloaty.c
++++ b/coreutils/od_bloaty.c
+@@ -589,7 +589,7 @@ decode_one_format(const char *s_orig, const char *s, struct tspec *tspec)
+ 		/* if *s == NUL, p != NULL! Testcase: "od -tx" */
+ 		if (!p || *p == '\0') {
+ 			size = sizeof(int);
+-			if (isdigit(s[0])) {
++			if (bb_isdigit(s[0])) {
+ 				size = bb_strtou(s, &end, 0);
+ 				if (errno == ERANGE
+ 				 || MAX_INTEGRAL_TYPE_SIZE < size
+@@ -684,7 +684,7 @@ decode_one_format(const char *s_orig, const char *s, struct tspec *tspec)
+ 		p = strchr(FDL, *s);
+ 		if (!p || *p == '\0') {
+ 			size = sizeof(double);
+-			if (isdigit(s[0])) {
++			if (bb_isdigit(s[0])) {
+ 				size = bb_strtou(s, &end, 0);
+ 				if (errno == ERANGE || size > MAX_FP_TYPE_SIZE
+ 				 || fp_type_size[size] == NO_SIZE
+@@ -1167,7 +1167,7 @@ parse_old_offset(char *s, off_t *offset)
+ 
+ 	/* Skip over any leading '+'. */
+ 	if (s[0] == '+') ++s;
+-	if (!isdigit(s[0])) return 0; /* not a number */
++	if (!bb_isdigit(s[0])) return 0; /* not a number */
+ 
+ 	/* Determine the radix we'll use to interpret S.  If there is a '.',
+ 	 * it's decimal, otherwise, if the string begins with '0X'or '0x',
+diff --git a/coreutils/printf.c b/coreutils/printf.c
+index 3cd48cfcc..2ba3eb9c4 100644
+--- a/coreutils/printf.c
++++ b/coreutils/printf.c
+@@ -323,7 +323,7 @@ static char **print_formatted(char *f, char **argv, int *conv_err)
+ 				if (*argv)
+ 					field_width = get_width_prec(*argv++);
+ 			} else {
+-				while (isdigit(*f)) {
++				while (bb_isdigit(*f)) {
+ 					++f;
+ 					++direc_length;
+ 				}
+@@ -337,7 +337,7 @@ static char **print_formatted(char *f, char **argv, int *conv_err)
+ 					if (*argv)
+ 						precision = get_width_prec(*argv++);
+ 				} else {
+-					while (isdigit(*f)) {
++					while (bb_isdigit(*f)) {
+ 						++f;
+ 						++direc_length;
+ 					}
+diff --git a/coreutils/shuf.c b/coreutils/shuf.c
+index 0d23382a2..761b651f2 100644
+--- a/coreutils/shuf.c
++++ b/coreutils/shuf.c
+@@ -128,7 +128,7 @@ int shuf_main(int argc, char **argv)
+ 			if (padding_width > 5 && padding_width == strlen(b)) {
+ 				/* How long is it? */
+ 				pfx = a;
+-				while (isdigit(*a) && *a == *b
++				while (bb_isdigit(*a) && *a == *b
+ 				 && a[1] /* "111111-111111" case: avoid xatoull("") */
+ 				) {
+ 					a++;
+diff --git a/coreutils/sort.c b/coreutils/sort.c
+index 2e952f81c..589f86f90 100644
+--- a/coreutils/sort.c
++++ b/coreutils/sort.c
+@@ -432,7 +432,7 @@ static int compare_keys(const void *xarg, const void *yarg)
+ static unsigned str2u(char **str)
+ {
+ 	unsigned long lu;
+-	if (!isdigit((*str)[0]))
++	if (!bb_isdigit((*str)[0]))
+ 		bb_simple_error_msg_and_die("bad field specification");
+ 	lu = strtoul(*str, str, 10);
+ 	if ((sizeof(long) > sizeof(int) && lu > INT_MAX) || !lu)
+diff --git a/coreutils/tail.c b/coreutils/tail.c
+index 4680295b9..4afea53a9 100644
+--- a/coreutils/tail.c
++++ b/coreutils/tail.c
+@@ -132,7 +132,7 @@ int tail_main(int argc, char **argv)
+ #if ENABLE_INCLUDE_SUSv2 || ENABLE_FEATURE_FANCY_TAIL
+ 	/* Allow legacy syntax of an initial numeric option without -n. */
+ 	if (argv[1] && (argv[1][0] == '+' || argv[1][0] == '-')
+-	 && isdigit(argv[1][1])
++	 && bb_isdigit(argv[1][1])
+ 	) {
+ 		count = eat_num(argv[1]);
+ 		argv++;
+diff --git a/e2fsprogs/fsck.c b/e2fsprogs/fsck.c
+index f7e93497d..16c149c68 100644
+--- a/e2fsprogs/fsck.c
++++ b/e2fsprogs/fsck.c
+@@ -222,8 +222,8 @@ static char *base_device(const char *device)
+ 	/* Handle DAC 960 devices */
+ 	if (is_prefixed_with(cp, "rd/")) {
+ 		cp += 3;
+-		if (cp[0] != 'c' || !isdigit(cp[1])
+-		 || cp[2] != 'd' || !isdigit(cp[3]))
++		if (cp[0] != 'c' || !bb_isdigit(cp[1])
++		 || cp[2] != 'd' || !bb_isdigit(cp[3]))
+ 			goto errout;
+ 		cp[4] = 0;
+ 		return str;
+@@ -233,7 +233,7 @@ static char *base_device(const char *device)
+ 	if ((cp[0] == 'h' || cp[0] == 's') && cp[1] == 'd') {
+ 		cp += 2;
+ 		/* If there's a single number after /dev/hd, skip it */
+-		if (isdigit(*cp))
++		if (bb_isdigit(*cp))
+ 			cp++;
+ 		/* What follows must be an alpha char, or give up */
+ 		if (!isalpha(*cp))
+@@ -262,7 +262,7 @@ static char *base_device(const char *device)
+ 			if (!cp)
+ 				goto errout;
+ 			while (*cp != '/' && *cp != '\0') {
+-				if (!isdigit(*cp))
++				if (!bb_isdigit(*cp))
+ 					goto errout;
+ 				cp++;
+ 			}
+@@ -285,7 +285,7 @@ static char *base_device(const char *device)
+ 		if (!cp)
+ 			goto errout;
+ 		while (*cp != '/' && *cp != '\0') {
+-			if (!isdigit(*cp))
++			if (!bb_isdigit(*cp))
+ 				goto errout;
+ 			cp++;
+ 		}
+diff --git a/editors/awk.c b/editors/awk.c
+index dd8f4ac42..5a0ee7cba 100644
+--- a/editors/awk.c
++++ b/editors/awk.c
+@@ -939,12 +939,12 @@ static double my_strtod_or_hexoct(char **pp)
+ 	if (cp[0] == '0') {
+ 		/* Might be hex or octal integer: 0x123abc or 07777 */
+ 		char c = (cp[1] | 0x20);
+-		if (c == 'x' || isdigit(cp[1])) {
++		if (c == 'x' || bb_isdigit(cp[1])) {
+ 			unsigned long long ull = strtoull(cp, pp, 0);
+ 			if (c == 'x')
+ 				return ull;
+ 			c = **pp;
+-			if (!isdigit(c) && c != '.')
++			if (!bb_isdigit(c) && c != '.')
+ 				return ull;
+ 			/* else: it may be a floating number. Examples:
+ 			 * 009.123 (*pp points to '9')
+@@ -1239,7 +1239,7 @@ static uint32_t next_token(uint32_t expected)
+ 			tc = TC_REGEXP;
+ 			debug_printf_parse("%s: token found:'%s' TC_REGEXP\n", __func__, t_string);
+ 
+-		} else if (*p == '.' || isdigit(*p)) {
++		} else if (*p == '.' || bb_isdigit(*p)) {
+ 			/* it's a number */
+ 			char *pp = p;
+ 			t_double = my_strtod_or_hexoct(&pp);
+diff --git a/editors/ed.c b/editors/ed.c
+index a02634ec7..69107fa28 100644
+--- a/editors/ed.c
++++ b/editors/ed.c
+@@ -258,13 +258,13 @@ static const char* getNum(const char *cp, smallint *retHaveNum, int *retNum)
+ 				break;
+ 
+ 			default:
+-				if (!isdigit(*cp)) {
++				if (!bb_isdigit(*cp)) {
+ 					*retHaveNum = haveNum;
+ 					*retNum = value;
+ 					return cp;
+ 				}
+ 				num = 0;
+-				while (isdigit(*cp))
++				while (bb_isdigit(*cp))
+ 					num = num * 10 + *cp++ - '0';
+ 				haveNum = TRUE;
+ 				break;
+diff --git a/editors/sed.c b/editors/sed.c
+index 029e9b8e7..013a83c4e 100644
+--- a/editors/sed.c
++++ b/editors/sed.c
+@@ -379,7 +379,7 @@ static int get_address(const char *my_str, int *linenum, regex_t ** regex)
+ {
+ 	const char *pos = my_str;
+ 
+-	if (isdigit(*my_str)) {
++	if (bb_isdigit(*my_str)) {
+ 		*linenum = strtol(my_str, (char**)&pos, 10);
+ 		/* endstr shouldn't ever equal NULL */
+ 	} else if (*my_str == '$') {
+@@ -460,7 +460,7 @@ static int parse_subst_cmd(sed_cmd_t *sed_cmd, const char *substr)
+ 	while (substr[++idx]) {
+ 		dbg("s flag:'%c'", substr[idx]);
+ 		/* Parse match number */
+-		if (isdigit(substr[idx])) {
++		if (bb_isdigit(substr[idx])) {
+ 			if (match[0] != '^') {
+ 				/* Match 0 treated as all, multiple matches we take the last one. */
+ 				const char *pos = substr + idx;
+@@ -707,14 +707,14 @@ static void add_cmd(const char *cmdstr)
+ 			int idx;
+ 
+ 			cmdstr++;
+-			if (*cmdstr == '+' && isdigit(cmdstr[1])) {
++			if (*cmdstr == '+' && bb_isdigit(cmdstr[1])) {
+ 				/* http://sed.sourceforge.net/sedfaq3.html#s3.3
+ 				 * Under GNU sed 3.02+, ssed, and sed15+, <address2>
+ 				 * may also be a notation of the form +num,
+ 				 * indicating the next num lines after <address1> is
+ 				 * matched.
+ 				 * GNU sed 4.2.1 accepts even "+" (meaning "+0").
+-				 * We don't (we check for isdigit, see above), think
++				 * We don't (we check for bb_isdigit, see above), think
+ 				 * about the "+-3" case.
+ 				 */
+ 				char *end;
+diff --git a/editors/vi.c b/editors/vi.c
+index ba607bcfd..1eaad45bf 100644
+--- a/editors/vi.c
++++ b/editors/vi.c
+@@ -1188,10 +1188,10 @@ static int get_motion_char(void)
+ 	int c, cnt;
+ 
+ 	c = get_one_char();
+-	if (isdigit(c)) {
++	if (bb_isdigit(c)) {
+ 		if (c != '0') {
+ 			// get any non-zero motion count
+-			for (cnt = 0; isdigit(c); c = get_one_char())
++			for (cnt = 0; bb_isdigit(c); c = get_one_char())
+ 				cnt = cnt * 10 + (c - '0');
+ 			cmdcnt = (cmdcnt ?: 1) * cnt;
+ 		} else {
+@@ -2569,9 +2569,9 @@ static char *get_one_address(char *p, int *result, int *valid)
+ 			got_addr = TRUE;
+ 		}
+ # endif
+-		else if (isdigit(*p)) {
++		else if (bb_isdigit(*p)) {
+ 			num = 0;
+-			while (isdigit(*p))
++			while (bb_isdigit(*p))
+ 				num = num * 10 + *p++ -'0';
+ 			if (!got_addr) {	// specific line number
+ 				addr = num;
+@@ -4569,7 +4569,7 @@ static void do_cmd(int c)
+ 		check_context(c);	// update the current context
+ #endif
+ 
+-	if (!isdigit(c))
++	if (!bb_isdigit(c))
+ 		cmdcnt = 0;		// cmd was not a number, reset cmdcnt
+ 	cnt = dot - begin_line(dot);
+ 	// Try to stay off of the Newline
+diff --git a/include/libbb.h b/include/libbb.h
+index ea6f3238e..e26cee88a 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -179,6 +179,7 @@
+ # define STRERROR_ERRNO  ,strerror(errno)
+ #endif
+ 
++#define bb_isdigit(c) ({ uint8_t _c = (c); (_c-'0' < 10); })
+ 
+ /* Some libc's forget to declare these, do it ourself */
+ 
+diff --git a/init/bootchartd.c b/init/bootchartd.c
+index a5447c6ad..15cd285bc 100644
+--- a/init/bootchartd.c
++++ b/init/bootchartd.c
+@@ -241,7 +241,7 @@ static void do_logging(unsigned sample_period_us, int process_accounting)
+ 		p = strchr(G.jiffy_line, '.');
+ 		if (!p)
+ 			goto wait_more;
+-		while (isdigit(*++p))
++		while (bb_isdigit(*++p))
+ 			p[-1] = *p;
+ 		p[-1] = '\n';
+ 		p[0] = '\0';
+diff --git a/libbb/bb_strtod.c b/libbb/bb_strtod.c
+index 5e1d0535e..774b487c2 100644
+--- a/libbb/bb_strtod.c
++++ b/libbb/bb_strtod.c
+@@ -79,7 +79,7 @@ char* FAST_FUNC bb_str_to_ts(struct timespec *ts, const char *arg)
+ 			ndigits++;
+ 			ts->tv_nsec *= 10;
+ 		}
+-		while (isdigit(*arg)) /* skip possible 10th plus digits */
++		while (bb_isdigit(*arg)) /* skip possible 10th plus digits */
+ 			arg++;
+ 	}
+ 	return arg;
+diff --git a/libbb/dump.c b/libbb/dump.c
+index d34094576..5d943c8c3 100644
+--- a/libbb/dump.c
++++ b/libbb/dump.c
+@@ -85,9 +85,9 @@ static NOINLINE int bb_dump_size(FS *fs)
+ 			 */
+ 			while (strchr(dot_flags_width_chars + 1, *++fmt))
+ 				continue;
+-			if (*fmt == '.' && isdigit(*++fmt)) {
++			if (*fmt == '.' && bb_isdigit(*++fmt)) {
+ 				prec = atoi(fmt);
+-				while (isdigit(*++fmt))
++				while (bb_isdigit(*++fmt))
+ 					continue;
+ 			}
+ 			p = strchr(size_conv_str + SCS_OFS, *fmt);
+@@ -154,9 +154,9 @@ static NOINLINE void rewrite(priv_dumper_t *dumper, FS *fs)
+ 				/* skip any special chars, field width */
+ 				while (strchr(dot_flags_width_chars + 1, *++p1))
+ 					continue;
+-				if (*p1 == '.' && isdigit(*++p1)) {
++				if (*p1 == '.' && bb_isdigit(*++p1)) {
+ 					prec = p1;
+-					while (isdigit(*++p1))
++					while (bb_isdigit(*++p1))
+ 						continue;
+ 				}
+ 			}
+@@ -809,8 +809,8 @@ void FAST_FUNC bb_dump_add(dumper_t* pub_dumper, const char *fmt)
+ 		tfu->reps = 1;
+ 
+ 		/* if leading digit, repetition count */
+-		if (isdigit(*p)) {
+-			for (savep = p; isdigit(*p); ++p)
++		if (bb_isdigit(*p)) {
++			for (savep = p; bb_isdigit(*p); ++p)
+ 				continue;
+ 			if (!isspace(*p) && *p != '/') {
+ 				bb_error_msg_and_die("bad format {%s}", fmt);
+@@ -828,10 +828,10 @@ void FAST_FUNC bb_dump_add(dumper_t* pub_dumper, const char *fmt)
+ 		}
+ 
+ 		/* byte count */
+-		if (isdigit(*p)) {
++		if (bb_isdigit(*p)) {
+ // TODO: use bb_strtou
+ 			savep = p;
+-			while (isdigit(*++p))
++			while (bb_isdigit(*++p))
+ 				continue;
+ 			if (!isspace(*p)) {
+ 				bb_error_msg_and_die("bad format {%s}", fmt);
+diff --git a/libbb/obscure.c b/libbb/obscure.c
+index ad17d1ff1..c7864359d 100644
+--- a/libbb/obscure.c
++++ b/libbb/obscure.c
+@@ -129,7 +129,7 @@ static const char *obscure_msg(const char *old_p, const char *new_p, const struc
+ 			mixed |= LOWERCASE;
+ 		} else if (isupper(new_p[i])) { /* A-Z */
+ 			mixed |= UPPERCASE;
+-		} else if (isdigit(new_p[i])) { /* 0-9 */
++		} else if (bb_isdigit(new_p[i])) { /* 0-9 */
+ 			mixed |= NUMBERS;
+ 		} else  {                       /* special characters */
+ 			mixed |= SPECIAL;
+diff --git a/libbb/read_key.c b/libbb/read_key.c
+index b1e5b1ddd..e6e38595c 100644
+--- a/libbb/read_key.c
++++ b/libbb/read_key.c
+@@ -252,13 +252,13 @@ int64_t FAST_FUNC read_key(int fd, char *buffer, int timeout)
+ 		 && n >= 5
+ 		 && buffer[0] == '['
+ 		 && buffer[n-1] == 'R'
+-		 && isdigit(buffer[1])
++		 && bb_isdigit(buffer[1])
+ 		) {
+ 			char *end;
+ 			unsigned long row, col;
+ 
+ 			row = strtoul(buffer + 1, &end, 10);
+-			if (*end != ';' || !isdigit(end[1]))
++			if (*end != ';' || !bb_isdigit(end[1]))
+ 				continue;
+ 			col = strtoul(end + 1, &end, 10);
+ 			if (*end != 'R')
+diff --git a/libbb/xfuncs.c b/libbb/xfuncs.c
+index b41b40a7e..0b33e2ab2 100644
+--- a/libbb/xfuncs.c
++++ b/libbb/xfuncs.c
+@@ -148,7 +148,7 @@ char* FAST_FUNC hex2bin(char *dst, const char *str, int count)
+ 	while (*str && count) {
+ 		uint8_t val;
+ 		uint8_t c = *str++;
+-		if (isdigit(c))
++		if (bb_isdigit(c))
+ 			val = c - '0';
+ 		else if ((c|0x20) >= 'a' && (c|0x20) <= 'f')
+ 			val = (c|0x20) - ('a' - 10);
+@@ -156,7 +156,7 @@ char* FAST_FUNC hex2bin(char *dst, const char *str, int count)
+ 			return NULL;
+ 		val <<= 4;
+ 		c = *str;
+-		if (isdigit(c))
++		if (bb_isdigit(c))
+ 			val |= c - '0';
+ 		else if ((c|0x20) >= 'a' && (c|0x20) <= 'f')
+ 			val |= (c|0x20) - ('a' - 10);
+diff --git a/loginutils/getty.c b/loginutils/getty.c
+index 232fa2b84..71f4bd960 100644
+--- a/loginutils/getty.c
++++ b/loginutils/getty.c
+@@ -194,7 +194,7 @@ static void parse_args(char **argv)
+ 	/* We loosen up a bit and accept both "baudrate tty" and "tty baudrate" */
+ 	G.tty_name = argv[0];
+ 	ts = argv[1];            /* baud rate(s) */
+-	if (isdigit(argv[0][0])) {
++	if (bb_isdigit(argv[0][0])) {
+ 		/* A number first, assume it's a speed (BSD style) */
+ 		G.tty_name = ts; /* tty name is in argv[1] */
+ 		ts = argv[0];    /* baud rate(s) */
+@@ -441,7 +441,7 @@ static void auto_baud(void)
+ 		char *bp;
+ 		G.line_buf[nread] = '\0';
+ 		for (bp = G.line_buf; bp < G.line_buf + nread; bp++) {
+-			if (isdigit(*bp)) {
++			if (bb_isdigit(*bp)) {
+ 				speed = bcode(bp);
+ 				if (speed > 0)
+ 					cfsetspeed(&G.tty_attrs, speed);
+diff --git a/miscutils/bc.c b/miscutils/bc.c
+index 1ef8f418d..6218d13e0 100644
+--- a/miscutils/bc.c
++++ b/miscutils/bc.c
+@@ -2971,7 +2971,7 @@ static BC_STATUS zxc_lex_number(char last)
+ 			c = peek_inbuf(); // force next line to be read
+ 			goto check_c;
+ 		}
+-		if (!isdigit(c) && (c < 'A' || c > last_valid_ch)) {
++		if (!bb_isdigit(c) && (c < 'A' || c > last_valid_ch)) {
+ 			if (c != '.') break;
+ 			// if '.' was already seen, stop on second one:
+ 			if (pt) break;
+@@ -3005,7 +3005,7 @@ static void xc_lex_name(void)
+ 	buf = p->lex_inbuf - 1;
+ 	for (;;) {
+ 		char c = buf[i];
+-		if ((c < 'a' || c > 'z') && !isdigit(c) && c != '_') break;
++		if ((c < 'a' || c > 'z') && !bb_isdigit(c) && c != '_') break;
+ 		i++;
+ 	}
+ 
+@@ -3292,7 +3292,7 @@ static BC_STATUS zbc_lex_token(void)
+ 			parse_lex_by_checking_eq_sign(BC_LEX_OP_ASSIGN_MINUS, XC_LEX_OP_MINUS);
+ 		break;
+ 	case '.':
+-		if (isdigit(*p->lex_inbuf))
++		if (bb_isdigit(*p->lex_inbuf))
+ 			s = zxc_lex_number(c);
+ 		else {
+ 			p->lex = BC_LEX_KEY_LAST;
+@@ -3548,7 +3548,7 @@ static BC_STATUS zdc_lex_token(void)
+ 		xc_lex_lineComment();
+ 		break;
+ 	case '.':
+-		if (isdigit(*p->lex_inbuf))
++		if (bb_isdigit(*p->lex_inbuf))
+ 			s = zxc_lex_number(c);
+ 		else
+ 			s = bc_error_bad_character(c);
+diff --git a/miscutils/crond.c b/miscutils/crond.c
+index 6a384fdfb..fec4bfd64 100644
+--- a/miscutils/crond.c
++++ b/miscutils/crond.c
+@@ -240,7 +240,7 @@ static void ParseField(char *user, char *ary, int modvalue, int off,
+ 			n2 = modvalue - 1;
+ 			skip = 1;
+ 			++ptr;
+-		} else if (isdigit(*ptr)) {
++		} else if (bb_isdigit(*ptr)) {
+ 			char *endp;
+ 			if (n1 < 0) {
+ 				n1 = strtol(ptr, &endp, 10) + off;
+diff --git a/miscutils/devfsd.c b/miscutils/devfsd.c
+index d57691414..c3572be7a 100644
+--- a/miscutils/devfsd.c
++++ b/miscutils/devfsd.c
+@@ -1147,7 +1147,7 @@ static int get_uid_gid(int flag, const char *string)
+ 	struct group *grp_ent;
+ 	const char *msg;
+ 
+-	if (isdigit(string[0]) || ((string[0] == '-') && isdigit(string[1])))
++	if (bb_isdigit(string[0]) || ((string[0] == '-') && isdigit(string[1])))
+ 		return atoi(string);
+ 
+ 	if (flag == UID && (pw_ent = getpwnam(string)) != NULL)
+@@ -1177,7 +1177,7 @@ static mode_t get_mode(const char *string)
+ 	mode_t mode;
+ 	int i;
+ 
+-	if (isdigit(string[0]))
++	if (bb_isdigit(string[0]))
+ 		return strtoul(string, NULL, 8);
+ 	if (strlen(string) != 9)
+ 		msg_logger_and_die(LOG_ERR, "bad mode: %s", string);
+diff --git a/miscutils/devmem.c b/miscutils/devmem.c
+index 015b18f71..4a6686325 100644
+--- a/miscutils/devmem.c
++++ b/miscutils/devmem.c
+@@ -49,7 +49,7 @@ int devmem_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 	/* WIDTH */
+ 	if (argv[2]) {
+-		if (isdigit(argv[2][0]) || argv[2][1])
++		if (bb_isdigit(argv[2][0]) || argv[2][1])
+ 			width = xatou(argv[2]);
+ 		else {
+ 			static const char bhwl[] ALIGN1 = "bhwl";
+diff --git a/miscutils/fbsplash.c b/miscutils/fbsplash.c
+index 912a501a3..c2055af5b 100644
+--- a/miscutils/fbsplash.c
++++ b/miscutils/fbsplash.c
+@@ -553,7 +553,7 @@ int fbsplash_main(int argc UNUSED_PARAM, char **argv)
+ 			break;
+ 		}
+ 		num = atoi(num_buf);
+-		if (isdigit(num_buf[0]) && (num <= 100)) {
++		if (bb_isdigit(num_buf[0]) && (num <= 100)) {
+ #if DEBUG
+ 			DEBUG_MESSAGE(itoa(num));
+ #endif
+diff --git a/miscutils/hdparm.c b/miscutils/hdparm.c
+index 8b844717f..c70574230 100644
+--- a/miscutils/hdparm.c
++++ b/miscutils/hdparm.c
+@@ -2029,7 +2029,7 @@ static void process_dev(char *devname)
+ #if ENABLE_FEATURE_HDPARM_GET_IDENTITY
+ static int fromhex(unsigned char c)
+ {
+-	if (isdigit(c))
++	if (bb_isdigit(c))
+ 		return (c - '0');
+ 	if (c >= 'a' && c <= 'f')
+ 		return (c - ('a' - 10));
+diff --git a/miscutils/less.c b/miscutils/less.c
+index 87f44a324..9492297dc 100644
+--- a/miscutils/less.c
++++ b/miscutils/less.c
+@@ -552,7 +552,7 @@ static void read_lines(void)
+ 				if (c == '\033')
+ 					goto discard;
+ 				if (G.in_escape) {
+-					if (isdigit(c)
++					if (bb_isdigit(c)
+ 					 || c == '['
+ 					 || c == ';'
+ 					 || c == 'm'
+@@ -1451,7 +1451,7 @@ static void number_process(int first_digit)
+ 	i = 1;
+ 	while (i < sizeof(num_input)-1) {
+ 		keypress = less_getch(i + 1);
+-		if ((unsigned)keypress > 255 || !isdigit(keypress))
++		if ((unsigned)keypress > 255 || !bb_isdigit(keypress))
+ 			break;
+ 		num_input[i] = keypress;
+ 		bb_putchar(keypress);
+@@ -1817,7 +1817,7 @@ static void keypress_process(int keypress)
+ 		break;
+ 	}
+ 
+-	if (isdigit(keypress))
++	if (bb_isdigit(keypress))
+ 		number_process(keypress);
+ }
+ 
+diff --git a/miscutils/lsscsi.c b/miscutils/lsscsi.c
+index 9f677ba28..d5b7f6b91 100644
+--- a/miscutils/lsscsi.c
++++ b/miscutils/lsscsi.c
+@@ -63,7 +63,7 @@ int lsscsi_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ 		const char *rev;
+ 		unsigned type;
+ 
+-		if (!isdigit(de->d_name[0]))
++		if (!bb_isdigit(de->d_name[0]))
+ 			continue;
+ 		if (!strchr(de->d_name, ':'))
+ 			continue;
+diff --git a/modutils/modutils-24.c b/modutils/modutils-24.c
+index 37c303f90..586407983 100644
+--- a/modutils/modutils-24.c
++++ b/modutils/modutils-24.c
+@@ -2446,7 +2446,7 @@ new_process_module_arguments(struct obj_file *f, const char *options)
+ 
+ 		/* Number of parameters */
+ 		min = max = 1;
+-		if (isdigit(*pinfo)) {
++		if (bb_isdigit(*pinfo)) {
+ 			min = max = strtoul(pinfo, &pinfo, 10);
+ 			if (*pinfo == '-')
+ 				max = strtoul(pinfo + 1, &pinfo, 10);
+@@ -2456,7 +2456,7 @@ new_process_module_arguments(struct obj_file *f, const char *options)
+ 		loc = contents + sym->value;
+ 
+ 		if (*pinfo == 'c') {
+-			if (!isdigit(pinfo[1])) {
++			if (!bb_isdigit(pinfo[1])) {
+ 				bb_error_msg_and_die("parameter type 'c' for %s must be followed by"
+ 						     " the maximum size", param);
+ 			}
+diff --git a/networking/ftpgetput.c b/networking/ftpgetput.c
+index 1172850ce..f4517d1ff 100644
+--- a/networking/ftpgetput.c
++++ b/networking/ftpgetput.c
+@@ -113,7 +113,7 @@ static int ftpcmd(const char *s1, const char *s2)
+ 		if (fgets(buf, BUFSZ - 2, control_stream) == NULL) {
+ 			ftp_die(NULL);
+ 		}
+-	} while (!isdigit(buf[0]) || buf[3] != ' ');
++	} while (!bb_isdigit(buf[0]) || buf[3] != ' ');
+ 
+ 	buf[3] = '\0';
+ 	n = xatou(buf);
+diff --git a/networking/httpd.c b/networking/httpd.c
+index 3b811cb71..7ce303d60 100644
+--- a/networking/httpd.c
++++ b/networking/httpd.c
+@@ -2240,7 +2240,7 @@ static int check_user_passwd(const char *path, char *user_and_passwd)
+ 			}
+ 			/* Else: passwd is from httpd.conf, it is either plaintext or encrypted */
+ 
+-			if (passwd[0] == '$' && isdigit(passwd[1])) {
++			if (passwd[0] == '$' && bb_isdigit(passwd[1])) {
+ 				char *encrypted;
+ # if !ENABLE_PAM
+  check_encrypted:
+@@ -2731,7 +2731,7 @@ static void handle_incoming_and_exit(const len_and_sockaddr *fromAddr)
+ 					*cp++ = c;
+ 					continue;
+ 				}
+-				if (!isdigit(*cp))
++				if (!bb_isdigit(*cp))
+ 					*cp = '_';
+ 				cp++;
+ 			}
+diff --git a/networking/interface.c b/networking/interface.c
+index 6b6c0944a..6db61f1e2 100644
+--- a/networking/interface.c
++++ b/networking/interface.c
+@@ -112,7 +112,7 @@ static int INET_getsock(char *bufp, struct sockaddr *sap)
+ 
+ 		if ((unsigned)(*sp - 'A') <= 5)
+ 			bp[i] |= (int) (*sp - ('A' - 10));
+-		else if (isdigit(*sp))
++		else if (bb_isdigit(*sp))
+ 			bp[i] |= (int) (*sp - '0');
+ 		else
+ 			return -1;
+@@ -123,7 +123,7 @@ static int INET_getsock(char *bufp, struct sockaddr *sap)
+ 
+ 		if ((unsigned)(*sp - 'A') <= 5)
+ 			bp[i] |= (int) (*sp - ('A' - 10));
+-		else if (isdigit(*sp))
++		else if (bb_isdigit(*sp))
+ 			bp[i] |= (int) (*sp - '0');
+ 		else
+ 			return -1;
+@@ -359,7 +359,7 @@ static int nstrcmp(const char *a, const char *b)
+ 		if (*a == '\0') {
+ 			return 0;
+ 		}
+-		if (!isdigit(*a) && isdigit(*(a+1))) {
++		if (!bb_isdigit(*a) && isdigit(*(a+1))) {
+ 			a_ptr = a+1;
+ 			b_ptr = b+1;
+ 		}
+@@ -367,7 +367,7 @@ static int nstrcmp(const char *a, const char *b)
+ 		b++;
+ 	}
+ 
+-	if (isdigit(*a) && isdigit(*b)) {
++	if (bb_isdigit(*a) && isdigit(*b)) {
+ 		return xatoul(a_ptr) > xatoul(b_ptr) ? 1 : -1;
+ 	}
+ 	return *a - *b;
+diff --git a/networking/netstat.c b/networking/netstat.c
+index d31928957..07898037b 100644
+--- a/networking/netstat.c
++++ b/networking/netstat.c
+@@ -306,7 +306,7 @@ static int FAST_FUNC dir_act(struct recursive_state *state,
+ 		return TRUE; /* continue looking one level below /proc */
+ 
+ 	pid = fileName + sizeof("/proc/")-1; /* point after "/proc/" */
+-	if (!isdigit(pid[0])) /* skip /proc entries which aren't processes */
++	if (!bb_isdigit(pid[0])) /* skip /proc entries which aren't processes */
+ 		return SKIP;
+ 
+ 	len = snprintf(proc_pid_fname, sizeof(proc_pid_fname), "%s/cmdline", fileName);
+diff --git a/networking/wget.c b/networking/wget.c
+index ec3767793..81641d372 100644
+--- a/networking/wget.c
++++ b/networking/wget.c
+@@ -523,7 +523,7 @@ static int ftpcmd(const char *s1, const char *s2, FILE *fp)
+ 	G.wget_buf[3] = 0;
+ 	do {
+ 		fgets_trim_sanitize(fp, "%s\n");
+-	} while (!isdigit(G.wget_buf[0]) || G.wget_buf[3] != ' ');
++	} while (!bb_isdigit(G.wget_buf[0]) || G.wget_buf[3] != ' ');
+ 
+ 	G.wget_buf[3] = '\0';
+ 	result = xatoi_positive(G.wget_buf);
+diff --git a/procps/iostat.c b/procps/iostat.c
+index d3157757f..31dfd8454 100644
+--- a/procps/iostat.c
++++ b/procps/iostat.c
+@@ -291,7 +291,7 @@ static void print_devstat_header(void)
+ static int is_partition(const char *dev)
+ {
+ 	/* Ok, this is naive... */
+-	return ((dev[0] - 's') | (dev[1] - 'd') | (dev[2] - 'a')) == 0 && isdigit(dev[3]);
++	return ((dev[0] - 's') | (dev[1] - 'd') | (dev[2] - 'a')) == 0 && bb_isdigit(dev[3]);
+ }
+ 
+ static stats_dev_t *stats_dev_find_or_new(const char *dev_name)
+@@ -425,7 +425,7 @@ int iostat_main(int argc UNUSED_PARAM, char **argv)
+ 	argv += optind;
+ 
+ 	/* Store device names into device list */
+-	while (*argv && !isdigit(*argv[0])) {
++	while (*argv && !bb_isdigit(*argv[0])) {
+ 		if (strcmp(*argv, "ALL") != 0) {
+ 			/* If not ALL, save device name */
+ 			char *dev_name = skip_dev_pfx(*argv);
+diff --git a/procps/kill.c b/procps/kill.c
+index d4be18dd8..7ced0c2ff 100644
+--- a/procps/kill.c
++++ b/procps/kill.c
+@@ -146,7 +146,7 @@ int kill_main(int argc UNUSED_PARAM, char **argv)
+ 		}
+ 		/* -l <sig list> */
+ 		do {
+-			if (isdigit(arg[0])) {
++			if (bb_isdigit(arg[0])) {
+ 				signo = bb_strtou(arg, NULL, 10);
+ 				if (errno) {
+ 					bb_error_msg("unknown signal '%s'", arg);
+diff --git a/procps/mpstat.c b/procps/mpstat.c
+index 795b4ccb7..74f827a6c 100644
+--- a/procps/mpstat.c
++++ b/procps/mpstat.c
+@@ -616,7 +616,7 @@ static void get_irqs_from_interrupts(const char *fname,
+ 			irq_i = &G.st_irq[current][cpu_index[cpu] + 1];
+ 			ic->interrupts = strtoul(cp, &next, 10);
+ 			/* Count only numerical IRQs */
+-			if (isdigit(last_char)) {
++			if (bb_isdigit(last_char)) {
+ 				irq_i->irq_nr += ic->interrupts;
+ 				//bb_error_msg("G.st_irq[%u][%u].irq_nr + %u = %lld",
+ 				// current, cpu_index[cpu] + 1, ic->interrupts, irq_i->irq_nr);
+diff --git a/procps/nmeter.c b/procps/nmeter.c
+index fd8907aac..604852e9e 100644
+--- a/procps/nmeter.c
++++ b/procps/nmeter.c
+@@ -280,7 +280,7 @@ static int rdval_diskstats(const char* p, ullong *vec)
+ 		if (value_idx == 3) {
+ 			char *end = strchrnul(p, ' ');
+ 			/* If this a hda1-like device (same prefix as last one + digit)? */
+-			if (devname_len && strncmp(devname, p, devname_len) == 0 && isdigit(p[devname_len])) {
++			if (devname_len && strncmp(devname, p, devname_len) == 0 && bb_isdigit(p[devname_len])) {
+ 				p = end;
+ 				goto skip_line; /* skip entire line */
+ 			}
+diff --git a/procps/powertop.c b/procps/powertop.c
+index a24748efc..3e3a90108 100644
+--- a/procps/powertop.c
++++ b/procps/powertop.c
+@@ -257,7 +257,7 @@ static int is_hpet_irq(const char *name)
+ 			if (!p)
+ 				continue;
+ 			p += sizeof("Clock Event Device: hpet")-1;
+-			if (!isdigit(*p))
++			if (!bb_isdigit(*p))
+ 				continue;
+ 			hpet_chan = xatoi_positive(p);
+ 			if (hpet_chan < G.percpu_hpet_start)
+@@ -273,7 +273,7 @@ static int is_hpet_irq(const char *name)
+ 	if (!p)
+ 		return 0;
+ 	p += 4;
+-	if (!isdigit(*p))
++	if (!bb_isdigit(*p))
+ 		return 0;
+ # if BLOATY_HPET_IRQ_NUM_DETECTION
+ 	hpet_chan = xatoi_positive(p);
+@@ -351,7 +351,7 @@ static void process_irq_counts(void)
+ 		while (1) {
+ 			char *tmp;
+ 			p = skip_whitespace(p);
+-			if (!isdigit(*p))
++			if (!bb_isdigit(*p))
+ 				break;
+ 			count += bb_strtoull(p, &tmp, 10);
+ 			p = tmp;
+@@ -532,7 +532,7 @@ static NOINLINE void print_intel_cstates(void)
+ 		if (len < 3 || len > BIG_SYSNAME_LEN)
+ 			continue;
+ 
+-		if (!isdigit(d->d_name[3]))
++		if (!bb_isdigit(d->d_name[3]))
+ 			continue;
+ 
+ 		len = sprintf(fname, "%s/%s/cpuidle", "/sys/devices/system/cpu", d->d_name);
+diff --git a/procps/smemcap.c b/procps/smemcap.c
+index a2231788b..41ce05a67 100644
+--- a/procps/smemcap.c
++++ b/procps/smemcap.c
+@@ -103,7 +103,7 @@ int smemcap_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ 	archivefile("meminfo");
+ 	archivefile("version");
+ 	while ((de = readdir(d)) != NULL) {
+-		if (isdigit(de->d_name[0])) {
++		if (bb_isdigit(de->d_name[0])) {
+ 			struct stat s;
+ 			memset(&s, 0, sizeof(s));
+ 			s.st_mode = 0555;
+diff --git a/shell/ash.c b/shell/ash.c
+index fb887f31b..afd27fe7d 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -647,9 +647,9 @@ static void trace_vprintf(const char *fmt, va_list va);
+ #define is_in_name(c)   ((c) == '_' || isalnum((unsigned char)(c)))
+ 
+ static int
+-isdigit_str(const char *str)
++bb_isdigit_str(const char *str)
+ {
+-	while (isdigit(*str))
++	while (bb_isdigit(*str))
+ 		str++;
+ 	return (*str == '\0');
+ }
+@@ -2038,7 +2038,7 @@ static int
+ is_number(const char *p)
+ {
+ 	do {
+-		if (!isdigit(*p))
++		if (!bb_isdigit(*p))
+ 			return 0;
+ 	} while (*++p != '\0');
+ 	return 1;
+@@ -10041,7 +10041,7 @@ expredir(union node *n)
+ 				if (fn.list == NULL)
+ 					ash_msg_and_raise_error("redir error");
+ #if BASH_REDIR_OUTPUT
+-				if (!isdigit_str(fn.list->text)) {
++				if (!bb_isdigit_str(fn.list->text)) {
+ 					/* >&file, not >&fd */
+ 					if (redir->nfile.fd != 1) /* 123>&file - BAD */
+ 						ash_msg_and_raise_error("redir error");
+@@ -13221,7 +13221,7 @@ readtoken1(int c, int syntax, struct heredoc *eofmark)
+ 		if ((c == '>' || c == '<' IF_BASH_REDIR_OUTPUT( || c == 0x100 + '>'))
+ 		 && quotef == 0
+ 		) {
+-			if (isdigit_str(out)) {
++			if (bb_isdigit_str(out)) {
+ 				PARSEREDIR(); /* passed as params: out, c */
+ 				lasttoken = TREDIR;
+ 				return lasttoken;
+@@ -13440,12 +13440,12 @@ parsesub: {
+ 				STPUTC(c, out);
+ 				c = pgetc_eatbnl();
+ 			} while (is_in_name(c));
+-		} else if (isdigit(c)) {
++		} else if (bb_isdigit(c)) {
+ 			/* $[{[#]]NUM[}] */
+ 			do {
+ 				STPUTC(c, out);
+ 				c = pgetc_eatbnl();
+-			} while ((subtype == 0 || subtype == VSLENGTH) && isdigit(c));
++			} while ((subtype == 0 || subtype == VSLENGTH) && bb_isdigit(c));
+ 		} else if (c != '}') {
+ 			/* $[{[#]]<specialchar>[}] */
+ 			int cc = c;
+@@ -14720,13 +14720,13 @@ umaskcmd(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ 		char *modestr = *argptr;
+ 		/* numeric umasks are taken as-is */
+ 		/* symbolic umasks are inverted: "umask a=rx" calls umask(222) */
+-		if (!isdigit(modestr[0]))
++		if (!bb_isdigit(modestr[0]))
+ 			mask ^= 0777;
+ 		mask = bb_parse_mode(modestr, mask);
+ 		if ((unsigned)mask > 0777) {
+ 			ash_msg_and_raise_error("illegal mode: %s", modestr);
+ 		}
+-		if (!isdigit(modestr[0]))
++		if (!bb_isdigit(modestr[0]))
+ 			mask ^= 0777;
+ 		umask(mask);
+ 	}
+diff --git a/shell/hush.c b/shell/hush.c
+index 23e7f512f..843960618 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -4630,7 +4630,7 @@ static int parse_redir_right_fd(o_string *as_string, struct in_str *input)
+ 	}
+ 	d = 0;
+ 	ok = 0;
+-	while (/*ch != EOF &&*/ isdigit(ch)) {
++	while (/*ch != EOF &&*/ bb_isdigit(ch)) {
+ 		d = d*10 + (ch-'0');
+ 		ok = 1;
+ 		ch = i_getch(input);
+@@ -5393,7 +5393,7 @@ static int parse_dollar(o_string *as_string,
+ 			nommu_addchr(as_string, ch);
+ 		}
+ 		o_addchr(dest, SPECIAL_VAR_SYMBOL);
+-	} else if (isdigit(ch)) {
++	} else if (bb_isdigit(ch)) {
+  make_one_char_var:
+ 		ch = i_getch(input);
+ 		nommu_addchr(as_string, ch);
+@@ -5440,8 +5440,8 @@ static int parse_dollar(o_string *as_string,
+ 		 * which check invalid constructs like ${%}.
+ 		 * Oh well... let's check that the var name part is fine... */
+ 
+-		if (isdigit(len_single_ch)
+-		 || (len_single_ch == '#' && isdigit(i_peek_and_eat_bkslash_nl(input)))
++		if (bb_isdigit(len_single_ch)
++		 || (len_single_ch == '#' && bb_isdigit(i_peek_and_eat_bkslash_nl(input)))
+ 		) {
+ 			/* Execution engine uses plain xatoi_positive()
+ 			 * to interpret ${NNN} and {#NNN},
+@@ -5462,7 +5462,7 @@ static int parse_dollar(o_string *as_string,
+ 				if (len_single_ch != '#' && strchr(VAR_SUBST_OPS, ch))
+ 					/* ${NN<op>...} is valid */
+ 					goto eat_until_closing;
+-				if (!isdigit(ch))
++				if (!bb_isdigit(ch))
+ 					goto bad_dollar_syntax;
+ 			}
+ 		} else
+@@ -7236,7 +7236,7 @@ static NOINLINE int expand_one_var(o_string *output, int n, char *arg, char **pp
+ 	}
+ 
+ 	/* Look up the variable in question */
+-	if (isdigit(var[0])) {
++	if (bb_isdigit(var[0])) {
+ 		/* parse_dollar should have vetted var for us */
+ 		int nn = xatoi_positive(var);
+ 		if (nn < G.global_argc)
+@@ -7558,7 +7558,7 @@ static NOINLINE int expand_one_var(o_string *output, int n, char *arg, char **pp
+ 					}
+ 					if (exp_op == '=') {
+ 						/* ${var=[word]} or ${var:=[word]} */
+-						if (isdigit(var[0]) || var[0] == '#') {
++						if (bb_isdigit(var[0]) || var[0] == '#') {
+ 							/* mimic bash message */
+ 							msg_and_die_if_script("$%s: cannot assign in this way", var);
+ 							val = NULL;
+@@ -11785,10 +11785,10 @@ static int FAST_FUNC builtin_umask(char **argv)
+ 
+ 		/* numeric umasks are taken as-is */
+ 		/* symbolic umasks are inverted: "umask a=rx" calls umask(222) */
+-		if (!isdigit(argv[0][0]))
++		if (!bb_isdigit(argv[0][0]))
+ 			mask ^= 0777;
+ 		mask = bb_parse_mode(argv[0], mask);
+-		if (!isdigit(argv[0][0]))
++		if (!bb_isdigit(argv[0][0]))
+ 			mask ^= 0777;
+ 		if ((unsigned)mask > 0777) {
+ 			mask = old_mask;
+diff --git a/shell/math.c b/shell/math.c
+index 536f22ff0..355b7c838 100644
+--- a/shell/math.c
++++ b/shell/math.c
+@@ -631,7 +631,7 @@ static arith_t strto_arith_t(const char *nptr, char **endptr)
+ 		/* else: "1#NN", bash says "invalid arithmetic base" */
+ 	}
+ 
+-	if (isdigit(nptr[1]) && nptr[2] == '#') {
++	if (bb_isdigit(nptr[1]) && nptr[2] == '#') {
+ 		base = 10 * base + (nptr[1] - '0');
+ 		/* base is at least 10 here */
+ 		if (base <= 64)
+@@ -762,7 +762,7 @@ evaluate_string(arith_state_t *math_state, const char *expr)
+ 			continue;
+ 		}
+ 
+-		if (isdigit(*expr)) {
++		if (bb_isdigit(*expr)) {
+ 			/* Number */
+ 			char *end;
+ 			numstackptr->var_name = NULL;
+diff --git a/sysklogd/logger.c b/sysklogd/logger.c
+index b99e8af74..ba54375aa 100644
+--- a/sysklogd/logger.c
++++ b/sysklogd/logger.c
+@@ -50,7 +50,7 @@ static int decode(char *name, const CODE *codetab)
+ {
+ 	const CODE *c;
+ 
+-	if (isdigit(*name))
++	if (bb_isdigit(*name))
+ 		return atoi(name);
+ 	for (c = codetab; c->c_name; c++) {
+ 		if (!strcasecmp(name, c->c_name)) {
+diff --git a/util-linux/fdisk.c b/util-linux/fdisk.c
+index 5ab350c74..94645e4e1 100644
+--- a/util-linux/fdisk.c
++++ b/util-linux/fdisk.c
+@@ -623,7 +623,7 @@ partname(const char *dev, int pno, int lth)
+ 	w = strlen(dev);
+ 	p = "";
+ 
+-	if (isdigit(dev[w-1]))
++	if (bb_isdigit(dev[w-1]))
+ 		p = "p";
+ 
+ 	/* devfs kludge - note: fdisk partition names are not supposed
+@@ -1627,7 +1627,7 @@ read_int(sector_t low, sector_t dflt, sector_t high, sector_t base, const char *
+ 		do {
+ 			printf(fmt, mesg, low, high, dflt);
+ 			read_maybe_empty("");
+-		} while (*line_ptr != '\n' && !isdigit(*line_ptr)
++		} while (*line_ptr != '\n' && !bb_isdigit(*line_ptr)
+ 		 && *line_ptr != '-' && *line_ptr != '+');
+ 
+ 		if (*line_ptr == '+' || *line_ptr == '-') {
+@@ -1642,7 +1642,7 @@ read_int(sector_t low, sector_t dflt, sector_t high, sector_t base, const char *
+ 			/* (1) if 2nd char is digit, use_default = 0.
+ 			 * (2) move line_ptr to first non-digit.
+ 			 */
+-			while (isdigit(*++line_ptr))
++			while (bb_isdigit(*++line_ptr))
+ 				use_default = 0;
+ 
+ 			scale_shift = 0;
+@@ -1700,7 +1700,7 @@ read_int(sector_t low, sector_t dflt, sector_t high, sector_t base, const char *
+ 				value = strtoul(line_ptr, NULL, 10);
+ 			else
+ 				value = strtoull(line_ptr, NULL, 10);
+-			while (isdigit(*line_ptr)) {
++			while (bb_isdigit(*line_ptr)) {
+ 				line_ptr++;
+ 				use_default = 0;
+ 			}
+@@ -2256,7 +2256,7 @@ list_table(int xtra)
+ 	 * then the partition is called /dev/foo1p3.
+ 	 */
+ 	w = strlen(disk_device);
+-	if (w && isdigit(disk_device[w-1]))
++	if (w && bb_isdigit(disk_device[w-1]))
+ 		w++;
+ 	if (w < 7)
+ 		w = 7;
+@@ -3012,7 +3012,7 @@ static int is_whole_disk(const char *disk)
+ 	/* Treat "nameN" as a partition name, not whole disk */
+ 	/* note: mmcblk0 should work from the geometry check above */
+ 	len = strlen(disk);
+-	if (len != 0 && isdigit(disk[len - 1]))
++	if (len != 0 && bb_isdigit(disk[len - 1]))
+ 		return 0;
+ 
+ 	return 1;
+diff --git a/util-linux/fdisk_osf.c b/util-linux/fdisk_osf.c
+index f34390e01..8b776d84d 100644
+--- a/util-linux/fdisk_osf.c
++++ b/util-linux/fdisk_osf.c
+@@ -637,7 +637,7 @@ edit_int(int def, const char *mesg)
+ 	do {
+ 		if (!read_line(mesg))
+ 			goto ret;
+-	} while (!isdigit(*line_ptr));
++	} while (!bb_isdigit(*line_ptr));
+ 	def = atoi(line_ptr);
+  ret:
+ 	free((char*)mesg);
+diff --git a/util-linux/hexdump_xxd.c b/util-linux/hexdump_xxd.c
+index 783ca9b26..be45014c7 100644
+--- a/util-linux/hexdump_xxd.c
++++ b/util-linux/hexdump_xxd.c
+@@ -144,7 +144,7 @@ static void reverse(unsigned opt, const char *filename, char *opt_s)
+ 			if (opt & OPT_p)
+ 				p = skip_whitespace(p);
+ 			c = *p++;
+-			if (isdigit(c))
++			if (bb_isdigit(c))
+ 				val = c - '0';
+ 			else if ((c|0x20) >= 'a' && (c|0x20) <= 'f')
+ 				val = (c|0x20) - ('a' - 10);
+@@ -180,7 +180,7 @@ static void reverse(unsigned opt, const char *filename, char *opt_s)
+ 			}
+ 
+ 			c = *p++;
+-			if (isdigit(c))
++			if (bb_isdigit(c))
+ 				val |= c - '0';
+ 			else if ((c|0x20) >= 'a' && (c|0x20) <= 'f')
+ 				val |= (c|0x20) - ('a' - 10);
+@@ -221,7 +221,7 @@ static void reverse(unsigned opt, const char *filename, char *opt_s)
+ 
+ static void print_C_style(const char *p, const char *hdr)
+ {
+-	printf(hdr, isdigit(p[0]) ? "__" : "");
++	printf(hdr, bb_isdigit(p[0]) ? "__" : "");
+ 	while (*p) {
+ 		bb_putchar(isalnum(*p) ? *p : '_');
+ 		p++;
+diff --git a/util-linux/taskset.c b/util-linux/taskset.c
+index a3aa06119..88cd479a6 100644
+--- a/util-linux/taskset.c
++++ b/util-linux/taskset.c
+@@ -256,7 +256,7 @@ static int process_pid_str(const char *pid_str, unsigned opts, char *aff)
+ 
+ 			last_char--;
+ 			c = *last_char;
+-			if (isdigit(c))
++			if (bb_isdigit(c))
+ 				val = c - '0';
+ 			else if ((c|0x20) >= 'a' && (c|0x20) <= 'f')
+ 				val = (c|0x20) - ('a' - 10);
+@@ -294,7 +294,7 @@ static int process_pid_str(const char *pid_str, unsigned opts, char *aff)
+ 
+ static int FAST_FUNC iter(const char *dn UNUSED_PARAM, struct dirent *ent, void *aff)
+ {
+-	if (isdigit(ent->d_name[0]))
++	if (bb_isdigit(ent->d_name[0]))
+ 		return process_pid_str(ent->d_name, option_mask32, aff);
+ 	return 0;
+ }
+diff --git a/util-linux/volume_id/get_devname.c b/util-linux/volume_id/get_devname.c
+index 52bb8e03a..b18d95216 100644
+--- a/util-linux/volume_id/get_devname.c
++++ b/util-linux/volume_id/get_devname.c
+@@ -191,7 +191,7 @@ get_spec_by_x(int n, const char *t, int *majorPtr, int *minorPtr)
+ static unsigned char
+ fromhex(char c)
+ {
+-	if (isdigit(c))
++	if (bb_isdigit(c))
+ 		return (c - '0');
+ 	return ((c|0x20) - 'a' + 10);
+ }
+-- 
+2.34.1
+
