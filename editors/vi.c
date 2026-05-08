@@ -1188,10 +1188,10 @@ static int get_motion_char(void)
 	int c, cnt;
 
 	c = get_one_char();
-	if (isdigit(c)) {
+	if (bb_isdigit(c)) {
 		if (c != '0') {
 			// get any non-zero motion count
-			for (cnt = 0; isdigit(c); c = get_one_char())
+			for (cnt = 0; bb_isdigit(c); c = get_one_char())
 				cnt = cnt * 10 + (c - '0');
 			cmdcnt = (cmdcnt ?: 1) * cnt;
 		} else {
@@ -2569,9 +2569,9 @@ static char *get_one_address(char *p, int *result, int *valid)
 			got_addr = TRUE;
 		}
 # endif
-		else if (isdigit(*p)) {
+		else if (bb_isdigit(*p)) {
 			num = 0;
-			while (isdigit(*p))
+			while (bb_isdigit(*p))
 				num = num * 10 + *p++ -'0';
 			if (!got_addr) {	// specific line number
 				addr = num;
@@ -4569,7 +4569,7 @@ static void do_cmd(int c)
 		check_context(c);	// update the current context
 #endif
 
-	if (!isdigit(c))
+	if (!bb_isdigit(c))
 		cmdcnt = 0;		// cmd was not a number, reset cmdcnt
 	cnt = dot - begin_line(dot);
 	// Try to stay off of the Newline

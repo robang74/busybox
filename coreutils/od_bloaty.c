@@ -589,7 +589,7 @@ decode_one_format(const char *s_orig, const char *s, struct tspec *tspec)
 		/* if *s == NUL, p != NULL! Testcase: "od -tx" */
 		if (!p || *p == '\0') {
 			size = sizeof(int);
-			if (isdigit(s[0])) {
+			if (bb_isdigit(s[0])) {
 				size = bb_strtou(s, &end, 0);
 				if (errno == ERANGE
 				 || MAX_INTEGRAL_TYPE_SIZE < size
@@ -684,7 +684,7 @@ decode_one_format(const char *s_orig, const char *s, struct tspec *tspec)
 		p = strchr(FDL, *s);
 		if (!p || *p == '\0') {
 			size = sizeof(double);
-			if (isdigit(s[0])) {
+			if (bb_isdigit(s[0])) {
 				size = bb_strtou(s, &end, 0);
 				if (errno == ERANGE || size > MAX_FP_TYPE_SIZE
 				 || fp_type_size[size] == NO_SIZE
@@ -1167,7 +1167,7 @@ parse_old_offset(char *s, off_t *offset)
 
 	/* Skip over any leading '+'. */
 	if (s[0] == '+') ++s;
-	if (!isdigit(s[0])) return 0; /* not a number */
+	if (!bb_isdigit(s[0])) return 0; /* not a number */
 
 	/* Determine the radix we'll use to interpret S.  If there is a '.',
 	 * it's decimal, otherwise, if the string begins with '0X'or '0x',

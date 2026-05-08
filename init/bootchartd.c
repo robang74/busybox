@@ -241,7 +241,7 @@ static void do_logging(unsigned sample_period_us, int process_accounting)
 		p = strchr(G.jiffy_line, '.');
 		if (!p)
 			goto wait_more;
-		while (isdigit(*++p))
+		while (bb_isdigit(*++p))
 			p[-1] = *p;
 		p[-1] = '\n';
 		p[0] = '\0';

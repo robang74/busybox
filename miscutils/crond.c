@@ -240,7 +240,7 @@ static void ParseField(char *user, char *ary, int modvalue, int off,
 			n2 = modvalue - 1;
 			skip = 1;
 			++ptr;
-		} else if (isdigit(*ptr)) {
+		} else if (bb_isdigit(*ptr)) {
 			char *endp;
 			if (n1 < 0) {
 				n1 = strtol(ptr, &endp, 10) + off;

@@ -49,7 +49,7 @@ int devmem_main(int argc UNUSED_PARAM, char **argv)
 
 	/* WIDTH */
 	if (argv[2]) {
-		if (isdigit(argv[2][0]) || argv[2][1])
+		if (bb_isdigit(argv[2][0]) || argv[2][1])
 			width = xatou(argv[2]);
 		else {
 			static const char bhwl[] ALIGN1 = "bhwl";

@@ -1147,7 +1147,7 @@ static int get_uid_gid(int flag, const char *string)
 	struct group *grp_ent;
 	const char *msg;
 
-	if (isdigit(string[0]) || ((string[0] == '-') && isdigit(string[1])))
+	if (bb_isdigit(string[0]) || ((string[0] == '-') && isdigit(string[1])))
 		return atoi(string);
 
 	if (flag == UID && (pw_ent = getpwnam(string)) != NULL)
@@ -1177,7 +1177,7 @@ static mode_t get_mode(const char *string)
 	mode_t mode;
 	int i;
 
-	if (isdigit(string[0]))
+	if (bb_isdigit(string[0]))
 		return strtoul(string, NULL, 8);
 	if (strlen(string) != 9)
 		msg_logger_and_die(LOG_ERR, "bad mode: %s", string);

@@ -43,7 +43,7 @@ int nproc_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
 			struct dirent *de;
 			while (NULL != (de = readdir(cpusd))) {
 				char *cpuid = strstr(de->d_name, "cpu");
-				if (cpuid && isdigit(cpuid[strlen(cpuid) - 1]))
+				if (cpuid && bb_isdigit(cpuid[strlen(cpuid) - 1]))
 					count++;
 			}
 			IF_FEATURE_CLEAN_UP(closedir(cpusd);)

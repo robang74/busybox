@@ -252,13 +252,13 @@ int64_t FAST_FUNC read_key(int fd, char *buffer, int timeout)
 		 && n >= 5
 		 && buffer[0] == '['
 		 && buffer[n-1] == 'R'
-		 && isdigit(buffer[1])
+		 && bb_isdigit(buffer[1])
 		) {
 			char *end;
 			unsigned long row, col;
 
 			row = strtoul(buffer + 1, &end, 10);
-			if (*end != ';' || !isdigit(end[1]))
+			if (*end != ';' || !bb_isdigit(end[1]))
 				continue;
 			col = strtoul(end + 1, &end, 10);
 			if (*end != 'R')

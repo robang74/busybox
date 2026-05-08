@@ -2446,7 +2446,7 @@ new_process_module_arguments(struct obj_file *f, const char *options)
 
 		/* Number of parameters */
 		min = max = 1;
-		if (isdigit(*pinfo)) {
+		if (bb_isdigit(*pinfo)) {
 			min = max = strtoul(pinfo, &pinfo, 10);
 			if (*pinfo == '-')
 				max = strtoul(pinfo + 1, &pinfo, 10);
@@ -2456,7 +2456,7 @@ new_process_module_arguments(struct obj_file *f, const char *options)
 		loc = contents + sym->value;
 
 		if (*pinfo == 'c') {
-			if (!isdigit(pinfo[1])) {
+			if (!bb_isdigit(pinfo[1])) {
 				bb_error_msg_and_die("parameter type 'c' for %s must be followed by"
 						     " the maximum size", param);
 			}

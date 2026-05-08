@@ -432,7 +432,7 @@ static int compare_keys(const void *xarg, const void *yarg)
 static unsigned str2u(char **str)
 {
 	unsigned long lu;
-	if (!isdigit((*str)[0]))
+	if (!bb_isdigit((*str)[0]))
 		bb_simple_error_msg_and_die("bad field specification");
 	lu = strtoul(*str, str, 10);
 	if ((sizeof(long) > sizeof(int) && lu > INT_MAX) || !lu)

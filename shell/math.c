@@ -631,7 +631,7 @@ static arith_t strto_arith_t(const char *nptr, char **endptr)
 		/* else: "1#NN", bash says "invalid arithmetic base" */
 	}
 
-	if (isdigit(nptr[1]) && nptr[2] == '#') {
+	if (bb_isdigit(nptr[1]) && nptr[2] == '#') {
 		base = 10 * base + (nptr[1] - '0');
 		/* base is at least 10 here */
 		if (base <= 64)
@@ -762,7 +762,7 @@ evaluate_string(arith_state_t *math_state, const char *expr)
 			continue;
 		}
 
-		if (isdigit(*expr)) {
+		if (bb_isdigit(*expr)) {
 			/* Number */
 			char *end;
 			numstackptr->var_name = NULL;

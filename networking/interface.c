@@ -112,7 +112,7 @@ static int INET_getsock(char *bufp, struct sockaddr *sap)
 
 		if ((unsigned)(*sp - 'A') <= 5)
 			bp[i] |= (int) (*sp - ('A' - 10));
-		else if (isdigit(*sp))
+		else if (bb_isdigit(*sp))
 			bp[i] |= (int) (*sp - '0');
 		else
 			return -1;
@@ -123,7 +123,7 @@ static int INET_getsock(char *bufp, struct sockaddr *sap)
 
 		if ((unsigned)(*sp - 'A') <= 5)
 			bp[i] |= (int) (*sp - ('A' - 10));
-		else if (isdigit(*sp))
+		else if (bb_isdigit(*sp))
 			bp[i] |= (int) (*sp - '0');
 		else
 			return -1;
@@ -359,7 +359,7 @@ static int nstrcmp(const char *a, const char *b)
 		if (*a == '\0') {
 			return 0;
 		}
-		if (!isdigit(*a) && isdigit(*(a+1))) {
+		if (!bb_isdigit(*a) && isdigit(*(a+1))) {
 			a_ptr = a+1;
 			b_ptr = b+1;
 		}
@@ -367,7 +367,7 @@ static int nstrcmp(const char *a, const char *b)
 		b++;
 	}
 
-	if (isdigit(*a) && isdigit(*b)) {
+	if (bb_isdigit(*a) && isdigit(*b)) {
 		return xatoul(a_ptr) > xatoul(b_ptr) ? 1 : -1;
 	}
 	return *a - *b;

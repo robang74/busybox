@@ -212,8 +212,8 @@ int date_main(int argc UNUSED_PARAM, char **argv)
 			int len = strspn(date_str, "0123456789");
 			if (date_str[len] == '\0'
 			 || (date_str[len] == '.'
-			    && isdigit(date_str[len+1])
-			    && isdigit(date_str[len+2])
+			    && bb_isdigit(date_str[len+1])
+			    && bb_isdigit(date_str[len+2])
 			    && date_str[len+3] == '\0'
 			    )
 			) {

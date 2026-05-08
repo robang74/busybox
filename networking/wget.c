@@ -523,7 +523,7 @@ static int ftpcmd(const char *s1, const char *s2, FILE *fp)
 	G.wget_buf[3] = 0;
 	do {
 		fgets_trim_sanitize(fp, "%s\n");
-	} while (!isdigit(G.wget_buf[0]) || G.wget_buf[3] != ' ');
+	} while (!bb_isdigit(G.wget_buf[0]) || G.wget_buf[3] != ' ');
 
 	G.wget_buf[3] = '\0';
 	result = xatoi_positive(G.wget_buf);

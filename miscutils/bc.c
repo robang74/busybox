@@ -2971,7 +2971,7 @@ static BC_STATUS zxc_lex_number(char last)
 			c = peek_inbuf(); // force next line to be read
 			goto check_c;
 		}
-		if (!isdigit(c) && (c < 'A' || c > last_valid_ch)) {
+		if (!bb_isdigit(c) && (c < 'A' || c > last_valid_ch)) {
 			if (c != '.') break;
 			// if '.' was already seen, stop on second one:
 			if (pt) break;
@@ -3005,7 +3005,7 @@ static void xc_lex_name(void)
 	buf = p->lex_inbuf - 1;
 	for (;;) {
 		char c = buf[i];
-		if ((c < 'a' || c > 'z') && !isdigit(c) && c != '_') break;
+		if ((c < 'a' || c > 'z') && !bb_isdigit(c) && c != '_') break;
 		i++;
 	}
 
@@ -3292,7 +3292,7 @@ static BC_STATUS zbc_lex_token(void)
 			parse_lex_by_checking_eq_sign(BC_LEX_OP_ASSIGN_MINUS, XC_LEX_OP_MINUS);
 		break;
 	case '.':
-		if (isdigit(*p->lex_inbuf))
+		if (bb_isdigit(*p->lex_inbuf))
 			s = zxc_lex_number(c);
 		else {
 			p->lex = BC_LEX_KEY_LAST;
@@ -3548,7 +3548,7 @@ static BC_STATUS zdc_lex_token(void)
 		xc_lex_lineComment();
 		break;
 	case '.':
-		if (isdigit(*p->lex_inbuf))
+		if (bb_isdigit(*p->lex_inbuf))
 			s = zxc_lex_number(c);
 		else
 			s = bc_error_bad_character(c);

@@ -132,7 +132,7 @@ int tail_main(int argc, char **argv)
 #if ENABLE_INCLUDE_SUSv2 || ENABLE_FEATURE_FANCY_TAIL
 	/* Allow legacy syntax of an initial numeric option without -n. */
 	if (argv[1] && (argv[1][0] == '+' || argv[1][0] == '-')
-	 && isdigit(argv[1][1])
+	 && bb_isdigit(argv[1][1])
 	) {
 		count = eat_num(argv[1]);
 		argv++;

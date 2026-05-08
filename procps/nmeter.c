@@ -280,7 +280,7 @@ static int rdval_diskstats(const char* p, ullong *vec)
 		if (value_idx == 3) {
 			char *end = strchrnul(p, ' ');
 			/* If this a hda1-like device (same prefix as last one + digit)? */
-			if (devname_len && strncmp(devname, p, devname_len) == 0 && isdigit(p[devname_len])) {
+			if (devname_len && strncmp(devname, p, devname_len) == 0 && bb_isdigit(p[devname_len])) {
 				p = end;
 				goto skip_line; /* skip entire line */
 			}

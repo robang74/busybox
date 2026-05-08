@@ -148,7 +148,7 @@ char* FAST_FUNC hex2bin(char *dst, const char *str, int count)
 	while (*str && count) {
 		uint8_t val;
 		uint8_t c = *str++;
-		if (isdigit(c))
+		if (bb_isdigit(c))
 			val = c - '0';
 		else if ((c|0x20) >= 'a' && (c|0x20) <= 'f')
 			val = (c|0x20) - ('a' - 10);
@@ -156,7 +156,7 @@ char* FAST_FUNC hex2bin(char *dst, const char *str, int count)
 			return NULL;
 		val <<= 4;
 		c = *str;
-		if (isdigit(c))
+		if (bb_isdigit(c))
 			val |= c - '0';
 		else if ((c|0x20) >= 'a' && (c|0x20) <= 'f')
 			val |= (c|0x20) - ('a' - 10);

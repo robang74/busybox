@@ -939,12 +939,12 @@ static double my_strtod_or_hexoct(char **pp)
 	if (cp[0] == '0') {
 		/* Might be hex or octal integer: 0x123abc or 07777 */
 		char c = (cp[1] | 0x20);
-		if (c == 'x' || isdigit(cp[1])) {
+		if (c == 'x' || bb_isdigit(cp[1])) {
 			unsigned long long ull = strtoull(cp, pp, 0);
 			if (c == 'x')
 				return ull;
 			c = **pp;
-			if (!isdigit(c) && c != '.')
+			if (!bb_isdigit(c) && c != '.')
 				return ull;
 			/* else: it may be a floating number. Examples:
 			 * 009.123 (*pp points to '9')
@@ -1360,7 +1360,7 @@ static uint32_t next_token(uint32_t expected)
 			tc = TC_REGEXP;
 			debug_printf_parse("%s: token found:'%s' TC_REGEXP\n", __func__, t_string);
 
-		} else if (*p == '.' || isdigit(*p)) {
+		} else if (*p == '.' || bb_isdigit(*p)) {
 			/* it's a number */
 			char *pp = p;
 			t_double = my_strtod_or_hexoct(&pp);

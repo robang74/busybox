@@ -647,9 +647,9 @@ static void trace_vprintf(const char *fmt, va_list va);
 #define is_in_name(c)   ((c) == '_' || isalnum((unsigned char)(c)))
 
 static int
-isdigit_str(const char *str)
+bb_isdigit_str(const char *str)
 {
-	while (isdigit(*str))
+	while (bb_isdigit(*str))
 		str++;
 	return (*str == '\0');
 }
@@ -2038,7 +2038,7 @@ static int
 is_number(const char *p)
 {
 	do {
-		if (!isdigit(*p))
+		if (!bb_isdigit(*p))
 			return 0;
 	} while (*++p != '\0');
 	return 1;
@@ -10048,7 +10048,7 @@ expredir(union node *n)
 				if (fn.list == NULL)
 					ash_msg_and_raise_error("redir error");
 #if BASH_REDIR_OUTPUT
-				if (!isdigit_str(fn.list->text)) {
+				if (!bb_isdigit_str(fn.list->text)) {
 					/* >&file, not >&fd */
 					if (redir->nfile.fd != 1) /* 123>&file - BAD */
 						ash_msg_and_raise_error("redir error");
@@ -13228,7 +13228,7 @@ readtoken1(int c, int syntax, struct heredoc *eofmark)
 		if ((c == '>' || c == '<' IF_BASH_REDIR_OUTPUT( || c == 0x100 + '>'))
 		 && quotef == 0
 		) {
-			if (isdigit_str(out)) {
+			if (bb_isdigit_str(out)) {
 				PARSEREDIR(); /* passed as params: out, c */
 				lasttoken = TREDIR;
 				return lasttoken;
@@ -13447,12 +13447,12 @@ parsesub: {
 				STPUTC(c, out);
 				c = pgetc_eatbnl();
 			} while (is_in_name(c));
-		} else if (isdigit(c)) {
+		} else if (bb_isdigit(c)) {
 			/* $[{[#]]NUM[}] */
 			do {
 				STPUTC(c, out);
 				c = pgetc_eatbnl();
-			} while ((subtype == 0 || subtype == VSLENGTH) && isdigit(c));
+			} while ((subtype == 0 || subtype == VSLENGTH) && bb_isdigit(c));
 		} else if (c != '}') {
 			/* $[{[#]]<specialchar>[}] */
 			int cc = c;
@@ -14727,13 +14727,13 @@ umaskcmd(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
 		char *modestr = *argptr;
 		/* numeric umasks are taken as-is */
 		/* symbolic umasks are inverted: "umask a=rx" calls umask(222) */
-		if (!isdigit(modestr[0]))
+		if (!bb_isdigit(modestr[0]))
 			mask ^= 0777;
 		mask = bb_parse_mode(modestr, mask);
 		if ((unsigned)mask > 0777) {
 			ash_msg_and_raise_error("illegal mode: %s", modestr);
 		}
-		if (!isdigit(modestr[0]))
+		if (!bb_isdigit(modestr[0]))
 			mask ^= 0777;
 		umask(mask);
 	}

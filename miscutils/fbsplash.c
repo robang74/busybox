@@ -553,7 +553,7 @@ int fbsplash_main(int argc UNUSED_PARAM, char **argv)
 			break;
 		}
 		num = atoi(num_buf);
-		if (isdigit(num_buf[0]) && (num <= 100)) {
+		if (bb_isdigit(num_buf[0]) && (num <= 100)) {
 #if DEBUG
 			DEBUG_MESSAGE(itoa(num));
 #endif

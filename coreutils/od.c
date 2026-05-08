@@ -65,7 +65,7 @@ odoffset(dumper_t *dumper, int argc, char ***argvp)
 
 	if ((*p != '+')
 		&& (argc < 2
-			|| (!isdigit(p[0])
+			|| (!bb_isdigit(p[0])
 				&& ((p[0] != 'x') || !isxdigit(p[1])))))
 		return;
 
@@ -89,7 +89,7 @@ odoffset(dumper_t *dumper, int argc, char ***argvp)
 		for (num = p; isxdigit(*p); ++p)
 			continue;
 	else
-		for (num = p; isdigit(*p); ++p)
+		for (num = p; bb_isdigit(*p); ++p)
 			continue;
 
 	/* check for no number */
