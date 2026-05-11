@@ -13,7 +13,7 @@ their awk scripts. A support usually welcomed in a transitional phase.
 
 To test against further regressions (downstreams):
 
-+ [patches/0008-awk-minimalist-approach-to-fix-some-unsupported-cases-v6.patch](patches/0008-awk-minimalist-approach-to-fix-some-unsupported-cases-v6.patch)
++ [patches/0010-awk-minimalist-approach-to-fix-some-unsupported-cases-v7.patch](patches/0010-awk-minimalist-approach-to-fix-some-unsupported-cases-v7.patch)
 
 BusyBox awk seeks for the last character in format and uses it for
 inferring the numeric specifier type (integer or float) despite it
