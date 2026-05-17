@@ -259,10 +259,10 @@ int readprofile_main(int argc UNUSED_PARAM, char **argv)
 	/* trailer */
 	if (optVerbose)
 		printf("%016x %-40s %6u %8.4f\n", 0, "total", total,
-			(fn_add != add0) ? total/(double)(fn_add-add0) : 0.0);
+			(fn_add-add0) ? total/(double)(fn_add-add0) : 0.0);
 	else
 		printf("%6u %-40s %8.4f\n", total, "total",
-			(fn_add != add0) ? total/(double)(fn_add-add0) : 0.0);
+			(fn_add-add0) ? total/(double)(fn_add-add0) : 0.0);
 
 	if (ENABLE_FEATURE_CLEAN_UP) {
 		fclose(map);
