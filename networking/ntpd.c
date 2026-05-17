@@ -2086,6 +2086,8 @@ recv_and_process_client_pkt(void /*int fd*/)
 	l_fixedpt_t      query_xmttime;
 
 	to = get_sock_lsa(G_listen_fd);
+	if (!to)
+		bb_simple_perror_msg_and_die("get_sock_lsa");
 	from = xzalloc(to->len);
 
 	size = recv_from_to(G_listen_fd, &msg, sizeof(msg), MSG_DONTWAIT, from, &to->u.sa, to->len);
