@@ -555,7 +555,8 @@ procps_status_t* FAST_FUNC procps_scan(procps_status_t* sp, int flags)
 	return sp;
 }
 
-int FAST_FUNC read_cmdline(char *buf, int col, unsigned pid, const char *comm)
+static inline
+int FAST_FUNC read_cmdline2(char *buf, int col, unsigned pid, const char *comm)
 {
 	int sz;
 	char filename[sizeof("/proc/%u/cmdline") + sizeof(int)*3];
@@ -584,8 +585,9 @@ int FAST_FUNC read_cmdline(char *buf, int col, unsigned pid, const char *comm)
 		 * list of NUL-strings into one string.
 		 */
 		while (sz >= 0) {
-			if ((unsigned char)(buf[sz]) < ' ')
-				buf[sz] = (buf[sz] ? /*ctrl*/'?' : /*NUL*/' ');
+			/* controls will be dealt with by printable_string */
+			if (buf[sz] == '\0')
+				buf[sz] = ' ';
 			sz--;
 		}
 
@@ -615,6 +617,19 @@ int FAST_FUNC read_cmdline(char *buf, int col, unsigned pid, const char *comm)
 		snprintf(buf, col, "[%s]", comm ? comm : "?");
 	}
 	return 0;
+}
+
+// defadvice (read_cmdline :after)
+int FAST_FUNC read_cmdline(char *buf, int col, unsigned pid, const char *comm)
+{
+	const char *printable;
+	int ret = read_cmdline2(buf, col, pid, comm);
+	if(ret > 0) {
+		printable = printable_string(buf);
+		if (printable != buf)
+			snprintf(buf, col, "%s", printable);
+	}
+	return ret;
 }
 
 /* from kernel:
