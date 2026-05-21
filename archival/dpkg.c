@@ -883,10 +883,11 @@ static void write_status_file(deb_file_t **deb_file)
 					fprintf(new_status_file, "Status: %s\n", status_from_hashtable);
 
 					while (1) {
-						char *field_name;
-						char *field_value;
+						char *field_name = NULL;
+						char *field_value = NULL;
 						field_start += read_package_field(&control_buffer[field_start], &field_name, &field_value);
 						if (field_name == NULL) {
+							free(field_value); //RAF
 							break;
 						}
 						if ((strcmp(field_name, "Priority") == 0)
@@ -894,6 +895,8 @@ static void write_status_file(deb_file_t **deb_file)
 						) {
 							fprintf(new_status_file, "%s: %s\n", field_name, field_value);
 						}
+						free(field_name);
+						free(field_value);
 					}
 					write_flag = TRUE;
 					fputs("\n", new_status_file);
@@ -901,10 +904,11 @@ static void write_status_file(deb_file_t **deb_file)
 				else if (strcmp("config-files", name_hashtable[state_status]) == 0) {
 					/* only change the status line */
 					while (1) {
-						char *field_name;
-						char *field_value;
+						char *field_name = NULL;
+						char *field_value = NULL;
 						field_start += read_package_field(&control_buffer[field_start], &field_name, &field_value);
 						if (field_name == NULL) {
+							free(field_value); //RAF
 							break;
 						}
 						/* Setup start point for next field */
@@ -913,6 +917,8 @@ static void write_status_file(deb_file_t **deb_file)
 						} else {
 							fprintf(new_status_file, "%s: %s\n", field_name, field_value);
 						}
+						free(field_name);
+						free(field_value);
 					}
 					write_flag = TRUE;
 					fputs("\n", new_status_file);
