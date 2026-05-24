@@ -44,7 +44,11 @@ test x"$ECHO" != x"" || {
 		# Compile and use a replacement 'echo' which understands -e -n
 		ECHO="$PWD/echo-ne"
 		test -x "$ECHO" || {
-			gcc -Os -o "$ECHO" ../scripts/echo.c || exit 1
+			echo_src=../scripts/echo.c
+			if test x"$srcdir" != x"" && test -f "$srcdir/../scripts/echo.c"; then
+				echo_src="$srcdir/../scripts/echo.c"
+			fi
+			${HOSTCC:-gcc} -Os -o "$ECHO" "$echo_src" || exit 1
 		}
 	}
 	export ECHO
