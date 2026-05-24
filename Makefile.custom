@@ -71,7 +71,7 @@ endif
 check test: busybox busybox.links
 	$(UNIT_CMD)
 	test -d $(objtree)/testsuite || cp -pPR $(srctree)/testsuite $(objtree)
-	bindir=$(objtree) srcdir=$(srctree)/testsuite \
+	bindir=$(objtree) srcdir=$(srctree)/testsuite HOSTCC="$(HOSTCC)" \
 	$(SHELL) -c "cd $(objtree)/testsuite && $(srctree)/testsuite/runtest $(if $(KBUILD_VERBOSE:0=),-v)"
 
 .PHONY: release
