@@ -162,13 +162,13 @@ static void parse_speeds(char *arg)
 	/* NB: at least one iteration is always done */
 	debug("entered parse_speeds\n");
 	while ((cp = strsep(&arg, ",")) != NULL) {
+		if (G.numspeed >= MAX_SPEED)
+			bb_simple_error_msg_and_die("too many alternate speeds");
 		G.speeds[G.numspeed] = bcode(cp);
 		if (G.speeds[G.numspeed] < 0)
 			bb_error_msg_and_die("bad speed: %s", cp);
 		/* note: arg "0" turns into speed B0 */
 		G.numspeed++;
-		if (G.numspeed > MAX_SPEED)
-			bb_simple_error_msg_and_die("too many alternate speeds");
 	}
 	debug("exiting parse_speeds\n");
 }
