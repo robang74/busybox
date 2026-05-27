@@ -87,7 +87,13 @@ int beep_main(int argc, char **argv)
 		switch (c) {
 		case 'f':
 /* TODO: what "-f 0" should do? */
-			tickrate_div_freq = (unsigned)CLOCK_TICK_RATE / xatou(optarg);
+/* RAF: the "man beep" indicates a range and a default frequency. However,
+ *      no top limit  is set because embedded systems might use "beep" to
+ *      communicate on an audio band above the humans hearing common PC
+ *      beepers capabilities (even if "beep" isn't the proper tool).
+ */
+			tickrate_div_freq = (unsigned)CLOCK_TICK_RATE
+				/ ( xatou(optarg) ?: 440U );
 			continue;
 		case 'l':
 			length = xatou(optarg);
