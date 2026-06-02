@@ -28,7 +28,8 @@
 //config:	help
 //config:	Set the maximum amount of RAM (in Kilobytes) that wget can
 //config:	allocate to buffer POST data from a file or pipe before
-//config:	enforcing quota limits to prevent OOMi by malloc().
+//config:	enforcing quota limits to prevent OOM by malloc().
+//config:	NOTE: max allowed quota is the amount-1 bytes.
 //config:
 //config:config FEATURE_WGET_STATUSBAR
 //config:	bool "Enable progress bar (+2k)"
@@ -263,9 +264,10 @@ struct globals {
 	char *dir_prefix;
 #if ENABLE_FEATURE_WGET_LONG_OPTIONS
 	char *post_data;
-	size_t post_data_len;
 	char *post_file;
+	int post_file_fd;
 	char *extra_headers;
+	size_t post_data_len;
 	unsigned char user_headers; /* Headers mentioned by the user */
 #endif
 	char *fname_out;        /* where to direct output (-O) */
@@ -1273,14 +1275,27 @@ static void download_one_url(const char *url)
 		}
 
 		if (option_mask32 & WGET_OPT_POST_FILE) {
-			int fd = xopen_stdin(G.post_file);
-			G.post_data_len = POST_CHUNK_BYTES; // max mem to use
-			G.post_data = xmalloc_read(fd, &G.post_data_len);
-			if(read(fd, &status, 1) == 1) // RAF: fstat() fails with pipes
+			G.post_file_fd = xopen_stdin(G.post_file);
+			G.post_data_len = POST_CHUNK_BYTES; // RAM: size N mem pages, hopefully
+			G.post_data = xmalloc_read(G.post_file_fd, &G.post_data_len);
+	#if ENABLE_DESKTOP
+			if(G.post_data_len < POST_CHUNK_BYTES) {
+				/* The whole file fit into one chunk -> transfer like --post-data */
+				close(G.post_file_fd);
+				G.post_file_fd = -1;
+			}
+	#else
+			if(G.post_data_len >= POST_CHUNK_BYTES) // RAF: quota is POST_CHUNK_BYTES-1
 				bb_simple_error_msg_and_die("wget POST exceeded quota");
-			close(fd);
-		} else if(G.post_data) {
+			close(G.post_file_fd);
+	#endif
+		}
+		else
+		if(G.post_data) { // RAF: populated by the getopt32() argument parser
 			G.post_data_len = strlen(G.post_data);
+	#if ENABLE_DESKTOP
+			G.post_file_fd = -1;
+	#endif
 		}
 
 		if (G.post_data) {
@@ -1290,10 +1305,35 @@ static void download_one_url(const char *url)
 					"Content-Type: application/x-www-form-urlencoded\r\n"
 				);
 			}
-			SENDFMT(sfp,
-				"Content-Length: %u\r\n\r\n", (int)G.post_data_len
-			);
-			fwrite(G.post_data, 1, G.post_data_len, sfp);
+	#if ENABLE_DESKTOP
+			if(G.post_file_fd >= 0) {
+				/* More to read in the post file -> chunked transfer */
+				int chunk_bytes = G.post_data_len;
+				SENDFMT(sfp, "Transfer-Encoding: chunked\r\n\r\n%x\r\n", chunk_bytes);
+
+				do {
+					fwrite(G.post_data, 1, chunk_bytes, sfp);
+					chunk_bytes = full_read(G.post_file_fd, G.post_data, POST_CHUNK_BYTES);
+
+					if(chunk_bytes < 0) {
+						/* There's no really good way to signal to the server what the problem is,
+						 * so just stop sending data. The server should recognize the request as
+						 * malformed and discard it. */
+						bb_error_msg_and_die("Error reading post-file: " STRERROR_FMT STRERROR_ERRNO);
+					}
+
+					SENDFMT(sfp, "\r\n%x\r\n", chunk_bytes);
+				} while(chunk_bytes > 0);
+
+				fwrite("\r\n", 1, 2, sfp);
+				close(G.post_file_fd);
+			}
+			else
+	#endif
+			{
+				SENDFMT(sfp, "Content-Length: %u\r\n\r\n", (int)G.post_data_len);
+				fwrite(G.post_data, 1, G.post_data_len, sfp);
+			}
 		} else
 #endif
 		{
