@@ -20,6 +20,16 @@
 //config:	default y
 //config:	depends on WGET && LONG_OPTS
 //config:
+//config:config FEATURE_WGET_POST_BUFFER_SIZE
+//config:	int "Max memory buffer size for POST data (in KB)"
+//config:	range 4 65536
+//config:	default 2048
+//config:	depends on WGET && FEATURE_WGET_LONG_OPTIONS
+//config:	help
+//config:	Set the maximum amount of RAM (in Kilobytes) that wget can
+//config:	allocate to buffer POST data from a file or pipe before
+//config:	enforcing quota limits to prevent OOMi by malloc().
+//config:
 //config:config FEATURE_WGET_STATUSBAR
 //config:	bool "Enable progress bar (+2k)"
 //config:	default y
@@ -225,6 +235,7 @@ static const char wget_user_headers[] ALIGN1 =
 	"Proxy-Authorization:\0"
 # endif
 	;
+# define POST_CHUNK_BYTES (CONFIG_FEATURE_WGET_POST_BUFFER_SIZE << 10)
 # define USR_HEADER_HOST         (G.user_headers & HDR_HOST)
 # define USR_HEADER_USER_AGENT   (G.user_headers & HDR_USER_AGENT)
 # define USR_HEADER_RANGE        (G.user_headers & HDR_RANGE)
@@ -1263,12 +1274,10 @@ static void download_one_url(const char *url)
 
 		if (option_mask32 & WGET_OPT_POST_FILE) {
 			int fd = xopen_stdin(G.post_file);
-			// RAF, TODO: 2MB is a provisional limit, better .config to set it
-			G.post_data_len = 2 << 20; // 2MB: max mem to use
+			G.post_data_len = POST_CHUNK_BYTES; // max mem to use
 			G.post_data = xmalloc_read(fd, &G.post_data_len);
 			if(read(fd, &status, 1) == 1) // RAF: fstat() fails with pipes
-				bb_error_msg_and_die("wget POST exceeded %zu quota",
-					G.post_data_len);
+				bb_simple_error_msg_and_die("wget POST exceeded quota");
 			close(fd);
 		} else if(G.post_data) {
 			G.post_data_len = strlen(G.post_data);
@@ -1282,7 +1291,7 @@ static void download_one_url(const char *url)
 				);
 			}
 			SENDFMT(sfp,
-				"Content-Length: %zu\r\n\r\n", G.post_data_len
+				"Content-Length: %u\r\n\r\n", (int)G.post_data_len
 			);
 			fwrite(G.post_data, 1, G.post_data_len, sfp);
 		} else
