@@ -133,7 +133,7 @@ void* FAST_FUNC xmalloc_read_with_initial_buf(int fd, size_t *maxsz_p, char *buf
 			break;
 		to_read -= rd_size;
 		/* grow by 1/8, but in [1k..64k] bounds */
-		size = ((total / 8) | 0x3ff) + 1;
+		size = ((total >> 3) | 0x3ff) + 1;
 		if (size > 64*1024)
 			size = 64*1024;
 	}
