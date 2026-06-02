@@ -1,0 +1,20 @@
+test x"$SKIP_INTERNET_TESTS" != x"" && exit
+
+mkfifo sync
+trap 'rm -f sync' EXIT
+
+busybox nc -l -p 31415 > foo < sync &
+printf 'HTTP/1.0 200 OK\r\n\r\n' > sync
+printf 'foo\0bar' | busybox wget --post-file - -O - http://localhost:31415
+wait
+
+printf "POST / HTTP/1.1\r\n" > expected
+printf "Host: localhost:31415\r\n" >> expected
+printf "User-Agent: Wget\r\n" >> expected
+printf "Connection: close\r\n" >> expected
+printf "Content-Type: application/x-www-form-urlencoded\r\n" >> expected
+printf "Content-Length: 7\r\n" >> expected
+printf "\r\n" >> expected
+printf "foo\0bar" >> expected
+
+diff -au foo expected
