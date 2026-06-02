@@ -252,6 +252,7 @@ struct globals {
 	char *dir_prefix;
 #if ENABLE_FEATURE_WGET_LONG_OPTIONS
 	char *post_data;
+	size_t post_data_len;
 	char *post_file;
 	char *extra_headers;
 	unsigned char user_headers; /* Headers mentioned by the user */
@@ -1262,8 +1263,15 @@ static void download_one_url(const char *url)
 
 		if (option_mask32 & WGET_OPT_POST_FILE) {
 			int fd = xopen_stdin(G.post_file);
-			G.post_data = xmalloc_read(fd, NULL);
+			// RAF, TODO: 2MB is a provisional limit, better .config to set it
+			G.post_data_len = 2 << 20; // 2MB: max mem to use
+			G.post_data = xmalloc_read(fd, &G.post_data_len);
+			if(read(fd, &status, 1) == 1) // RAF: fstat() fails with pipes
+				bb_error_msg_and_die("wget POST exceeded %zu quota",
+					G.post_data_len);
 			close(fd);
+		} else if(G.post_data) {
+			G.post_data_len = strlen(G.post_data);
 		}
 
 		if (G.post_data) {
@@ -1274,11 +1282,9 @@ static void download_one_url(const char *url)
 				);
 			}
 			SENDFMT(sfp,
-				"Content-Length: %u\r\n"
-				"\r\n"
-				"%s",
-				(int) strlen(G.post_data), G.post_data
+				"Content-Length: %zu\r\n\r\n", G.post_data_len
 			);
+			fwrite(G.post_data, 1, G.post_data_len, sfp);
 		} else
 #endif
 		{
