@@ -30,7 +30,9 @@
 #include <errno.h>
 static inline int *get_perrno(void) { return &errno; }
 
+#define BB_COMPILE_SINGLE_PRINTOUTS
 #include "busybox.h"
+#undef  BB_COMPILE_SINGLE_PRINTOUTS
 
 #if !(defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) \
     || defined(__APPLE__) \

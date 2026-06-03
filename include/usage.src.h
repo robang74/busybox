@@ -12,18 +12,12 @@
 #ifndef BB_USAGE_H
 #define BB_USAGE_H 1
 
+#include "libbb.h"
+
 #define NOUSAGE_STR "\b"
 
 #define scripted_trivial_usage NOUSAGE_STR
 #define scripted_full_usage ""
-
-#if !ENABLE_USE_BB_CRYPT
-# define CRYPT_METHODS_HELP_STR "des,md5,sha256/512,yescrypt" \
-	" (default "CONFIG_FEATURE_DEFAULT_PASSWD_ALGO")"
-#else
-# define CRYPT_METHODS_HELP_STR "des,md5"IF_USE_BB_CRYPT_SHA(",sha256/512")IF_USE_BB_CRYPT_YES(",yescrypt") \
-	" (default "CONFIG_FEATURE_DEFAULT_PASSWD_ALGO")"
-#endif
 
 #if ENABLE_FEATURE_HWCLOCK_ADJTIME_FHS
 # define ADJTIME_PATH "/var/lib/hwclock/adjtime"

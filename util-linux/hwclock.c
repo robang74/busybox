@@ -37,18 +37,9 @@
 #include <sys/utsname.h>
 #include "rtc_.h"
 
-
-//musl has no __MUSL__ or similar define to check for,
-//but its <sys/types.h> has these lines:
-// #define __NEED_fsblkcnt_t
-// #define __NEED_fsfilcnt_t
-#if defined(__linux__) && defined(__NEED_fsblkcnt_t) && defined(__NEED_fsfilcnt_t)
-# define LIBC_IS_MUSL 1
+#if LIBC_IS_MUSL
 # include <sys/syscall.h>
-#else
-# define LIBC_IS_MUSL 0
 #endif
-
 
 /* diff code is disabled: it's not sys/hw clock diff, it's some useless
  * "time between hwclock was started and we saw CMOS tick" quantity.
