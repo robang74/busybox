@@ -39,15 +39,8 @@
 # define SCHED_IDLE 5
 #endif
 
-//musl has no __MUSL__ or similar define to check for,
-//but its <sys/types.h> has these lines:
-// #define __NEED_fsblkcnt_t
-// #define __NEED_fsfilcnt_t
-#if defined(__linux__) && defined(__NEED_fsblkcnt_t) && defined(__NEED_fsfilcnt_t)
-# define LIBC_IS_MUSL 1
+#if LIBC_IS_MUSL
 # include <sys/syscall.h>
-#else
-# define LIBC_IS_MUSL 0
 #endif
 
 static const char *policy_name(int pol)

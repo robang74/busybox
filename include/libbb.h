@@ -21,6 +21,77 @@
 #include <setjmp.h>
 #include <signal.h>
 #include <paths.h>
+
+#if defined(__GLIBC__) || defined(__gnu_linux__)
+#  define LIBC_IS_GNUL     1
+#elif defined(ANDROID) || defined(__ANDROID__)
+#  define LIBC_IS_GNUL     0
+#elif !defined(__linux__)
+#  define LIBC_IS_GNUL     0
+#elif defined(__UCLIBC__)
+#  define LIBC_IS_GNUL     0
+#else
+#  define LIBC_IS_GNUL     0 // RAF: inverse logic
+#endif
+
+#if LIBC_IS_GNUL
+#  define LIBC_IS_MUSL     0
+#elif defined(__linux__) && defined(__NEED_fsblkcnt_t) && defined(__NEED_fsfilcnt_t)
+/*
+ * RAF: this check about musl internal is from util-linux/hwclock.c
+ */
+ // musl has no __MUSL__ or similar define to check for,
+ // but its <sys/types.h> has these lines:
+ //   #define __NEED_fsblkcnt_t
+ //   #define __NEED_fsfilcnt_t
+#  define LIBC_IS_MUSL     1
+#else
+#  define LIBC_IS_MUSL     0 // RAF: inverse logic
+#endif
+
+#if LIBC_IS_MUSL
+#  ifdef BB_COMPILE_SINGLE_PRINTOUTS
+#  warning "musl do not offer yescrypt, yet"
+#  endif
+#  define YESCRYPT_STR ""
+#elif ENABLE_USE_BB_CRYPT
+#  ifdef BB_COMPILE_SINGLE_PRINTOUTS
+#  warning "busybox yescrypt disabled by RAF"
+#  endif
+#  define YESCRYPT_STR ""
+#elif LIBC_IS_GNUL
+#  ifdef BB_COMPILE_SINGLE_PRINTOUTS
+#  pragma message "libc yescrypt support active"
+#  endif
+#  define YESCRYPT_STR ",yescrypt"
+#else
+#  ifdef BB_COMPILE_SINGLE_PRINTOUTS
+#  warning "busybox yescrypt disabled"
+#  endif
+#  define YESCRYPT_STR ""
+#endif
+
+#if !LIBC_IS_GNUL
+/*
+ * RAF: yescrypt internal minimal-footprint implementation is not going
+ * to receive the same level of auditing and maintenance of the libc one.
+ * The main reason for busybox to have yescrypt is to build a static linked
+ * rescue system to deploy in every standard distribution installation.
+ * Once deployed with SUID privileges and a "potentially weaker" yescrypt
+ * implementation, it risks being a universal backdooring gate. No thanks!
+ */
+#undef  ENABLE_USE_BB_CRYPT_YES
+#define ENABLE_USE_BB_CRYPT_YES 0
+#endif
+
+#if !ENABLE_USE_BB_CRYPT
+# define CRYPT_METHODS_HELP_STR "des,md5,sha256/512"YESCRYPT_STR \
+        " (default "CONFIG_FEATURE_DEFAULT_PASSWD_ALGO")"
+#else
+# define CRYPT_METHODS_HELP_STR "des,md5"IF_USE_BB_CRYPT_SHA(",sha256/512")IF_USE_BB_CRYPT_YES(YESCRYPT_STR) \
+        " (default "CONFIG_FEATURE_DEFAULT_PASSWD_ALGO")"
+#endif
+
 #if defined __UCLIBC__ /* TODO: and glibc? */
 /* use inlined versions of these: */
 # define sigfillset(s)    __sigfillset(s)
