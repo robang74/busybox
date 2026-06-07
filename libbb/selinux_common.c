@@ -6,8 +6,14 @@
  *
  * Licensed under GPLv2, see file LICENSE in this source tree.
  */
+
+#if ENABLE_SELINUX
+
+#define BB_COMPILE_SINGLE_PRINTOUTS
 #include "libbb.h"
+#undef  BB_COMPILE_SINGLE_PRINTOUTS
 #include <selinux/context.h>
+#include <selinux/label.h>
 
 context_t FAST_FUNC set_security_context_component(security_context_t cur_context,
 			char *user, char *role, char *type, char *range)
@@ -53,3 +59,22 @@ void FAST_FUNC selinux_preserve_fcontext(int fdesc)
 	setfscreatecon_or_die(context);
 	freecon(context);
 }
+
+# if ENABLE_DESKTOP
+int FAST_FUNC bb_match_path_context(const char *path, mode_t mode, security_context_t *con)
+{
+        struct selabel_handle *hnd;
+        int rc = -1;
+
+		hnd = selabel_open(SELABEL_CTX_FILE, NULL, 0);
+		if(hnd) {
+			rc = selabel_lookup(hnd, con, path, mode);
+			if(ENABLE_FEATURE_CLEAN_UP)
+				selabel_close(hnd);
+		}
+
+        return rc;
+}
+# endif
+
+#endif

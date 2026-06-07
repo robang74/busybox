@@ -68,13 +68,12 @@ static const char install_longopts[] ALIGN1 =
 # define LONGOPTS
 #endif
 
-
 #if ENABLE_SELINUX
 static void setdefaultfilecon(const char *path)
 {
-	struct stat s;
+ 	struct stat s;
 	security_context_t scontext = NULL;
-
+ 
 	if (!is_selinux_enabled()) {
 		return;
 	}
@@ -82,7 +81,7 @@ static void setdefaultfilecon(const char *path)
 		return;
 	}
 
-	if (matchpathcon(path, s.st_mode, &scontext) < 0) {
+	if (bb_match_path_context(path, s.st_mode, &scontext) < 0) {
 		goto out;
 	}
 	if (strcmp(scontext, "<<none>>") == 0) {
@@ -92,14 +91,13 @@ static void setdefaultfilecon(const char *path)
 	if (lsetfilecon(path, scontext) < 0) {
 		if (errno != ENOTSUP) {
 			bb_perror_msg("warning: can't change context"
-					" of %s to %s", path, scontext);
+				" of %s to %s", path, scontext);
 		}
 	}
-
- out:
+ 
+out:
 	freecon(scontext);
 }
-
 #endif
 
 int install_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;

@@ -151,8 +151,23 @@
  * Include sys/sysinfo.h only in those files which need it.
  */
 #if ENABLE_SELINUX
+/*
+ * RAF: the two main goals here are to change the code as less as possible
+ * to keep the most of compatibility for independent patches application
+ * and at the same time keep the original type definition but without the
+ * deprecated warnings because busybox is peculiar and some embedded systems
+ * might use a different implementation of SELinux which might also have a
+ * different definition of the security_context_t type and having a single
+ * point of re/definition is the most friendly way to make this renewation.
+ */
+# define security_context_t _deprected_security_context_t
 # include <selinux/selinux.h>
 # include <selinux/context.h>
+# undef security_context_t
+# ifdef BB_COMPILE_SINGLE_PRINTOUTS
+# warning "SElinux security_context_t over-typedefed in char* by RAF"
+# endif
+typedef char* security_context_t;
 #endif
 #if ENABLE_FEATURE_UTMP
 # if defined __UCLIBC__ && ( \
@@ -1961,6 +1976,19 @@ extern context_t set_security_context_component(security_context_t cur_context,
 						char *user, char *role, char *type, char *range) FAST_FUNC;
 extern void setfscreatecon_or_die(security_context_t scontext) FAST_FUNC;
 extern void selinux_preserve_fcontext(int fdesc) FAST_FUNC;
+# if ENABLE_DESKTOP
+/*
+ * RAF: replacing the deprecated matchpathcon() increases the footprint
+ * in a way which is acceptable for a desktop use but it might not as much
+ * acceptable in embedded systems with very constrained resources and possibly
+ * relying on old/custom SELinux implementations. Hence, the transition is
+ * starting with the desktop build first while waiting for downstreams feedback
+ * before porting also the embedded build on the SELinux modernisation.
+ */
+extern int bb_match_path_context(const char *path, mode_t mode, security_context_t *con) FAST_FUNC;
+# else
+# define bb_match_path_context matchpathcon
+# endif
 #else
 #define selinux_preserve_fcontext(fdesc) ((void)0)
 #endif
