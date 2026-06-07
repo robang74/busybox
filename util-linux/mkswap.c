@@ -56,7 +56,7 @@ static void mkswap_selinux_setcontext(int fd, const char *path)
 		if (fgetfilecon(fd, &oldcon) < 0) {
 			if (errno != ENODATA)
 				goto error;
-			if (matchpathcon(path, stbuf.st_mode, &oldcon) < 0)
+			if (bb_match_path_context(path, stbuf.st_mode, &oldcon) < 0)
 				goto error;
 		}
 		context = context_new(oldcon);

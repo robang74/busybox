@@ -28,9 +28,6 @@
  * SUCH DAMAGE.
  */
 #include "libbb.h"
-#if ENABLE_SELINUX
-#include <selinux/selinux.h>  /* for setexeccon  */
-#endif
 
 #if ENABLE_SELINUX
 static security_context_t current_sid;
