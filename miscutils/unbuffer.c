@@ -70,7 +70,7 @@ int unbuffer_main(int argc, char **argv)
 	signal(SIGCHLD, SIG_DFL);
 
 	if((pid = forkpty(&fd, NULL, NULL, NULL)) < 0)
-		bb_perror_msg_and_die("forkpty");
+		bb_simple_perror_msg_and_die("forkpty");
 
 	if (pid == 0) { // child proccess
 		sigprocmask(SIG_SETMASK, &oldset, NULL);
