@@ -1319,7 +1319,7 @@ static void download_one_url(const char *url)
 						/* There's no really good way to signal to the server what the problem is,
 						 * so just stop sending data. The server should recognize the request as
 						 * malformed and discard it. */
-						bb_error_msg_and_die("Error reading post-file: " STRERROR_FMT STRERROR_ERRNO);
+						bb_simple_perror_msg_and_die("Error reading post-file");
 					}
 
 					SENDFMT(sfp, "\r\n%x\r\n", chunk_bytes);

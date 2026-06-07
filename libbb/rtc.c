@@ -83,7 +83,7 @@ void FAST_FUNC rtc_read_tm(struct tm *ptm, int fd)
 	if(!ptm) return;
 	memset(ptm, 0, sizeof(*ptm));
 	if (ioctl(fd, RTC_RD_TIME, ptm) < 0)
-		bb_perror_msg_and_die("ioctl(RTC_RD_TIME)");
+		bb_simple_perror_msg_and_die("ioctl(RTC_RD_TIME)");
 	ptm->tm_isdst = -1; /* "not known" */
 }
 
