@@ -1808,6 +1808,23 @@ int udhcpc6_main(int argc UNUSED_PARAM, char **argv)
 						continue;
 					}
 					if (client6_data.ia_na->len < (4 + 4 + 4) + (2 + 2 + 16 + 4 + 4)) {
+						/*
+						 * RAF: invalid packets are usually dropped by the firewall but
+						 * a NoAddrsAvail is valid, pass through, arrive here, log and
+						 * it could cause a DOS or a QoS degradation when flooded. Thus
+						 * free() + NULL to prevent memory leakage and crash, then jump.
+						 *
+						 * This is the code of a client, not a server, however in many
+						 * systems the DHCP clients run in a relatively tight loop due
+						 * to the fact that is triggered by a script or crond rather
+						 * than put in background (-b), especially at boot time, even
+						 * if the loop at boot time runs "until got an IP or timeout".
+						 */
+						if (option_mask32 & OPT_d) {
+							free(client6_data.ia_na);
+							client6_data.ia_na = NULL;
+							goto OPT_d_eval;
+						}
 						bb_info_msg("%s option is too short:%d bytes",
 							"IA_NA", client6_data.ia_na->len);
 						continue;
@@ -1837,6 +1854,7 @@ int udhcpc6_main(int argc UNUSED_PARAM, char **argv)
 					address_timeout = lease_seconds;
 				}
 				if (option_mask32 & OPT_d) {
+OPT_d_eval:
 					struct d6_option *iaprefix;
 
 					free(client6_data.ia_pd);
