@@ -102,11 +102,11 @@ config LFS
 	bool "Support files > 2 GB"
 	default y
 	help
-	If you need to work with large files, enable this option.
-	This will have no effect if your kernel or your C
-	library lacks large file support for large files. Some of the
-	programs that can benefit from large file support include dd, gzip,
-	cp, mount, tar.
+	Choose this option if you want to manipulate files larger than 2GB,
+	or if your underlying libc implementation forces a 64-bit off_t
+	without the option of 32-bit legacy support. Otherwise, say N.
+	If your toolchain enforces 64-bit offsets, setting this to N will
+	cause a build failure. You should probably say Y here.
 
 config TIME64
 	bool "Support 64bit wide time types"
