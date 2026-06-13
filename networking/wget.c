@@ -325,6 +325,16 @@ enum {
 	PROGRESS_END   = 0,
 	PROGRESS_BUMP  = 1,
 };
+
+#if ENABLE_FEATURE_WGET_HTTPS
+enum {
+	PROXY_NONE         = 0,
+	PROXY_NEED_CONNECT = 1,
+	PROXY_CONNECT      = 2,
+	PROXY_TLS          = 3,
+};
+#endif
+
 #if ENABLE_FEATURE_WGET_STATUSBAR
 static void progress_meter(int flag)
 {
@@ -687,7 +697,7 @@ static void reset_beg_range_to_zero(void)
 }
 
 #if ENABLE_FEATURE_WGET_OPENSSL
-static int spawn_https_helper_openssl(const char *host, unsigned port)
+static int spawn_https_helper_openssl(const char *host, unsigned port, bool use_proxy, const char *proxy_host)
 {
 	char *allocated = NULL;
 	char *servername;
@@ -708,7 +718,7 @@ static int spawn_https_helper_openssl(const char *host, unsigned port)
 	pid = xvfork();
 	if (pid == 0) {
 		/* Child */
-		char *argv[13];
+		char *argv[17];
 		char **argp;
 
 		close(sp[0]);
@@ -725,14 +735,23 @@ static int spawn_https_helper_openssl(const char *host, unsigned port)
 		argv[0] = (char*)"openssl";
 		argv[1] = (char*)"s_client";
 		argv[2] = (char*)"-quiet";
-		argv[3] = (char*)"-connect";
-		argv[4] = (char*)host;
+		if (use_proxy) {
+			argv[3] = (char*)"-proxy";
+			argv[4] = (char*)proxy_host;
+			argv[5] = (char*)"-connect";
+			argv[6] = (char*)host;
+			argp = &argv[7];
+		} else {
+			argv[3] = (char*)"-connect";
+			argv[4] = (char*)host;
+			argp = &argv[5];
+		}
 		/*
 		 * Per RFC 6066 Section 3, the only permitted values in the
 		 * TLS server_name (SNI) field are FQDNs (DNS hostnames).
 		 * IPv4 and IPv6 addresses, port numbers are not allowed.
 		 */
-		argp = &argv[5];
+
 		if (!is_ip_address(servername)) {
 			*argp++ = (char*)"-servername"; //[5]
 			*argp++ = (char*)servername;    //[6]
@@ -1109,6 +1128,9 @@ static void NOINLINE retrieve_file_data(FILE *dfp)
 static void download_one_url(const char *url)
 {
 	bool use_proxy;                 /* Use proxies if env vars are set  */
+	#if ENABLE_FEATURE_WGET_HTTPS
+	int proxy_state = PROXY_NONE;
+	#endif
 	int redir_limit;
 	len_and_sockaddr *lsa;
 	FILE *sfp;                      /* socket to web/ftp server         */
@@ -1202,16 +1224,19 @@ static void download_one_url(const char *url)
 		/* Open socket to http(s) server */
 #if ENABLE_FEATURE_WGET_OPENSSL
 		/* openssl (and maybe internal TLS) support is configured */
-		if (server.protocol == P_HTTPS) {
+		if (target.protocol == P_HTTPS) {
 			/* openssl-based helper
 			 * Inconvenient API since we can't give it an open fd
 			 */
-			int fd = spawn_https_helper_openssl(server.host, server.port);
+			int fd = spawn_https_helper_openssl(target.host, target.port, use_proxy, server.host);
 # if ENABLE_FEATURE_WGET_HTTPS
 			if (fd < 0) { /* no openssl? try internal */
 				sfp = open_socket(lsa);
-				spawn_ssl_client(server.host, fileno(sfp), /*flags*/ 0);
-				goto socket_opened;
+				if (use_proxy) {
+					proxy_state = PROXY_NEED_CONNECT;
+					goto socket_opened;
+				} else
+					spawn_ssl_client(target.host, fileno(sfp), /*flags*/ 0);
 			}
 # else
 			/* We don't check for exec("openssl") failure in this case */
@@ -1222,22 +1247,36 @@ static void download_one_url(const char *url)
 			goto socket_opened;
 		}
 		sfp = open_socket(lsa);
- socket_opened:
+
 #elif ENABLE_FEATURE_WGET_HTTPS
 		/* Only internal TLS support is configured */
 		sfp = open_socket(lsa);
-		if (server.protocol == P_HTTPS)
-			spawn_ssl_client(server.host, fileno(sfp), /*flags*/ 0);
+		if (target.protocol == P_HTTPS) {
+			if (use_proxy)
+				proxy_state = PROXY_NEED_CONNECT;
+			else
+				spawn_ssl_client(target.host, fileno(sfp), /*flags*/ 0);
+
+		}
 #else
 		/* ssl (https) support is not configured */
 		sfp = open_socket(lsa);
 #endif
+socket_opened:
 		/* Send HTTP request */
-		if (use_proxy) {
+		if (use_proxy && target.protocol == P_HTTP) {
 			SENDFMT(sfp, "GET %s://%s/%s HTTP/1.1\r\n",
 				target.protocol, target.host,
 				target.path);
-		} else {
+		}
+		#if ENABLE_FEATURE_WGET_HTTPS
+		else if (use_proxy && proxy_state == PROXY_NEED_CONNECT && target.protocol == P_HTTPS) {
+			SENDFMT(sfp, "CONNECT %s:%d HTTP/1.1\r\n",
+				target.host, target.port);
+			proxy_state = PROXY_CONNECT;
+		}
+		#endif
+		else {
 			SENDFMT(sfp, "%s /%s HTTP/1.1\r\n",
 				(option_mask32 & WGET_OPT_POST) ? "POST" : "GET",
 				target.path);
@@ -1312,6 +1351,10 @@ static void download_one_url(const char *url)
 			 * even after child closes its copy of the fd.
 			 * This helps:
 			 */
+			#if ENABLE_FEATURE_WGET_HTTPS
+				if (proxy_state != PROXY_CONNECT)
+				/* Do not shutdown in the middle of CONNECT, still need to send HTTPS request */
+			#endif
 			shutdown(fileno(sfp), SHUT_WR);
 		}
 #endif
@@ -1373,6 +1416,18 @@ is always terminated by the first empty line after the header fields."
 However, in real world it was observed that some web servers
 (e.g. Boa/0.94.14rc21) simply use code 204 when file size is zero.
 */
+			#if ENABLE_FEATURE_WGET_HTTPS
+			if (use_proxy && proxy_state == PROXY_CONNECT && target.protocol == P_HTTPS) {
+				/* CONNECT worked. Now we have a tunnel to the server.
+				 * Need to start an SSL session and send HTTPS request.
+				 */
+				while (get_sanitized_hdr(sfp) != NULL)
+					/* eat all remaining headers */;
+				spawn_ssl_client(target.host, fileno(sfp), /*flags*/ 0);
+				proxy_state = PROXY_TLS;
+				goto socket_opened;
+			}
+			#endif
 			if (G.beg_range != 0) {
 				/* "Range:..." was not honored by the server.
 				 * Restart download from the beginning.
