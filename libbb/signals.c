@@ -11,7 +11,7 @@
 #include "libbb.h"
 
 /* All known arches use small ints for signals */
-smallint bb_got_signal;
+volatile smallint bb_got_signal;
 
 void record_signo(int signo)
 {

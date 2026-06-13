@@ -751,7 +751,7 @@ int sigprocmask2(int how, sigset_t *set) FAST_FUNC;
 /* SIG_BLOCK all signals, return old set: */
 int sigblockall(sigset_t *set) FAST_FUNC;
 /* Standard handler which just records signo */
-extern smallint bb_got_signal;
+extern volatile smallint bb_got_signal;
 void record_signo(int signo); /* not FAST_FUNC! */
 
 
