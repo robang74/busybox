@@ -3664,16 +3664,20 @@ signal_handler(int signo)
 		if (!trap[SIGCHLD])
 			return;
 	}
-#if ENABLE_FEATURE_EDITING
-//TODO: don't do it if it's SIGCHLD?
-	bb_got_signal = signo; /* for read_line_input / read builtin: "we got a signal" */
-#endif
-	gotsig[signo - 1] = 1; /* "run a trap for this later" */
+
 	pending_sig = signo;
+	gotsig[pending_sig - 1] = 1; /* "run a trap for this later" */
+#if ENABLE_FEATURE_EDITING  //TODO: don't do it if it's SIGCHLD?
+	/* for read_line_input / read builtin: "we got a signal" */
+	bb_got_signal = pending_sig;
+#endif
 
 	if (signo == SIGINT && !trap[SIGINT]) {
 		if (!suppress_int) {
 			pending_sig = 0;
+#if ENABLE_FEATURE_EDITING
+			bb_got_signal = pending_sig;
+#endif
 			raise_interrupt(); /* does not return */
 		}
 		pending_int = 1;
@@ -9615,6 +9619,11 @@ dotrap(void)
 		savestatus = status;
 	}
 	pending_sig = 0;
+#if ENABLE_FEATURE_EDITING
+// RAF: something can happen here which alter pending_sig value
+// but bb_got_signal is set by current the value of pending_sig
+	bb_got_signal = pending_sig;
+#endif
 	barrier();
 
 	TRACE(("dotrap entered\n"));
