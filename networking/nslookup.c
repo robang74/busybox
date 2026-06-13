@@ -808,6 +808,8 @@ static NOINLINE int parse_reply(const unsigned char *msg, size_t len)
 				return -1;
 			}
 			n = *(unsigned char *)ns_rr_rdata(rr);
+			// RAF, TODO: max lenght limit or return(-1), pros vs cons?
+			if(n > rdlen - 1) n = rdlen - 1;
 			if (n > 0) {
 				memset(dname, 0, sizeof(dname));
 				memcpy(dname, ns_rr_rdata(rr) + 1, n);
@@ -835,6 +837,10 @@ static NOINLINE int parse_reply(const unsigned char *msg, size_t len)
 			break;
 
 		case ns_t_soa:
+			const unsigned char *ip;
+			static const char *prtstr[] = {
+				"serial", "refresh", "retry", "expire", "minimum"
+			};
 			if (rdlen < 20) {
 				dbg("SOA record too short:%d\n", rdlen);
 				return -1;
@@ -863,19 +869,9 @@ static NOINLINE int parse_reply(const unsigned char *msg, size_t len)
 			printf("\tmail addr = %s\n", dname);
 			cp += n;
 
-			printf("\tserial = %lu\n", ns_get32(cp));
-			cp += 4;
-
-			printf("\trefresh = %lu\n", ns_get32(cp));
-			cp += 4;
-
-			printf("\tretry = %lu\n", ns_get32(cp));
-			cp += 4;
-
-			printf("\texpire = %lu\n", ns_get32(cp));
-			cp += 4;
-
-			printf("\tminimum = %lu\n", ns_get32(cp));
+			// RAF, TODO: max lenght limit or return(-1), pros vs cons?
+			for(i = 0, ip += rdlen; cp < ip; cp += 4, i++)
+				printf("\t%s = %lu\n", prtstr[i], ns_get32(cp));
 			break;
 
 		default:
