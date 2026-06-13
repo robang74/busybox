@@ -170,8 +170,8 @@ static char *fmt_url(char *dst, const char *name)
 		 && !strchr("._-+@", c)
 		) {
 			*dst++ = '%';
-			*dst++ = "0123456789ABCDEF"[c >> 4];
-			c = "0123456789ABCDEF"[c & 0xf];
+			*dst++ = bb_hexdigits_upcase[c >> 4];
+			c = bb_hexdigits_upcase[c & 0xf];
 		}
 		*dst++ = c;
 	}
