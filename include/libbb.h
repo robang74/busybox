@@ -2560,6 +2560,11 @@ extern const char bb_msg_standard_output[] ALIGN1;
 /* NB: (bb_hexdigits_upcase[i] | 0x20) -> lowercase hex digit */
 extern const char bb_hexdigits_upcase[] ALIGN1;
 
+#define bb_hexdigits_mshb(_x) bb_hexdigits_upcase[(_x) >> 4]
+#define bb_hexdigits_lshb(_x) bb_hexdigits_upcase[(_x) & 15]
+
+char* FAST_FUNC url_sanitizer_to_dest(char *dst, const char *name);
+
 extern const char bb_path_wtmp_file[] ALIGN1;
 
 /* Busybox mount uses either /proc/mounts or /etc/mtab to

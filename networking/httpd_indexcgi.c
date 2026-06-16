@@ -161,22 +161,7 @@ static char *fmt_str(char *dst, const char *src)
 	return dst;
 }
 
-static char *fmt_url(char *dst, const char *name)
-{
-	while (*name) {
-		unsigned c = (unsigned char)*name++;
-		if ((c - '0') > 9 /* not a digit */
-		 && ((c|0x20) - 'a') > ('z' - 'a') /* not A-Z or a-z */
-		 && !strchr("._-+@", c)
-		) {
-			*dst++ = '%';
-			*dst++ = bb_hexdigits_upcase[c >> 4];
-			c = bb_hexdigits_upcase[c & 0xf];
-		}
-		*dst++ = c;
-	}
-	return dst;
-}
+#define fmt_url url_sanitizer_to_dest
 
 static char *fmt_html(char *dst, const char *name)
 {

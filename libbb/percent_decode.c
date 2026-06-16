@@ -66,3 +66,29 @@ char* FAST_FUNC percent_decode_in_place(char *str, int strict)
 	*dst = '\0';
 	return str;
 }
+
+/* RFC 3986: the request-target on the HTTP request line must not carry raw
+ * control characters or spaces - a crafted URL could otherwise split the
+ * request line and inject headers (CVE-2025-60876). Percent-encode such octets
+ * (controls, space, DEL) instead of sending them verbatim. '%' and other
+ * printable bytes pass through unchanged, so already-encoded sequences are not
+ * double-encoded and "/foo bar" is sent as "/foo%20bar", matching wget/curl.
+ */
+char* FAST_FUNC url_sanitizer_to_dest(char *dst, const char *name)
+{
+	unsigned char *d = dst;
+
+	while (*name) {
+		unsigned c = (unsigned char)*name++;
+		if (c <= ' ' || c == 0x7f) {
+			*d++ = '%';
+			*d++ = bb_hexdigits_mshb(c);
+			   c = bb_hexdigits_lshb(c);
+		}
+		*d++ = c;
+	}
+	*d = '\0';
+
+	return dst;
+}
+
