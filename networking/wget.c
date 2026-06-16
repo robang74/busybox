@@ -1314,7 +1314,8 @@ socket_opened:
 				}
 				else
 #endif
-				SENDFMT(sfp, "GET %s://%s/%s HTTP/1.1\r\n",
+				SENDFMT(sfp, "%s %s://%s/%s HTTP/1.1\r\n",
+					(option_mask32 & WGET_OPT_POST) ? "POST" : "GET",
 					target.protocol, target.host,
 					req_target);
 
