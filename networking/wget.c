@@ -646,6 +646,32 @@ static void parse_url(const char *src_url, struct host_info *h)
 	 */
 }
 
+/* RFC 3986: the request-target on the HTTP request line must not carry raw
+ * control characters or spaces - a crafted URL could otherwise split the
+ * request line and inject headers (CVE-2025-60876). Percent-encode such octets
+ * (controls, space, DEL) instead of sending them verbatim. '%' and other
+ * printable bytes pass through unchanged, so already-encoded sequences are not
+ * double-encoded and "/foo bar" is sent as "/foo%20bar", matching wget/curl. */
+static char *percent_encode_target(const char *path)
+{
+	const char *hex = bb_hexdigits_upcase;
+	const unsigned char *s = (const unsigned char *)path;
+	char *buf, *d;
+
+	d = buf = xmalloc(strlen(path) * 3 + 1);
+	while (*s) {
+		unsigned char c = *s++;
+		if (c <= ' ' || c == 0x7f) {
+			*d++ = '%';
+			*d++ = hex[c >> 4];
+			c = hex[c & 0xf];
+		}
+		*d++ = c;
+	}
+	*d = '\0';
+	return buf;
+}
+
 static char *get_sanitized_hdr(FILE *fp)
 {
 	char *s, *hdrval;
@@ -1265,23 +1291,42 @@ static void download_one_url(const char *url)
 		sfp = open_socket(lsa);
 #endif
 socket_opened:
-		/* Send HTTP request */
-		if (use_proxy && target.protocol == P_HTTP) {
-			SENDFMT(sfp, "GET %s://%s/%s HTTP/1.1\r\n",
-				target.protocol, target.host,
-				target.path);
-		}
-		#if ENABLE_FEATURE_WGET_HTTPS
-		else if (use_proxy && proxy_state == PROXY_NEED_CONNECT && target.protocol == P_HTTPS) {
-			SENDFMT(sfp, "CONNECT %s:%d HTTP/1.1\r\n",
-				target.host, target.port);
-			proxy_state = PROXY_CONNECT;
-		}
-		#endif
-		else {
-			SENDFMT(sfp, "%s /%s HTTP/1.1\r\n",
-				(option_mask32 & WGET_OPT_POST) ? "POST" : "GET",
-				target.path);
+		/* Send HTTP request. The request-target path is percent-encoded so a
+		 * crafted URL cannot split the request line or inject headers
+		 * (CVE-2025-60876): "/foo bar" is sent as "/foo%20bar". The host is sent
+		 * verbatim in the proxy request-target and the Host: header, and in proxy
+		 * mode is not resolved locally, so reject control chars and space there
+		 * (a hostname can never legitimately contain them). */
+		{
+			const unsigned char *hp = (const unsigned char *)target.host;
+			char *req_target;
+			while (*hp) {
+				if (*hp <= ' ' || *hp == 0x7f)
+					bb_simple_error_msg_and_die("bad character in URL host");
+				hp++;
+			}
+			req_target = percent_encode_target(target.path);
+			if (use_proxy && target.protocol == P_HTTP) {
+				SENDFMT(sfp, "GET %s://%s/%s HTTP/1.1\r\n",
+					target.protocol, target.host,
+					req_target);
+			}
+#if ENABLE_FEATURE_WGET_HTTPS
+			else
+			if (use_proxy && target.protocol == P_HTTPS
+			&& proxy_state == PROXY_NEED_CONNECT) {
+				SENDFMT(sfp, "CONNECT %s:%d HTTP/1.1\r\n",
+					target.host, target.port);
+				proxy_state = PROXY_CONNECT;
+			}
+#endif
+			else {
+				SENDFMT(sfp, "%s /%s HTTP/1.1\r\n",
+					(option_mask32 & WGET_OPT_POST) ? "POST" : "GET",
+					req_target);
+			}
+			if (ENABLE_FEATURE_CLEAN_UP)
+				free(req_target);
 		}
 		if (!USR_HEADER_HOST)
 			SENDFMT(sfp, "Host: %s\r\n", target.host);
