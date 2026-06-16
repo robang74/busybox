@@ -644,31 +644,8 @@ static void parse_url(const char *src_url, struct host_info *h)
 	 */
 }
 
-/* RFC 3986: the request-target on the HTTP request line must not carry raw
- * control characters or spaces - a crafted URL could otherwise split the
- * request line and inject headers (CVE-2025-60876). Percent-encode such octets
- * (controls, space, DEL) instead of sending them verbatim. '%' and other
- * printable bytes pass through unchanged, so already-encoded sequences are not
- * double-encoded and "/foo bar" is sent as "/foo%20bar", matching wget/curl. */
-static char *percent_encode_target(const char *path)
-{
-	const char *hex = bb_hexdigits_upcase;
-	const unsigned char *s = (const unsigned char *)path;
-	char *buf, *d;
-
-	d = buf = xmalloc(strlen(path) * 3 + 1);
-	while (*s) {
-		unsigned char c = *s++;
-		if (c <= ' ' || c == 0x7f) {
-			*d++ = '%';
-			*d++ = hex[c >> 4];
-			c = hex[c & 0xf];
-		}
-		*d++ = c;
-	}
-	*d = '\0';
-	return buf;
-}
+#define percent_encode_target(path) \
+	url_sanitizer_to_dest(xmalloc(strlen(path) * 3 + 1), path);
 
 static char *get_sanitized_hdr(FILE *fp)
 {
