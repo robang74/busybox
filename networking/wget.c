@@ -1306,11 +1306,13 @@ socket_opened:
 			req_target = percent_encode_target(target.path);
 			if (use_proxy) {
 #if ENABLE_FEATURE_WGET_HTTPS
-				if (target.protocol == P_HTTPS
-				&& proxy_state == PROXY_NEED_CONNECT) {
-					SENDFMT(sfp, "CONNECT %s:%d HTTP/1.1\r\n",
-						target.host, target.port);
-					proxy_state = PROXY_CONNECT;
+				if (target.protocol == P_HTTPS) {
+					if(proxy_state == PROXY_NEED_CONNECT) {
+						SENDFMT(sfp, "CONNECT %s:%d HTTP/1.1\r\n",
+							target.host, target.port);
+						proxy_state = PROXY_CONNECT;
+					}
+					else goto plain_request;
 				}
 				else
 #endif
@@ -1320,6 +1322,7 @@ socket_opened:
 					req_target);
 
 			} else {
+plain_request:
 				SENDFMT(sfp, "%s /%s HTTP/1.1\r\n",
 					(option_mask32 & WGET_OPT_POST) ? "POST" : "GET",
 					req_target);
