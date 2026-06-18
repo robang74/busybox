@@ -6014,10 +6014,10 @@ static void
 restore_handler_expandarg(struct jmploc *savehandler, int err)
 {
 	exception_handler = savehandler;
-	if (err) {
+	ifsfree(); // RAF: main reason of this handler existence
+	if (err) { // always do it before the longjmp() --> trap
 		if (exception_type != EXERROR)
 			longjmp(exception_handler->loc, 1);
-		ifsfree();
 	}
 }
 
