@@ -244,7 +244,7 @@ struct globals {
 #define INIT_G() do { \
 	setup_common_bufsiz(); \
 	SET_PTR_TO_GLOBALS(xzalloc(sizeof(G))); \
-	linemax = 1000; \
+	linemax = COMMON_BUFSIZE-32; \
 	/*buflen = 1024;*/ \
 	linecomplete = 1; \
 	replace = ""; \
