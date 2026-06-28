@@ -7,6 +7,8 @@
  */
 //kbuild:lib-$(CONFIG_USE_BB_CRYPT_YES) += y.o
 
+#include <string.h>
+
 #include "libbb.h"
 
 #define YESCRYPT_INTERNAL
