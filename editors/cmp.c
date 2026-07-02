@@ -55,12 +55,12 @@ int cmp_main(int argc UNUSED_PARAM, char **argv)
 	FILE *fp1, *fp2, *outfile = stdout;
 	const char *filename1, *filename2 = "-";
 	unsigned long long skip1 = 0, skip2 = 0, char_pos = 0;
+	unsigned long long max_count = max_count;
 	int line_pos = 1; /* Hopefully won't overflow... */
 	const char *fmt;
 	int c1, c2;
 	unsigned opt;
 	int retval = 0;
-	long int max_count = -1;
 	char *max_count_str = NULL;
 
 #if !ENABLE_LONG_OPTS
@@ -103,7 +103,7 @@ int cmp_main(int argc UNUSED_PARAM, char **argv)
 	}
 	
 	if (opt & CMP_OPT_n)
-		max_count = xatol_sfx(max_count_str, kmg_i_suffixes);
+		max_count = xatoull_sfx(max_count_str, kmg_i_suffixes);
 
 	xfunc_error_retval = 2;  /* missing file results in exitcode 2 */
 	if (opt & CMP_OPT_s)
@@ -129,7 +129,7 @@ int cmp_main(int argc UNUSED_PARAM, char **argv)
 		while (skip2) { if (getc(fp2) == EOF) break; skip2--; }
 	}
 	do {
-		if (max_count >= 0 && --max_count < 0)
+		if ((opt & CMP_OPT_n) && max_count-- == 0)
 			break;
 		c1 = getc(fp1);
 		c2 = getc(fp2);
