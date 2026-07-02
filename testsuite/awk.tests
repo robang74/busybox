@@ -63,7 +63,7 @@ testing "awk %-*c width with NUL" \
 "awk 'BEGIN { printf \"%-*c\", 5, 0 }'" "\0    " "" ""
 
 testing "awk %W%d - W is unknown format specifier" \
-"awk 'BEGIN { printf \"[%W%d]\n\", 42; }'" "[%W0]\n" "" ""
+"awk 'BEGIN { printf \"[%W%d]\n\", 42; }'" "[%W42]\n" "" ""
 
 # do not truncate large integer outout
 # (the ...008 instead of ...000 is due to limited precision of 64-bit floats)
@@ -127,7 +127,7 @@ testing "awk printf %% before asterisk format" "awk 'BEGIN { printf \"Progress: 
 SKIP=
 
 # 4294967295 = 0xffffffff
-testing "awk bitwise op"  "awk '{ print or(4294967295,1) }'" "4294967295\n" "" "\n"
+testing "awk bitwise op" "awk '{ print or(4294967295,1) }'" "4294967295\n" "" "\n"
 
 # bitwise AND
 testing "awk bitwise and basic" \
