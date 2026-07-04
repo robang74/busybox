@@ -2443,7 +2443,16 @@ static char *awk_printf(node *n, size_t *len)
 		char sv;
 		var *arg;
 		size_t slen;
-
+		char *fmt_str = NULL;
+#if ENABLE_DESKTOP
+#define fmt_buf_size 64
+		int w;
+		char sze = fmt_buf_size-2;
+		char fmt_buf[fmt_buf_size];
+		char *p, *out = fmt_buf;
+		bool has_star = 0;
+#define chksze(n) { if(sze-(n) <= 0) syntax_error("format specifier too long"); }
+#endif
 		/* Find end of the next format spec, or end of line */
 		s = f;
 		while (1) {
@@ -2454,6 +2463,10 @@ static char *awk_printf(node *n, size_t *len)
 			if (c == '%')
 				break;
 		}
+#if ENABLE_DESKTOP
+		p = f - 1;
+		*out++ = '%'; //RAF: sze--, but already computed in COMMON_BUFSIZE-2
+#endif
 		/* we are past % in "....%..." */
 		c = *f;
 		if (!c) /* "....%" */
@@ -2464,11 +2477,49 @@ static char *awk_printf(node *n, size_t *len)
 			f++;
 			goto append; /* print "....%" part verbatim */
 		}
+
+#if ENABLE_DESKTOP
+		/* flags */
+		while (c && strchr("+- 0#", c)) {
+			*out++ = c;
+			c = *++f;
+			chksze(1);
+		}
+
+star_again:
+		if (c == '*') {
+			has_star = 1;
+			w = (int)getvar_i(evaluate(nextarg(&n), TMPVAR));
+			char wrn = sprintf(out, "%d", w);
+			out += wrn;
+			chksze(wrn);
+			c = *++f;
+			if (c >= '0' && c <= '9') /* invalidate "^^^%5.*8f^^^" */
+				syntax_error("invalid format specifier");
+		} else {
+			while (c >= '0' && c <= '9') {
+				*out++ = c;
+				c = *++f;
+				chksze(1);
+			}
+		}
+
+		/* precision */
+		if (c == '.') {
+			*out++ = '.';
+			c = *++f;
+			chksze(1);
+			goto star_again;
+		}
+#endif
 		while (1) {
 			if (isalpha(c))
 				break;
-			if (c == '*') /* gawk supports %*d and %*.*f, we don't... */
+#if ENABLE_DESKTOP
+#else
+			if (c == '*')
 				syntax_error("%*x formats are not supported");
+#endif
 			c = *++f;
 			if (!c) { /* "....%...." and no letter found after % */
 				/* Example: awk 'BEGIN { printf "^^^%^^^\n"; }' */
@@ -2486,16 +2537,29 @@ static char *awk_printf(node *n, size_t *len)
 		 */
 		sv = *++f;
 		*f = '\0';
+#if ENABLE_DESKTOP
+		*out++ = c;
+		chksze(1);
+		*out = '\0'; //RAF: sze--, but already computed in COMMON_BUFSIZE-2
+		if (has_star) {
+			size_t prefix_len = p - s;
+			size_t fmt_buf_len = out - fmt_buf;
+			fmt_str = xmalloc(prefix_len + fmt_buf_len + 1);
+			memcpy(fmt_str, s, prefix_len);
+			strcpy(fmt_str + prefix_len, fmt_buf);
+		} else
+#endif //RAF,TODO: it would be nice to use 's' instead of 'fmt_str' here below
+		fmt_str = s;
 		if (c == 'c') {
 			char cc = is_numeric(arg) ? getvar_i(arg) : *getvar_s(arg);
-			char *r = xasprintf(s, cc ? cc : '^' /* else strlen will be wrong */);
+			char *r = xasprintf(fmt_str, cc ? cc : '^' /* else strlen will be wrong */);
 			slen = strlen(r);
 			if (cc == '\0') /* if cc is NUL, re-format the string with it */
-				sprintf(r, s, cc);
+				sprintf(r, fmt_str, cc);
 			s = r;
 		} else {
 			if (c == 's') {
-				s = xasprintf(s, getvar_s(arg));
+				s = xasprintf(fmt_str, getvar_s(arg));
 			} else {
 				double d = getvar_i(arg);
 				if (strchr("diouxX", c)) {
@@ -2506,17 +2570,18 @@ static char *awk_printf(node *n, size_t *len)
 //but some replacements are not equivalent:
 //%09d -> %09s: breaks zero-padding;
 //%+d -> %+s: won't prepend +; etc
-					s = xasprintf(s, (int)d);
+					s = xasprintf(fmt_str, (int)d);
 				} else if (strchr("eEfFgGaA", c)) {
-					s = xasprintf(s, d);
+					s = xasprintf(fmt_str, d);
 				} else {
 					/* gawk 5.1.1 printf("%W") prints "%W", does not error out */
-					s = xstrndup(s, f - s);
-				}
+					s = xstrdup(fmt_str);				}
 			}
 			slen = strlen(s);
 		}
 		*f = sv;
+		if (has_star)
+			free(fmt_str);
  append:
 		if (i == 0) {
 			b = s;
