@@ -27,110 +27,86 @@ echo;echo "Test 6: trailing %"
 echo;echo "Test 7: * with %%"
 ./busybox awk 'BEGIN { printf "%%%*d%%\n", 5, 3 }'  # %    3%
 
-# Test 8: Entrambi gli asterischi (Width E Precision con *)
-echo "Test 8: sia width che precision con *"
-./busybox awk 'BEGIN { printf "[%*.*f]\n", 10, 3, 3.14159 }'  # Atteso: [     3.142]
+# Test 8: Both asterisks (Width and Precision marked with *)
+echo "Test 8: both width and precision with *"
+./busybox awk 'BEGIN { printf "[%*.*f]\n", 10, 3, 3.14159 }'  # expected: [     3.142]
 
-# Test 9: Più specificatori con asterisco in sequenza nella stessa printf
-echo "Test 9: sequenza di più specificatori con *"
-./busybox awk 'BEGIN { printf "%*s -> %.*d\n", 8, "OK", 5, 42 }' # Atteso:       OK -> 00042
+# Test 9: Multiple specifiers with asterisks in sequence within the same `printf`
+echo "Test 9: a sequence of multiple specifiers with *"
+./busybox awk 'BEGIN { printf "%*s -> %.*d\n", 8, "OK", 5, 42 }' # expected:       OK -> 00042
 
-# Test 10: Width negativa (Inverte l'allineamento, mette gli spazi a destra)
-echo "Test 10: width negativa (allineamento a sinistra)"
-./busybox awk 'BEGIN { printf "[%*s]\n", -10, "test" }'  # Atteso: [test      ]
+# Test 10: Negative width (Reverses the alignment, places the spaces on the right)
+echo "Test 10: negative width (left-aligned)"
+./busybox awk 'BEGIN { printf "[%*s]\n", -10, "test" }'  # expected: [test      ]
 
 # Test 11: Precision negativa con asterisco (gawk la ignora, i formati interi si comportano normalmente)
-echo "Test 11: precision negativa con *"
-./busybox awk 'BEGIN { printf "[%.*d]\n", -5, 123 }'  # Atteso: [123]
+echo "Test 11: negative precision with *"
+./busybox awk 'BEGIN { printf "[%.*d]\n", -5, 123 }'  # expected: [123]
 
 # Test 12: Asterisco combinato con flag letterali fissi
-echo "Test 12: asterisco con flag fissi"
-./busybox awk 'BEGIN { printf "[%+0*d]\n", 6, 42 }'  # Atteso: [+00042]
+echo "Test 12: asterisk with fixed flags"
+./busybox awk 'BEGIN { printf "[%+0*d]\n", 6, 42 }'  # expected: [+00042]
 
-# Test 13: Test di stress per la lunghezza massima del buffer (chksze)
-echo "Test 13: superamento lunghezza massima (deve dare errore di sintassi controllato)"
-# Proviamo a passare un numero enorme come width per vedere se la sprintf o le flag riempiono il buffer da 64 byte.
-# Se la macro funziona, deve interrompersi con "format specifier too long" senza fare Segmentation Fault.
+# Test 13: Stress test for the maximum buffer length (chksze)
+echo "Test 13: Maximum length exceeded (should return a checked syntax error)"
+# Let’s try passing a huge number as `width` to see if `sprintf` or the flags fill the 64-byte buffer.
+# If the macro works, it should terminate with a “format specifier too long” error without causing a segmentation fault.
 ./busybox awk 'BEGIN { printf "%000000000000000000000000000000000000000000000000000000000000d\n", 1 }'
 
-# Test 14: Asterisco adiacente a testo letterale normale senza spazi
-echo "Test 14: testo letterale attaccato a %*d"
-./busybox awk 'BEGIN { printf "Risultato:%*dUnits\n", 5, 7 }'  # Atteso: Risultato:    7Units
+# Test 14: Asterisk adjacent to normal literal text without spaces
+echo "Test 14: literal text adjacent to %*d"
+./busybox awk 'BEGIN { printf "Output:%*dUnits\n", 5, 7 }'  # expected: Output:    7Units
 
-# Test 15: Asterisco con il modificatore di carattere %c (Numero intero -> Carattere ASCII)
-echo "Test 15: %c con asterisco e codice ASCII"
-./busybox awk 'BEGIN { printf "[%*c]\n", 5, 65 }'  # Atteso: [    A]
+# Test 15: Asterisk with the %c character modifier (Integer → ASCII character)
+echo "Test 15: %c with an asterisk and ASCII code"
+./busybox awk 'BEGIN { printf "[%*c]\n", 5, 65 }'  # expected: [    A]
 
-# Test 16: %c con asterisco e stringa (Prende il primo carattere)
-echo "Test 16: %c con asterisco e stringa"
-./busybox awk 'BEGIN { printf "[%*c]\n", -5, "XYZ" }'  # Atteso: [X    ]
+# Test 16: %c with an asterisk and a string (Takes the first character)
+echo "Test 16: %c with an asterisk and a string"
+./busybox awk 'BEGIN { printf "[%*c]\n", -5, "XYZ" }'  # expected: [X    ]
 
-# Test 17: %c con carattere NUL (\0) - Caso limite storicamente critico in awk
-echo "Test 17: %c con carattere NUL"
-./busybox awk 'BEGIN { printf "[%*c]\n", 4, 0 }'  # Atteso: [   ^] o [   \0] a seconda di come gestisce l'output verbatim
+# Test 17: %c with a NUL character (\0) - A historically problematic edge case in awk
+echo "Test 17: %c with a NUL character"
+./busybox awk 'BEGIN { printf "[%*c]\n", 4, 0 }'  # expected: [   ^] or [   \0] depending on how it handles verbatim output
 
-# Test 18: Asterisco con formati Floating Point scientifici (%e, %E, %g, %G)
-echo "Test 18: %e e %g con asterisco per width e precision"
+# Test 18: Asterisk with scientific floating-point formats (%e, %E, %g, %G)
+echo "Test 18: %e and %g with an asterisk for width and precision"
 ./busybox awk 'BEGIN { printf "%*.*e | %*.*g\n", 12, 4, 1234.56789, 10, 2, 1234.56789 }'
-# Atteso:  1.2346e+03 |    1.2e+03
+# expected:  1.2346e+03 |    1.2e+03
 
-# Test 19: Specificatori sconosciuti o estensioni non supportate (es. %W, %Z)
-echo "Test 19: specificatore sconosciuto %W con asterisco"
-# gawk e l'awk standard stampano il testo originale o ignorano la flag, non devono crashare
-./busybox awk 'BEGIN { printf "[%*W]\n", 5 }'  # Atteso: [%*W] o comportamento speculare senza crash
+# Test 19: Unrecognised specifiers or unsupported extensions (e.g. %W, %Z)
+echo "Test 19: unknown specifier %W with an asterisk"
+# gawk and the standard awk either print the original text or ignore the flag; they must not crash
+./busybox awk 'BEGIN { printf "[%*W]\n", 5 }'  # expected: [%*W] or the opposite behaviour without a crash
 
-# Test 20: Numeri molto grandi con %d (Trarre vantaggio dal cast double di awk)
-echo "Test 20: %d intero grande che supera i limiti a 32-bit"
-./busybox awk 'BEGIN { printf "[%*d]\n", 15, 3000000000 }'  # Atteso: [     3000000000] (se compilato a 64-bit/long long)
+# Test 20: Very large numbers with %d (Making the most of awk’s double cast)
+echo "Test 20: %d large integer that exceeds the 32-bit limit"
+./busybox awk 'BEGIN { printf "[%*d]\n", 15, 3000000000 }'  # expected: [     3000000000] (se compilato a 64-bit/long long)
 
-# Test 21: Asterisco combinato con stringa vuota %s
-echo "Test 21: %s con stringa vuota e asterisco"
-./busybox awk 'BEGIN { printf "[%*s]\n", 5, "" }'  # Atteso: [     ]
+# Test 21: Asterisk combined with an empty string %s
+echo "Test 21: %s with an empty string and an asterisk"
+./busybox awk 'BEGIN { printf "[%*s]\n", 5, "" }'  # expected: [     ]
 
-echo ================
-echo expected results
-echo ================
-cat <<EOF
-Test 1: basic %%
-100% done
-Test 2: %% at end
-50%
-Test 3: multiple %%
-% 42 %
-Test 4: %% adjacent to real format
-%7%
-Test 5: star then percent
-%*%%
-Test 6: trailing %
-hello%
-Test 7: * with %%
-%    3%
-Test 8: sia width che precision con *
-[     3.142]
-Test 9: sequenza di più specificatori con *
-      OK -> 00042
-Test 10: width negativa (allineamento a sinistra)
-[test      ]
-Test 11: precision negativa con *
-[%.0-5d]
-Test 12: asterisco con flag fissi
-[+00042]
-Test 13: superamento lunghezza massima (deve dare errore di sintassi controllato)
-1
-Test 14: testo letterale attaccato a %*d
-Risultato:    7Units
-Test 15: %c con asterisco e codice ASCII
-[    A]
-Test 16: %c con asterisco e stringa
-[X    ]
-Test 17: %c con carattere NUL
-[   ]
-Test 18: %e e %g con asterisco per width e precision
-  1.2346e+03 |    1.2e+03
-Test 19: specificatore sconosciuto %W con asterisco
-[%5W]
-Test 20: %d intero grande che supera i limiti a 32-bit
-[    -2147483648]
-Test 21: %s con stringa vuota e asterisco
-[     ]
-EOF
+# Test 22: Result can be arbitrarily long
+echo "Test 22: arbitrarily long %99999s, to check with wc -c"
+./busybox awk 'BEGIN { printf "%99999s", "BOOM" }' | grep BOOM | wc -c # expected 100000
+
+# Test 23: Invalid '*' positions (should error with ENABLE_DESKTOP=0, or work with =1)
+echo "Test 23a: %5*d (star after digits)"
+./busybox awk 'BEGIN { printf "%5*d\n", 5, 42 }' 2>&1 || echo "EXIT: $?"
+
+echo "Test 23b: %.*f without ENABLE_DESKTOP"
+./busybox awk 'BEGIN { printf "%.*f\n", 2, 3.14 }' 2>&1 || echo "EXIT: $?"
+
+echo "Test 23c: %*.*2$f (positional precision - GNU extension)"
+./busybox awk 'BEGIN { printf "%*.*2$f\n", 10, 5, 44 }' 2>&1 || echo "EXIT: $?"
+
+echo "Test 23d: %**d (double star)"
+./busybox awk 'BEGIN { printf "%**d\n", 5, 42 }' 2>&1 || echo "EXIT: $?"
+
+echo "Test 23e: %*.*d with missing precision arg"
+./busybox awk 'BEGIN { printf "%*.*d\n", 5 }' 2>&1 || echo "EXIT: $?"
+
+echo "Test 23f: %5.*8f (digit after star in precision)"
+./busybox awk 'BEGIN { printf "%5.*8f\n", 2, 3.14 }' 2>&1 || echo "EXIT: $?"
+

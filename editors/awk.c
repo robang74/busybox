@@ -2447,11 +2447,15 @@ static char *awk_printf(node *n, size_t *len)
 #if ENABLE_DESKTOP
 #define fmt_buf_size 64
 		int w;
-		char sze = fmt_buf_size-2;
 		char fmt_buf[fmt_buf_size];
 		char *p, *out = fmt_buf;
 		bool has_star = 0;
-#define chksze(n) { if(sze-(n) <= 0) syntax_error("format specifier too long"); }
+#if 0 //RAF: debug only
+		char sze = fmt_buf_size-2;
+#define chksze(n) { if((sze-=(n)) <= 0) syntax_error("%* format too long"); }
+#else
+#define chksze(n)
+#endif
 #endif
 		/* Find end of the next format spec, or end of line */
 		s = f;
@@ -2465,7 +2469,7 @@ static char *awk_printf(node *n, size_t *len)
 		}
 #if ENABLE_DESKTOP
 		p = f - 1;
-		*out++ = '%'; //RAF: sze--, but already computed in COMMON_BUFSIZE-2
+		*out++ = '%'; //RAF: sze--, but already computed in fmt_buf_size-2
 #endif
 		/* we are past % in "....%..." */
 		c = *f;
@@ -2488,9 +2492,10 @@ static char *awk_printf(node *n, size_t *len)
 
 star_again:
 		if (c == '*') {
+			char wrn;
 			has_star = 1;
 			w = (int)getvar_i(evaluate(nextarg(&n), TMPVAR));
-			char wrn = sprintf(out, "%d", w);
+			wrn = sprintf(out, "%d", w);
 			out += wrn;
 			chksze(wrn);
 			c = *++f;
@@ -2518,7 +2523,7 @@ star_again:
 #if ENABLE_DESKTOP
 #else
 			if (c == '*')
-				syntax_error("%*x formats are not supported");
+				syntax_error("%* requires ENABLE_DESKTOP");
 #endif
 			c = *++f;
 			if (!c) { /* "....%...." and no letter found after % */
@@ -2540,13 +2545,16 @@ star_again:
 #if ENABLE_DESKTOP
 		*out++ = c;
 		chksze(1);
-		*out = '\0'; //RAF: sze--, but already computed in COMMON_BUFSIZE-2
+		*out = '\0'; //RAF: sze--, but already computed in fmt_buf_size-2
 		if (has_star) {
 			size_t prefix_len = p - s;
-			size_t fmt_buf_len = out - fmt_buf;
-			fmt_str = xmalloc(prefix_len + fmt_buf_len + 1);
+			size_t fmt_buf_len = out - fmt_buf + 1; //RAF: faster than strnlen()
+			fmt_str = xmalloc(prefix_len + fmt_buf_len);
 			memcpy(fmt_str, s, prefix_len);
-			strcpy(fmt_str + prefix_len, fmt_buf);
+			//RAF: since we already calculated fmt_buf_len for xmalloc() then
+			//     using that value costs 4 bytes but memcpy() is faster than
+			//     strcpy() because it has not to find the trailing \0 again.
+			memcpy(fmt_str + prefix_len, fmt_buf, fmt_buf_len);
 		} else
 #endif //RAF,TODO: it would be nice to use 's' instead of 'fmt_str' here below
 		fmt_str = s;
@@ -2580,8 +2588,10 @@ star_again:
 			slen = strlen(s);
 		}
 		*f = sv;
+#if ENABLE_DESKTOP
 		if (has_star)
 			free(fmt_str);
+#endif
  append:
 		if (i == 0) {
 			b = s;
