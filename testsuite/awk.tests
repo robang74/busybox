@@ -27,6 +27,111 @@ testing "awk if string == "    "awk 'BEGIN{if(\"a\"==\"ab\") print \"bar\"}'" ""
 # 4294967295 = 0xffffffff
 testing "awk bitwise op"  "awk '{ print or(4294967295,1) }'" "4294967295\n" "" "\n"
 
+# bitwise AND
+testing "awk bitwise and basic" \
+    "awk 'BEGIN { print and(0xff, 0x0f) }'" \
+    "15\n" "" ""
+
+testing "awk bitwise and with large hex" \
+    "awk 'BEGIN { print and(0xffffffff, 0x0f0f0f0f) }'" \
+    "252645135\n" "" ""
+
+testing "awk bitwise and with zero" \
+    "awk 'BEGIN { print and(0xffffffff, 0) }'" \
+    "0\n" "" ""
+
+# bitwise XOR
+testing "awk bitwise xor basic" \
+    "awk 'BEGIN { print xor(0xff, 0x0f) }'" \
+    "240\n" "" ""
+
+testing "awk bitwise xor with large hex" \
+    "awk 'BEGIN { print xor(0xffffffff, 0x0f0f0f0f) }'" \
+    "4042322160\n" "" ""
+
+testing "awk bitwise xor same value" \
+    "awk 'BEGIN { print xor(0x12345678, 0x12345678) }'" \
+    "0\n" "" ""
+
+# bitwise complement, these test would fail also with gawk
+testing "awk bitwise compl zero" \
+    "awk 'BEGIN { print compl(0) }'" \
+    "4294967295\n" "" ""
+
+testing "awk bitwise compl with hex" \
+    "awk 'BEGIN { print compl(0x0f0f0f0f) }'" \
+    "4042322160\n" "" ""
+
+testing "awk printf unsigned from bitwise compl" \
+    "awk 'BEGIN { printf \"%u\\n\", compl(0) }'" \
+    "4294967295\n" "" ""
+
+# shift operations
+testing "awk bitwise lshift basic" \
+    "awk 'BEGIN { print lshift(1, 8) }'" \
+    "256\n" "" ""
+
+testing "awk bitwise lshift to high bit" \
+    "awk 'BEGIN { print lshift(1, 31) }'" \
+    "2147483648\n" "" ""
+
+testing "awk bitwise rshift basic" \
+    "awk 'BEGIN { print rshift(256, 8) }'" \
+    "1\n" "" ""
+
+testing "awk bitwise rshift from max unsigned" \
+    "awk 'BEGIN { print rshift(0xffffffff, 1) }'" \
+    "2147483647\n" "" ""
+
+testing "awk bitwise rshift high bit" \
+    "awk 'BEGIN { print rshift(0x80000000, 1) }'" \
+    "1073741824\n" "" ""
+
+# combinations
+testing "awk bitwise or then and" \
+    "awk 'BEGIN { print and(or(0x00ff00ff, 0xff00ff00), 0xffffffff) }'" \
+    "4294967295\n" "" ""
+
+testing "awk bitwise and then or" \
+    "awk 'BEGIN { print or(and(0x00ff00ff, 0xff00ff00), 0x000000ff) }'" \
+    "255\n" "" ""
+
+# float truncation (awk truncates toward zero before bitwise)
+testing "awk bitwise or with float args" \
+    "awk 'BEGIN { print or(1.9, 2.9) }'" \
+    "3\n" "" ""
+
+testing "awk bitwise and with float args" \
+    "awk 'BEGIN { print and(1.9, 2.9) }'" \
+    "0\n" "" ""
+
+# printf formats with bitwise results (these should always work)
+testing "awk printf hex from bitwise or" \
+    "awk 'BEGIN { printf \"%x\\n\", or(0x80000000, 1) }'" \
+    "80000001\n" "" ""
+
+testing "awk printf oct from bitwise or" \
+    "awk 'BEGIN { printf \"%o\\n\", or(01000, 02000) }'" \
+    "3000\n" "" ""
+
+# print vs printf behavior (reveals the OFMT precision issue)
+testing "awk print and printf agree on bitwise result" \
+    "awk 'BEGIN { v = or(0xffffffff, 1); print v; printf \"%u\\n\", v }'" \
+    "4294967295\n4294967295\n" "" ""
+
+# edge cases
+testing "awk bitwise or with zero" \
+    "awk 'BEGIN { print or(0, 0) }'" \
+    "0\n" "" ""
+
+testing "awk bitwise with negative arg" \
+    "awk 'BEGIN { print and(-1, 0xff) }'" \
+    "255\n" "" ""
+
+testing "awk bitwise precision limit 2^53" \
+    "awk 'BEGIN { print and(9007199254740992, 1) }'" \
+    "0\n" "" ""
+
 # we were testing for a non-empty body when deciding if a function was
 # defined or not. The testcase below caused:
 # awk: cmd. line:8: Call to undefined function

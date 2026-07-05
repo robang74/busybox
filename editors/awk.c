@@ -1069,7 +1069,7 @@ static const char *getvar_s(var *v)
 		/* Get CONVFMT, unless we already recursed on it:
 		 * someone might try to cause stack overflow by setting
 		 * CONVFMT=9 (a numeric, not string, value)
-		 */
+		 */  
 		if (v != intvar[CONVFMT])
 			convfmt = getvar_s(intvar[CONVFMT]);
 		/* OFMT isn't affected by %n issue, only CONVFMT */
@@ -1112,8 +1112,16 @@ static double getvar_i(var *v)
 	return v->number;
 }
 
+
+/*
+ * RAF: among bitwise and hexadecimal operations, the complements are those fail
+ *      and the reason is pretty clear: the complements are arch dependant ops
+ *      as much as the variable that stores the input/argument value. To settle
+ *      down this matter a fixed size "register" should be chosen and 32 bit
+ *      might not seem the best choice vs 64 bit but it the most universal one
+ */
 /* Used for operands of bitwise ops */
-static unsigned long getvar_i_int(var *v)
+static uint32_t getvar_i_int(var *v)
 {
 	double d = getvar_i(v);
 
@@ -3158,8 +3166,9 @@ static var *evaluate(node *op, var *res)
 					for (;;) {
 						var *v = evaluate(nextarg(&op1), TMPVAR0);
 						if (v->type & VF_NUMBER) {
-							fputs(fmt_num(getvar_s(intvar[OFMT]), getvar_i(v)),
-								F);
+							fputs(fmt_num("%lu", getvar_i_int(v)), F);
+							//fputs(fmt_num(getvar_s(intvar[OFMT]), getvar_i(v)),
+							//	F);
 						} else {
 							fputs(getvar_s(v), F);
 						}
