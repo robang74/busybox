@@ -2592,8 +2592,11 @@ static char *awk_printf(node *n, size_t *len)
 #endif
 		/* we are past % in "....%..." */
 		c = *f;
-		if (!c) /* "....%" */
-			goto nul;
+		if (!c) { /* "....%" */
+nul:
+			slen = f - s;
+			goto tail;
+	    }
 		if (c == '%') { /* "....%%...." */
 			slen = f - s;
 			s = xstrndup(s, slen);
@@ -2644,7 +2647,11 @@ star_again:
 			c = *++f;
 			chksze(1);
 		}
+#else
+		if (c == '*')
+			syntax_error("%* requires ENABLE_DESKTOP");
 #endif
+#if 0
 		while (1) {
 			if (isalpha(c))
 				break;
@@ -2662,7 +2669,7 @@ star_again:
 			}
 		}
 		/* we are at A in "....%...A..." */
-
+#endif
 		arg = evaluate(nextarg(&n), TMPVAR);
 
 		/* Result can be arbitrarily long. Example:
