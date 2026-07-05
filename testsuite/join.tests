@@ -48,4 +48,10 @@ testing "join -o works for combinatorial" \
 	"a 123\na 456\n" \
 	"a abc\na def\n"
 
+testing "join -t non-space with spaces in fields" \
+    "join -t ',' -o 1.1,1.2,1.3 input -" \
+    "a b,c,\n" \
+    "a b,c\n" \
+    "a b,d\n"
+
 exit $FAILCOUNT

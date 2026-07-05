@@ -9,7 +9,11 @@
  */
 //config:config JOIN
 //config:	bool "join (6.6 kb)"
+<<<<<<< HEAD
 //config:	default y
+=======
+//config:	default n
+>>>>>>> eaebed87c (join: new applet + newly added test + bugfix, v2)
 //config:	help
 //config:	Equality join on two files
 
@@ -88,6 +92,9 @@ static void field_split(char *s, char sep, LINE *curr)
 		sl[n] = ps;
 		n++;
 		curr->fieldcount = n;
+		// RAF: without this return, the -t options is broken
+		//      as the newly specifically added test shown.
+		return;
 	}
 	/* default split: skip the initial whitespace and then any run
 	   of non-whitespace characters is a field */
