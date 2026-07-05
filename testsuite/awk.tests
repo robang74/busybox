@@ -26,26 +26,67 @@ testing "awk if string == "    "awk 'BEGIN{if(\"a\"==\"ab\") print \"bar\"}'" ""
 
 # width and precision
 optional DESKTOP
-testing "awk only width" \
+testing "awk %* only width" \
 "awk 'BEGIN { printf \"%*d\", 10, -42 }'" "       -42" "" ""
 
-testing "awk negative width" \
+testing "awk %* negative width" \
 "awk 'BEGIN { printf \"%*s\", -10, \"hello\" }'" "hello     " "" ""
 
-testing "awk only precision" \
+testing "awk %.* only precision" \
 "awk 'BEGIN { printf \"%.*f\n\", 2, 3.14159 }'" "3.14\n" "" ""
 
-testing "awk width and precision" \
+testing "awk %*.* width and precision" \
 "awk 'BEGIN { printf \"%*.*f\", 10, 2, 3.14159 }'" "      3.14" "" ""
 
-testing "awk 0 padding with width and precision" \
+testing "awk %0*.* 0 padding with width and precision" \
 "awk 'BEGIN { printf \"%0*.*f\", 10, 2, 3.14 }'" "0000003.14" "" ""
 
 testing "awk multiple format specifications" \
 "awk 'BEGIN { printf \"%d %*d %d\", 1, 5, 2, 3 }'" "1     2 3" "" ""
 
-testing "awk width with char" \
+testing "awk %*c width with char" \
 "awk 'BEGIN { printf \"%*c\", 5, 65 }'" "    A" "" ""
+
+testing "awk %-*c width with char" \
+"awk 'BEGIN { printf \"%-*c\", 5, 65 }'" "A    " "" ""
+
+# For some reason, this works in GNU Awk 5.3.0
+# (why does it work? does it allow flag chars _after_ width, not only before width?)
+# This is undocumented, and we do not support this.
+## testing "awk %*-c width with char" \
+## "awk 'BEGIN { printf \"%*-c\", 5, 65 }'" "A    " "" ""
+
+testing "awk %*c width with NUL" \
+"awk 'BEGIN { printf \"%*c\", 5, 0 }'" "    \0" "" ""
+
+testing "awk %-*c width with NUL" \
+"awk 'BEGIN { printf \"%-*c\", 5, 0 }'" "\0    " "" ""
+
+testing "awk %W%d - W is unknown format specifier" \
+"awk 'BEGIN { printf \"[%W%d]\n\", 42; }'" "E?:[%W0]\n" "" ""
+
+# do not truncate large integer outout
+# (the ...008 instead of ...000 is due to limited precision of 64-bit floats)
+testing "awk %d 99999999999999000.1234" \
+"awk 'BEGIN { printf \"%ld\n\", 99999999999999000.1234; }'" "99999999999999008\n" "" ""
+
+testing "awk %ld large integer (robust value)" \
+"awk 'BEGIN { printf \"%ld\n\", 9007199254740992; }'" "9007199254740992\n" "" ""
+
+
+# .precision on integer formatting allowed and ignored
+testing "awk %.3d 99999999999999000.1234" \
+"awk 'BEGIN { printf \"%.3ld\n\", 99999999999999000.1234; }'" "99999999999999008\n" "" ""
+testing "awk %.*d 3 99999999999999000.1234" \
+"awk 'BEGIN { printf \"%.*ld\n\", 3, 99999999999999000.1234; }'" "99999999999999008\n" "" ""
+
+# fractioals are rounded towards 0
+testing "awk %d -1.9" \
+"awk 'BEGIN { printf \"%d\n\", -1.9; }'" "-1\n" "" ""
+testing "awk %u -1.9" \
+"awk 'BEGIN { printf \"%lu\n\", -1.9; }'" "18446744073709551615\n" "" ""
+testing "awk %x -1.9" \
+"awk 'BEGIN { printf \"%lx\n\", -1.9; }'" "ffffffffffffffff\n" "" ""
 SKIP=
 
 # 4294967295 = 0xffffffff
@@ -358,7 +399,7 @@ testing "awk FS assignment" "awk '{FS=\":\"; print \$1}'" \
 	"a:b c:d\ne:f g:h"
 
 optional FEATURE_AWK_LIBM
-testing "awk large integer" \
+testing "awk large integer (libm)" \
 	"awk 'BEGIN{n=(2^31)-1; print n, int(n), n%1, ++n, int(n), n%1}'" \
 	"2147483647 2147483647 0 2147483648 2147483648 0\n" \
 	"" ""
