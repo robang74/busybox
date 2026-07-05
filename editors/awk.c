@@ -2449,7 +2449,7 @@ static char *awk_printf(node *n, size_t *len)
 		int w;
 		char fmt_buf[fmt_buf_size];
 		char *p, *out = fmt_buf;
-		bool has_star = 0;
+		bool has_star = 0, has_prec = 0;
 #if 0 //RAF: debug only
 		char sze = fmt_buf_size-2;
 #define chksze(n) { if((sze-=(n)) <= 0) syntax_error("%* format too long"); }
@@ -2495,6 +2495,7 @@ star_again:
 			char wrn;
 			has_star = 1;
 			w = (int)getvar_i(evaluate(nextarg(&n), TMPVAR));
+			if(has_prec && w < 0) w = 0;
 			wrn = sprintf(out, "%d", w);
 			out += wrn;
 			chksze(wrn);
@@ -2514,6 +2515,7 @@ star_again:
 			*out++ = '.';
 			c = *++f;
 			chksze(1);
+			has_prec=1;
 			goto star_again;
 		}
 #endif
