@@ -1,112 +1,150 @@
+( exec 2>&1 ####################################################################
+echo
 # Test 1: Basic %% handling
 echo "Test 1: basic %%"
 ./busybox awk 'BEGIN { printf "100%% done\n" }'
-
+echo
 # Test 2: %% at end of string
 echo "Test 2: %% at end"
 ./busybox awk 'BEGIN { printf "50%%" }'
 echo  # newline for readability
-
+echo
 # Test 3: Multiple %% in one format
 echo "Test 3: multiple %%"
 ./busybox awk 'BEGIN { printf "%% %d %%\n", 42 }'
-
+echo
 # Test 4: %% adjacent to real format specifier
 echo "Test 4: %% adjacent to real format"
 ./busybox awk 'BEGIN { printf "%%%d%%\n", 7 }'  # should print %7%
-
+echo
 # Test 5: %*% (star followed by percent) - edge case
 echo "Test 5: star then percent"
 ./busybox awk 'BEGIN { printf "%*%%", 5, 65 }'  # tricky: width=5, then literal %
-
+echo
 # Test 6: Empty format string after %
 echo;echo "Test 6: trailing %"
 ./busybox awk 'BEGIN { printf "hello%" }'  # should error or print "hello%"
-
+echo
 # Test 7: Your new * feature with %%
 echo;echo "Test 7: * with %%"
 ./busybox awk 'BEGIN { printf "%%%*d%%\n", 5, 3 }'  # %    3%
-
+echo
 # Test 8: Both asterisks (Width and Precision marked with *)
 echo "Test 8: both width and precision with *"
 ./busybox awk 'BEGIN { printf "[%*.*f]\n", 10, 3, 3.14159 }'  # expected: [     3.142]
-
+echo
 # Test 9: Multiple specifiers with asterisks in sequence within the same `printf`
 echo "Test 9: a sequence of multiple specifiers with *"
 ./busybox awk 'BEGIN { printf "%*s -> %.*d\n", 8, "OK", 5, 42 }' # expected:       OK -> 00042
-
+echo
 # Test 10: Negative width (Reverses the alignment, places the spaces on the right)
 echo "Test 10: negative width (left-aligned)"
 ./busybox awk 'BEGIN { printf "[%*s]\n", -10, "test" }'  # expected: [test      ]
-
+echo
 # Test 11: Precision negativa con asterisco (gawk la ignora, i formati interi si comportano normalmente)
 echo "Test 11: negative precision with *"
 ./busybox awk 'BEGIN { printf "[%.*d]\n", -5, 123 }'  # expected: [123]
-
+echo
 # Test 12: Asterisco combinato con flag letterali fissi
 echo "Test 12: asterisk with fixed flags"
 ./busybox awk 'BEGIN { printf "[%+0*d]\n", 6, 42 }'  # expected: [+00042]
-
+echo
 # Test 13: Stress test for the maximum buffer length (chksze)
 echo "Test 13: Maximum length exceeded (should return a checked syntax error)"
-# Let’s try passing a huge number as `width` to see if `sprintf` or the flags fill the 64-byte buffer.
-# If the macro works, it should terminate with a “format specifier too long” error without causing a segmentation fault.
+# Let’s try passing a huge number as 'width' to see if 'sprintf' or the flags fill the 64-byte buffer.
+# If the macro works, it should terminate with a 'format specifier too long' error without causing a segmentation fault.
 ./busybox awk 'BEGIN { printf "%000000000000000000000000000000000000000000000000000000000000d\n", 1 }'
-
+echo
 # Test 14: Asterisk adjacent to normal literal text without spaces
 echo "Test 14: literal text adjacent to %*d"
 ./busybox awk 'BEGIN { printf "Output:%*dUnits\n", 5, 7 }'  # expected: Output:    7Units
-
+echo
 # Test 15: Asterisk with the %c character modifier (Integer → ASCII character)
 echo "Test 15: %c with an asterisk and ASCII code"
 ./busybox awk 'BEGIN { printf "[%*c]\n", 5, 65 }'  # expected: [    A]
-
+echo
 # Test 16: %c with an asterisk and a string (Takes the first character)
 echo "Test 16: %c with an asterisk and a string"
 ./busybox awk 'BEGIN { printf "[%*c]\n", -5, "XYZ" }'  # expected: [X    ]
-
+echo
 # Test 17: %c with a NUL character (\0) - A historically problematic edge case in awk
 echo "Test 17: %c with a NUL character"
-./busybox awk 'BEGIN { printf "[%*c]\n", 4, 0 }'  # expected: [   ^] or [   \0] depending on how it handles verbatim output
-
+./busybox awk 'BEGIN { printf "[%*c]\n", 4, 0 }' | tr '\0' @ | sed -e 's,@,@hex(\\00),g'
+# expected: [   ^] or [   \0] depending on how it handles verbatim output
+echo
 # Test 18: Asterisk with scientific floating-point formats (%e, %E, %g, %G)
 echo "Test 18: %e and %g with an asterisk for width and precision"
 ./busybox awk 'BEGIN { printf "%*.*e | %*.*g\n", 12, 4, 1234.56789, 10, 2, 1234.56789 }'
 # expected:  1.2346e+03 |    1.2e+03
-
+echo
 # Test 19: Unrecognised specifiers or unsupported extensions (e.g. %W, %Z)
 echo "Test 19: unknown specifier %W with an asterisk"
 # gawk and the standard awk either print the original text or ignore the flag; they must not crash
 ./busybox awk 'BEGIN { printf "[%*W]\n", 5 }'  # expected: [%*W] or the opposite behaviour without a crash
-
+echo
 # Test 20: Very large numbers with %d (Making the most of awk’s double cast)
 echo "Test 20: %d large integer that exceeds the 32-bit limit"
 ./busybox awk 'BEGIN { printf "[%*d]\n", 15, 3000000000 }'  # expected: [     3000000000] (se compilato a 64-bit/long long)
-
+echo
 # Test 21: Asterisk combined with an empty string %s
 echo "Test 21: %s with an empty string and an asterisk"
 ./busybox awk 'BEGIN { printf "[%*s]\n", 5, "" }'  # expected: [     ]
-
+echo
 # Test 22: Result can be arbitrarily long
 echo "Test 22: arbitrarily long %99999s, to check with wc -c"
 ./busybox awk 'BEGIN { printf "%99999s", "BOOM" }' | grep BOOM | wc -c # expected 100000
-
+# Test n.23 is redundendated by Test n.29 which is more complex
+# echo
 # Test 23: Invalid '*' positions (should error with ENABLE_DESKTOP=0, or work with =1)
-echo "Test 23a: %5*d (star after digits)"
-./busybox awk 'BEGIN { printf "%5*d\n", 5, 42 }' 2>&1 || echo "EXIT: $?"
-
-echo "Test 23b: %.*f without ENABLE_DESKTOP"
+# echo "Test 23: %5*d (star after digits)"
+# ./busybox awk 'BEGIN { printf "%5*d\n", 5, 42 }' 2>&1 || echo "EXIT: $?"
+echo
+echo "Test 24: %.*f without ENABLE_DESKTOP"
 ./busybox awk 'BEGIN { printf "%.*f\n", 2, 3.14 }' 2>&1 || echo "EXIT: $?"
-
-echo "Test 23c: %*.*2$f (positional precision - GNU extension)"
+echo
+echo "Test 25: %*.*2$f (positional precision - GNU extension)"
 ./busybox awk 'BEGIN { printf "%*.*2$f\n", 10, 5, 44 }' 2>&1 || echo "EXIT: $?"
-
-echo "Test 23d: %**d (double star)"
+echo
+echo "Test 26: %**d (double star)"
 ./busybox awk 'BEGIN { printf "%**d\n", 5, 42 }' 2>&1 || echo "EXIT: $?"
-
-echo "Test 23e: %*.*d with missing precision arg"
-./busybox awk 'BEGIN { printf "%*.*d\n", 5 }' 2>&1 || echo "EXIT: $?"
-
-echo "Test 23f: %5.*8f (digit after star in precision)"
+# Test n.27 is redundendated by Test n.36 which is more explicit
+# echo
+# echo "Test 27: %*.*d with missing precision arg"
+# ./busybox awk 'BEGIN { printf "%*.*d\n", 5 }' 2>&1 || echo "EXIT: $?"
+echo
+echo "Test 28: %5.*8f (digit after star in precision)"
 ./busybox awk 'BEGIN { printf "%5.*8f\n", 2, 3.14 }' 2>&1 || echo "EXIT: $?"
-
+echo
+# Test 29: Invalid '*.*.*' sequence, edge cass
+echo "Test 29: Invalid '*.*.*' sequence, edge case"
+./busybox awk 'BEGIN { printf "%5*.*.*d\n", 5, 42 }'
+echo
+echo "Test 30: Expression evaluation forcing TMPVAR exhaustion"
+./busybox awk 'BEGIN { printf "[%*.*f]\n", (2+3), (1+1), 3.14159 }'
+echo
+echo "Test 31: Invalid format trailing digit following a star"
+./busybox awk 'BEGIN { printf "%*5d\n", 5, 42 }'
+echo
+# Redundand by Test n.11
+# echo "Test 32: Negative precision asterisk handling"
+# ./busybox awk 'BEGIN { printf "[%.*d]\n", -5, 123 }'
+# echo
+echo "Test 33: Multi-specifier back-to-back with verbatim strings"
+./busybox awk 'BEGIN { printf "Start %% %*d Mid %% %*s End\n", 5, 1, 10, "two" }'
+echo
+echo "Test 34: 64-bit integer tracking underflow/overflow"
+./busybox awk 'BEGIN { printf "%*d\n", 12, 4000000000 }'
+echo
+echo "Test 35: Multiple distinct dynamic specifiers"
+./busybox awk 'BEGIN { printf "|%*s| or |%*d|\n", 5, "abc", 8, 123 }'
+echo
+echo "Test 36: Double star behavior with argument trapping"
+./busybox awk 'BEGIN { printf "[%**d]\n", 5, 99, 42 }'
+echo
+echo "Test 37: Dynamic expressions for both width and precision"
+./busybox awk 'BEGIN { printf "[%*.*f]\n", (3 + 4), (1 * 3), 3.14159265 }'
+echo
+echo "Test 38: Literal percent sequences right before an asterisk format"
+./busybox awk 'BEGIN { printf "Progress: %% %*d%%\n", 5, 85 }'
+echo
+) ##############################################################################
