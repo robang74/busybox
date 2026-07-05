@@ -2637,6 +2637,13 @@ star_again:
 			has_prec=1;
 			goto star_again;
 		}
+
+		/* long integer */
+		if (c == 'l') { //RAF,TODO: not just 'l' we need to bring %* in fmt_num()
+			*out++ = '.';
+			c = *++f;
+			chksze(1);
+		}
 #endif
 		while (1) {
 			if (isalpha(c))
@@ -2690,6 +2697,9 @@ star_again:
 			if (c == 's') {
 				s = xasprintf(fmt_str, getvar_s(arg));
 			} else {
+				//RAF: re-use the novel fmt_num() here
+				s = xstrdup(fmt_num(fmt_str, getvar_i(arg)));
+#if 0
 				double d = getvar_i(arg);
 				if (strchr("diouxX", c)) {
 //TODO: make it wider here (%x -> %llx etc)?
@@ -2706,6 +2716,7 @@ star_again:
 					/* gawk 5.1.1 printf("%W") prints "%W", does not error out */
 					s = xstrdup(fmt_str);
 				}
+#endif
 			}
 			slen = strlen(s);
 		}

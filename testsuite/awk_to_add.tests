@@ -82,9 +82,13 @@ echo "Test 19: unknown specifier %W with an asterisk"
 # gawk and the standard awk either print the original text or ignore the flag; they must not crash
 ./busybox awk 'BEGIN { printf "[%*W]\n", 5 }'  # expected: [%*W] or the opposite behaviour without a crash
 echo
-# Test 20: Very large numbers with %d (Making the most of awk’s double cast)
-echo "Test 20: %d large integer that exceeds the 32-bit limit"
+# Test 20-d: Very large numbers with %d (Making the most of awk’s double cast)
+echo "Test 20-d: %d large integer that exceeds the 32-bit limit"
 ./busybox awk 'BEGIN { printf "[%*d]\n", 15, 3000000000 }'  # expected: [     3000000000] (se compilato a 64-bit/long long)
+echo
+# Test 20-ld: Very large numbers with %d (Making the most of awk’s double cast)
+echo "Test 20-ld: %ld large integer that exceeds the 32-bit limit"
+./busybox awk 'BEGIN { printf "[%*ld]\n", 15, 3000000000 }'  # expected: [     3000000000] (se compilato a 64-bit/long long)
 echo
 # Test 21: Asterisk combined with an empty string %s
 echo "Test 21: %s with an empty string and an asterisk"
