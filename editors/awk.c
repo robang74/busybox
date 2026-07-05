@@ -2625,6 +2625,7 @@ star_again:
 			chksze(wrn);
 			c = *++f;
 			if (c >= '0' && c <= '9') /* invalidate "^^^%5.*8f^^^" */
+//invalid:
 				syntax_error("invalid format specifier");
 		} else {
 			while (c >= '0' && c <= '9') {
@@ -2643,35 +2644,28 @@ star_again:
 			goto star_again;
 		}
 
+/*
+ * RAF,TODO: it is not just about 'fmt_num_types_l' but we need to consider
+ *          moving  %* in fmt_num() altogether, for the most of generality
+ *          single place of code running, maintenance and footprint size
+ */
 		/* long integer */
-		if (c == 'l') { //RAF,TODO: not just 'l' we need to bring %* in fmt_num()
-			*out++ = '.';
+		if (strchr(fmt_num_types_l, c)) {
+			*out++ = c;
 			c = *++f;
 			chksze(1);
 		}
+#if 0
+//RAF: alternative branch of compilation (+16b) with different output on edge cases
+		else
+		if (!isalpha(c))
+			goto invalid;
+#endif
 #else
 		if (c == '*')
 			syntax_error("%* requires ENABLE_DESKTOP");
 #endif
-#if 0
-		while (1) {
-			if (isalpha(c))
-				break;
-#if ENABLE_DESKTOP
-#else
-			if (c == '*')
-				syntax_error("%* requires ENABLE_DESKTOP");
-#endif
-			c = *++f;
-			if (!c) { /* "....%...." and no letter found after % */
-				/* Example: awk 'BEGIN { printf "^^^%^^^\n"; }' */
- nul:
-				slen = f - s;
-				goto tail; /* print remaining string, exit loop */
-			}
-		}
-		/* we are at A in "....%...A..." */
-#endif
+
 		arg = evaluate(nextarg(&n), TMPVAR);
 
 		/* Result can be arbitrarily long. Example:
@@ -2708,24 +2702,6 @@ star_again:
 			} else {
 				//RAF: re-use the novel fmt_num() here
 				s = xstrdup(fmt_num(fmt_str, getvar_i(arg)));
-#if 0
-				double d = getvar_i(arg);
-				if (strchr("diouxX", c)) {
-//TODO: make it wider here (%x -> %llx etc)?
-//Can even print the value into a temp string with %.0f,
-//then replace diouxX with s and print that string.
-//This will correctly print even very large numbers,
-//but some replacements are not equivalent:
-//%09d -> %09s: breaks zero-padding;
-//%+d -> %+s: won't prepend +; etc
-					s = xasprintf(fmt_str, (int)d);
-				} else if (strchr("eEfFgGaA", c)) {
-					s = xasprintf(fmt_str, d);
-				} else {
-					/* gawk 5.1.1 printf("%W") prints "%W", does not error out */
-					s = xstrdup(fmt_str);
-				}
-#endif
 			}
 			slen = strlen(s);
 		}
