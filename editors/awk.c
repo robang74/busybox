@@ -1053,11 +1053,13 @@ static const char *fmt_num(const char *format, double n)
 #if BYTE_ORDER == BIG_ENDIAN && ULONG_MAX > 0xFFFFFFFFU
 				 */
 #if __BYTE_ORDER == __BIG_ENDIAN && __SIZEOF_LONG__ == 8
+#pragma message "fmt_num() is using int or long for %ld"
 				if(*(p-2) != 'l' || c == 'p')
 				snprintf(g_buf, MAXVARFMT, format, (int)n);
 				else
 				snprintf(g_buf, MAXVARFMT, format, (long)n);
 #else
+#pragma message "fmt_num() is using long long for %ld"
 				snprintf(g_buf, MAXVARFMT, format, (long long)n);
 #endif
 				break;
