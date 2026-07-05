@@ -1064,6 +1064,7 @@ static const char *fmt_num(const char *format, double n)
 #endif
 				break;
 			}
+			else
 			if (strchr(fmt_num_types_f, c)) {
 #if 0 // RAF: %llf isn't a valid format, printf will take care of it
 				if(*(p-2) == 'l' && *(p-3) == 'l')
@@ -1088,11 +1089,13 @@ static const char *fmt_num(const char *format, double n)
  * RAF:
  * For helping users debug their awk scripts, print the format
  * given adding a short prefix "E?:" which to grep these cases
+ * A noble cause helping users to debug their awk scripts but
+ * in practice the "E?" flag is rare compared the GIGO volume.
  */
 			#if 0 // RAF: using strncpy saves 3b, just "E?:", in footprint
-			strncpy(g_buf, format, MAXVARFMT);
-			#else
 			snprintf(g_buf, MAXVARFMT, "E?:%s", format);
+			#else
+			strncpy(g_buf, format, MAXVARFMT);
 			#endif
 			break;
 #endif
@@ -1235,7 +1238,7 @@ static unsigned long getvar_i_int(var *v)
 
 	/* Casting doubles to longs is undefined for values outside
 	 * of target type range. Try to widen it as much as possible */
-	if (d >= 0)
+	if (d >= 0.0)
 		return (unsigned long)d;
 	/* Why? Think about d == -4294967295.0 (assuming 32bit longs) */
 	return - (long) (unsigned long) (-d);

@@ -62,8 +62,8 @@ testing "awk %*c width with NUL" \
 testing "awk %-*c width with NUL" \
 "awk 'BEGIN { printf \"%-*c\", 5, 0 }'" "\0    " "" ""
 
-testing "awk %W%d - W is unknown format specifier (awk format E?: debug prefix)" \
-"awk 'BEGIN { printf \"[%W%d]\n\", 42; }'" "E?:[%W0]\n" "" ""
+testing "awk %W%d - W is unknown format specifier" \
+"awk 'BEGIN { printf \"[%W%d]\n\", 42; }'" "[%W0]\n" "" ""
 
 # do not truncate large integer outout
 # (the ...008 instead of ...000 is due to limited precision of 64-bit floats)
@@ -105,8 +105,8 @@ testing "awk printf %*c with string takes first char" "awk 'BEGIN { printf \"[%*
 testing "awk printf %*c with NUL character" "awk 'BEGIN { printf \"[%*c]\n\", 4, 0 }'" "[   \0]\n" "" ""
 testing "awk printf %*.*e and %*.*g with asterisks" "awk 'BEGIN { printf \"%*.*e | %*.*g\n\", 12, 4, 1234.56789, 10, 2, 1234.56789 }'" "  1.2346e+03 |    1.2e+03\n" "" ""
 
-# Invalid format test, the output can be arbitrary (awk format E?: debug prefix)
-testing "awk printf unknown specifier %*W" "awk 'BEGIN { printf \"[%*W]\n\", 5 }'" "E?:[%5W]\n" "" ""
+# Invalid format test, the output can be arbitrary
+testing "awk printf unknown specifier %*W" "awk 'BEGIN { printf \"[%*W]\n\", 5 }'" "[%5W]\n" "" ""
 
 # These two depends on the implementation: with or without %ld support (64bit or 32bit arch)
 testing "awk printf %*d with large integer exceeding 32-bit" "awk 'BEGIN { printf \"[%*d]\n\", 15, 3000000000 }'" "[     3000000000]\n" "" ""
