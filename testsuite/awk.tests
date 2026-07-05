@@ -62,7 +62,7 @@ testing "awk %*c width with NUL" \
 testing "awk %-*c width with NUL" \
 "awk 'BEGIN { printf \"%-*c\", 5, 0 }'" "\0    " "" ""
 
-testing "awk %W%d - W is unknown format specifier" \
+testing "awk %W%d - W is unknown format specifier (awk format E?: debug prefix)" \
 "awk 'BEGIN { printf \"[%W%d]\n\", 42; }'" "E?:[%W0]\n" "" ""
 
 # do not truncate large integer outout
@@ -87,6 +87,44 @@ testing "awk %u -1.9" \
 "awk 'BEGIN { printf \"%lu\n\", -1.9; }'" "18446744073709551615\n" "" ""
 testing "awk %x -1.9" \
 "awk 'BEGIN { printf \"%lx\n\", -1.9; }'" "ffffffffffffffff\n" "" ""
+
+# New tests integrated into awk.tests format
+testing "awk printf multiple %% with value" "awk 'BEGIN { printf \"%% %d %%\n\", 42 }'" "% 42 %\n" "" ""
+testing "awk printf %% adjacent to format specifier" "awk 'BEGIN { printf \"%%%d%%\n\", 7 }'" "%7%\n" "" ""
+testing "awk printf trailing %" "awk 'BEGIN { printf \"hello%\" }'" "hello%" "" ""
+testing "awk printf %% with %*d and %%" "awk 'BEGIN { printf \"%%%*d%%\n\", 5, 3 }'" "%    3%\n" "" ""
+testing "awk printf %*.*f with width and precision" "awk 'BEGIN { printf \"[%*.*f]\n\", 10, 3, 3.14159 }'" "[     3.142]\n" "" ""
+testing "awk printf multiple specifiers with * width and precision" "awk 'BEGIN { printf \"%*s -> %.*d\n\", 8, \"OK\", 5, 42 }'" "      OK -> 00042\n" "" ""
+testing "awk printf %*s with negative width" "awk 'BEGIN { printf \"[%*s]\n\", -10, \"test\" }'" "[test      ]\n" "" ""
+testing "awk printf %.*d with negative precision" "awk 'BEGIN { printf \"[%.*d]\n\", -5, 123 }'" "[123]\n" "" ""
+testing "awk printf %+0*d with flag and asterisk" "awk 'BEGIN { printf \"[%+0*d]\n\", 6, 42 }'" "[+00042]\n" "" ""
+testing "awk printf very long format width specifier" "awk 'BEGIN { printf \"%000000000000000000000000000000000000000000000000000000000000d\n\", 1 }'" "1\n" "" ""
+testing "awk printf literal text adjacent to %*d" "awk 'BEGIN { printf \"Output:%*dUnits\n\", 5, 7 }'" "Output:    7Units\n" "" ""
+testing "awk printf %*c with ASCII code" "awk 'BEGIN { printf \"[%*c]\n\", 5, 65 }'" "[    A]\n" "" ""
+testing "awk printf %*c with string takes first char" "awk 'BEGIN { printf \"[%*c]\n\", -5, \"XYZ\" }'" "[X    ]\n" "" ""
+testing "awk printf %*c with NUL character" "awk 'BEGIN { printf \"[%*c]\n\", 4, 0 }'" "[   \0]\n" "" ""
+testing "awk printf %*.*e and %*.*g with asterisks" "awk 'BEGIN { printf \"%*.*e | %*.*g\n\", 12, 4, 1234.56789, 10, 2, 1234.56789 }'" "  1.2346e+03 |    1.2e+03\n" "" ""
+
+# Invalid format test, the output can be arbitrary (awk format E?: debug prefix)
+testing "awk printf unknown specifier %*W" "awk 'BEGIN { printf \"[%*W]\n\", 5 }'" "E?:[%5W]\n" "" ""
+
+# These two depends on the implementation: with or without %ld support (64bit or 32bit arch)
+testing "awk printf %*d with large integer exceeding 32-bit" "awk 'BEGIN { printf \"[%*d]\n\", 15, 3000000000 }'" "[     3000000000]\n" "" ""
+testing "awk printf %*d with large integer exceeding 32-bit" "awk 'BEGIN { printf \"[%*d]\n\", 15, 3000000000 }'" "[    -1294967296]\n" "" ""
+testing "awk printf %*ld with large integer exceeding 32-bit" "awk 'BEGIN { printf \"[%*ld]\n\", 15, 3000000000 }'" "[     3000000000]\n" "" ""
+
+testing "awk printf %*s with empty string" "awk 'BEGIN { printf \"[%*s]\n\", 5, \"\" }'" "[     ]\n" "" ""
+testing "awk printf positional precision GNU extension" "awk 'BEGIN { printf \"%*.*2$f\n\", 10, 5, 44 }'" "" "" ""
+testing "awk printf invalid *.*.* sequence" "awk 'BEGIN { printf \"%5*.*.*d\n\", 5, 42 }'" "" "" ""
+testing "awk printf expressions as width and precision args" "awk 'BEGIN { printf \"[%*.*f]\n\", (2+3), (1+1), 3.14159 }'" "[ 3.14]\n" "" ""
+testing "awk printf multiple specifiers with %% literals" "awk 'BEGIN { printf \"Start %% %*d Mid %% %*s End\n\", 5, 1, 10, \"two\" }'" "Start %     1 Mid %        two End\n" "" ""
+testing "awk printf multiple distinct dynamic specifiers" "awk 'BEGIN { printf \"|%*s| or |%*d|\n\", 5, \"abc\", 8, 123 }'" "|  abc| or |     123|\n" "" ""
+
+# Invalid format test, the output can be arbitrary
+testing "awk printf double star with extra argument" "awk 'BEGIN { printf \"[%**d]\n\", 5, 99, 42 }'" "[%5*d]\n" "" ""
+
+testing "awk printf dynamic expressions for width and precision" "awk 'BEGIN { printf \"[%*.*f]\n\", (3 + 4), (1 * 3), 3.14159265 }'" "[  3.142]\n" "" ""
+testing "awk printf %% before asterisk format" "awk 'BEGIN { printf \"Progress: %% %*d%%\n\", 5, 85 }'" "Progress: %    85%\n" "" ""
 SKIP=
 
 # 4294967295 = 0xffffffff
