@@ -83,9 +83,21 @@ testing "awk %.*d 3 99999999999999000.1234" \
 testing "awk %d -1.9" \
 "awk 'BEGIN { printf \"%d\n\", -1.9; }'" "-1\n" "" ""
 testing "awk %u -1.9" \
-"awk 'BEGIN { printf \"%lu\n\", -1.9; }'" "18446744073709551615\n" "" ""
+"awk 'BEGIN { printf \"%u\n\", -1.9; }'" "18446744073709551615\n" "" ""
 testing "awk %x -1.9" \
+"awk 'BEGIN { printf \"%x\n\", -1.9; }'" "ffffffffffffffff\n" "" ""
+testing "awk %o -1.9" \
+"awk 'BEGIN { printf \"%o\n\", -1.9; }'" "1777777777777777777777\n" "" ""
+
+# fractioals are rounded towards 0, but with %l
+testing "awk %ld -1.9" \
+"awk 'BEGIN { printf \"%ld\n\", -1.9; }'" "-1\n" "" ""
+testing "awk %lu -1.9" \
+"awk 'BEGIN { printf \"%lu\n\", -1.9; }'" "18446744073709551615\n" "" ""
+testing "awk %lx -1.9" \
 "awk 'BEGIN { printf \"%lx\n\", -1.9; }'" "ffffffffffffffff\n" "" ""
+testing "awk %lo -1.9" \
+"awk 'BEGIN { printf \"%lo\n\", -1.9; }'" "1777777777777777777777\n" "" ""
 
 # New tests integrated into awk.tests format
 testing "awk printf multiple %% with value" "awk 'BEGIN { printf \"%% %d %%\n\", 42 }'" "% 42 %\n" "" ""
