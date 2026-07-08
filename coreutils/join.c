@@ -9,11 +9,7 @@
  */
 //config:config JOIN
 //config:	bool "join (6.6 kb)"
-<<<<<<< HEAD
-//config:	default y
-=======
 //config:	default n
->>>>>>> eaebed87c (join: new applet + newly added test + bugfix, v2)
 //config:	help
 //config:	Equality join on two files
 
