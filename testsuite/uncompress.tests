@@ -6,7 +6,7 @@
 
 # testing "test name" "commands" "expected result" "file input" "stdin"
 
-testing "uncompress < \x1f\x9d\x90 \x01 x N" \
+testing "uncompress < 0x1f9d90 0x01 x N" \
 'uncompress 2>&1 1>/dev/null; echo $?' \
 "\
 uncompress: corrupted data
