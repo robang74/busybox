@@ -273,7 +273,7 @@ testing "sed a cmd ended by double backslash" \
 	| two \\
 '
 
-testing "sed a cmd understands \\n,\\t,\\r" \
+testing 'sed a cmd understands \\n,\\t,\\r' \
 	"sed '/1/a\\\\t\\rzero\\none\\\\ntwo\\\\\\nthree'" \
 "\
 line1
@@ -282,7 +282,7 @@ one\\\\ntwo\\
 three
 " "" "line1\n"
 
-testing "sed i cmd understands \\n,\\t,\\r" \
+testing 'sed i cmd understands \\n,\\t,\\r' \
 	"sed '/1/i\\\\t\\rzero\\none\\\\ntwo\\\\\\nthree'" \
 "\
 \t\rzero
@@ -300,7 +300,7 @@ testing "sed -i with address modifies all files, not only first" \
 	"cp input input2; sed -i -e '1s/foo/bar/' input input2 && cat input input2; rm input2" \
 	"bar\nbar\n" "foo\n" ""
 
-testing "sed understands \r" \
+testing 'sed understands \\r' \
 	"sed 's/r/\r/'" \
 	"\rrr\n" "" "rrr\n"
 
