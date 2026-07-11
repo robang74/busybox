@@ -45,12 +45,12 @@
 //usage:     "\n	-s	Drop lines with no delimiter (else print them in full)"
 //usage:     "\n	-D	Don't sort ranges; line without delimiters has one field"
 //usage:     IF_LONG_OPTS(
-//usage:     "\n	--output-delimiter SEP	Output field delimeter"
+//usage:     "\n	--output-delimiter SEP	Output field delimiter"
 //usage:     ) IF_NOT_LONG_OPTS(
 //usage:     IF_FEATURE_CUT_REGEX(
-//usage:     "\n	-O SEP	Output field delimeter (default = -d for -f, one space for -F)"
+//usage:     "\n	-O SEP	Output field delimiter (default = -d for -f, one space for -F)"
 //usage:     ) IF_NOT_FEATURE_CUT_REGEX(
-//usage:     "\n	-O SEP	Output field delimeter (default = -d)"
+//usage:     "\n	-O SEP	Output field delimiter (default = -d)"
 //usage:     )
 //usage:     )
 //usage:     "\n	-n	Ignored"
