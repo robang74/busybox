@@ -12112,22 +12112,15 @@ showvars(const char *sep_prefix, int on, int off)
 	sep = *sep_prefix ? " " : sep_prefix;
 
 	for (; ep < epend; ep++) {
-		const char *p;
-		const char *q;
-
-		p = endofname(*ep);
-/* Used to have simple "p = strchrnul(*ep, '=')" here instead, but this
- * makes "export -p" to have output not suitable for "eval":
- * import os
- * os.environ["test-test"]="test"
- * if os.fork() == 0:
- *   os.execv("ash", [ 'ash', '-c', 'eval $(export -p); echo OK' ])  # fixes this
- * os.execv("ash", [ 'ash', '-c', 'env | grep test-test' ])
- */
-		q = nullstr;
-		if (*p == '=')
-			q = single_quote(++p);
-		out1fmt("%s%s%.*s%s\n", sep_prefix, sep, (int)(p - *ep), *ep, q);
+		/*
+		 * omit variables with invalid names, so `export -p` can be eval'ed:
+		 *   env -i 'test-test=test' busybox ash -c 'eval $(export -p)'
+		 */
+		const char *p = endofname(*ep);
+		if (*p == '=') {
+			const char *q = single_quote(++p);
+			out1fmt("%s%s%.*s%s\n", sep_prefix, sep, (int)(p - *ep), *ep, q);
+        }
 	}
 	return 0;
 }
