@@ -29,6 +29,11 @@
 //config:	bool "Enable --reflink[=auto]"
 //config:	default y
 //config:	depends on FEATURE_CP_LONG_OPTIONS
+//config:
+//config:config FEATURE_CP_SPARSE
+//config:	bool "Enable --sparse=WHEN"
+//config:	default y
+//config:	depends on FEATURE_CP_LONG_OPTIONS
 
 //applet:IF_CP(APPLET_NOEXEC(cp, cp, BB_DIR_BIN, BB_SUID_DROP, cp))
 /* NOEXEC despite cases when it can be a "runner" (cp -r LARGE_DIR NEW_DIR) */
@@ -130,6 +135,9 @@ int cp_main(int argc, char **argv)
 # if ENABLE_FEATURE_CP_REFLINK
 	char *reflink = NULL;
 # endif
+# if ENABLE_FEATURE_CP_SPARSE
+	char *sparse = NULL;
+# endif
 	flags = getopt32long(argv, "^"
 		FILEUTILS_CP_OPTSTR
 		"\0"
@@ -159,9 +167,16 @@ int cp_main(int argc, char **argv)
 # if ENABLE_FEATURE_CP_REFLINK
 		"reflink\0"        Optional_argument "\xfd"
 # endif
+# if ENABLE_FEATURE_CP_SPARSE
+		"sparse\0"         Optional_argument "\xfc"
+# endif
 		, &last
 # if ENABLE_FEATURE_CP_REFLINK
 		, &reflink
+# endif
+# if ENABLE_FEATURE_CP_SPARSE
+		// NOP for now
+		, &sparse
 # endif
 	);
 # if ENABLE_FEATURE_CP_REFLINK
