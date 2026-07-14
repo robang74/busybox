@@ -113,6 +113,8 @@
 #include "libbb.h"
 #include "libcoreutils/coreutils.h"
 
+#define DBG_OPTION_PARSING 0
+
 /* This is a NOEXEC applet. Be very careful! */
 
 int cp_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
@@ -168,7 +170,7 @@ int cp_main(int argc, char **argv)
 		"reflink\0"        Optional_argument "\xfd"
 # endif
 # if ENABLE_FEATURE_CP_SPARSE
-		"sparse\0"         Optional_argument "\xfc"
+		"sparse\0"         Required_argument "\xfc"
 # endif
 		, &last
 # if ENABLE_FEATURE_CP_REFLINK
@@ -179,6 +181,7 @@ int cp_main(int argc, char **argv)
 		, &sparse
 # endif
 	);
+
 # if ENABLE_FEATURE_CP_REFLINK
 	BUILD_BUG_ON((int)OPT_reflink != (int)FILEUTILS_REFLINK);
 	if (flags & FILEUTILS_REFLINK) {
@@ -189,6 +192,16 @@ int cp_main(int argc, char **argv)
 		else if (strcmp(reflink, "auto") != 0)
 			bb_show_usage();
 	}
+# endif
+# if DBG_OPTION_PARSING
+	bb_error_msg("flags: 0x%08x", flags);
+#  define showopt(o) bb_error_msg("flags & %s(%x):\t%x", #o, o, flags & o);
+	showopt(FILEUTILS_RMDEST        );
+	showopt(OPT_parents             );
+	showopt(OPT_reflink             );
+	showopt(FILEUTILS_REFLINK_ALWAYS);
+	return 0;
+#  undef showopt
 # endif
 #else
 	flags = getopt32(argv, "^"
