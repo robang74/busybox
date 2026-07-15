@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Busybox version: 1.38.0.git
-# Sun Jun  7 20:03:15 2026
+# Busybox version: 1.38.0.ucs
+# Wed Jul 15 13:49:44 2026
 #
 CONFIG_HAVE_DOT_CONFIG=y
 
@@ -506,6 +506,7 @@ CONFIG_FEATURE_XARGS_SUPPORT_ARGS_FILE=y
 # Init Utilities
 #
 CONFIG_BOOTCHARTD=y
+CONFIG_BOOTCHARTD_TIMEOUT=60
 CONFIG_FEATURE_BOOTCHARTD_BLOATED_HEADER=y
 CONFIG_FEATURE_BOOTCHARTD_CONFIG_FILE=y
 CONFIG_HALT=y
