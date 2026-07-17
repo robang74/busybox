@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Busybox version: 1.38.0.ucs
-# Fri Jul 17 19:28:00 2026
+# Fri Jul 17 21:26:50 2026
 #
 CONFIG_HAVE_DOT_CONFIG=y
 
@@ -1221,6 +1221,7 @@ CONFIG_HUSH_ULIMIT=y
 CONFIG_HUSH_UMASK=y
 CONFIG_HUSH_GETOPTS=y
 CONFIG_HUSH_MEMLEAK=y
+CONFIG_UXSH=y
 
 #
 # Options common to all shells
