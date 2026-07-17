@@ -1,3 +1,8 @@
+/*
+ * (c) 2026, Roberto A. Foglietta <roberto.foglietta@gmail.com>, GPLv2
+ *
+ ******************************************************************************/
+
 #include "libbb.h"
 #include <unistd.h>
 #include <fcntl.h>
@@ -13,7 +18,7 @@
 //usage:       "Execute a script by parsing its shebang line."
 
 //config:config UXSH
-//config:	bool "uxsh (0.6 kb)"
+//config:	bool "uxsh (0.4 kb)"
 //config:	default n
 //config:	help
 //config:	  uxsh parses the shebang (#!) of a script passed as 1st argument
@@ -22,92 +27,51 @@
 int uxsh_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int uxsh_main(int argc, char **argv)
 {
-	char buf[256];
-	unsigned char magic[4];
-	char *interp, *interp_arg, *newline;
-	char **new_argv;
-	int src_fd, new_argc, i;
+    char buf[256];
+    char *interp, *interp_arg = NULL;
+    char *script_path;
+    int fd, n;
 
-	argv++; /* Skip "uxsh" from the original argv */
+    script_path = *++argv;
+    if (!script_path)
+        bb_simple_error_msg_and_die("Missing 1st argument");
 
-	if (!*argv || LONE_DASH(*argv)) {
-		src_fd = STDIN_FILENO;
-	} else {
-		src_fd = xopen(*argv, O_RDONLY);
-	}
+    fd = xopen(script_path, O_RDONLY);
 
-	/* Peek at the first 4 bytes to check for a valid uxshang safely */
-	if (full_read(src_fd, magic, 4) < 2) {
-		bb_error_msg_and_die("short read or empty file");
-	}
+    n = full_read(fd, buf, sizeof(buf) - 1);
+    close(fd);
+    
+    if (n < 2 || buf[0] != '#' || buf[1] != '!')
+        bb_simple_error_msg_and_die("Invalid shebang (!#)");
 
-	/* Check if it actually starts with '#!' */
-	if (magic[0] != '#' || magic[1] != '!') {
-		bb_error_msg_and_die("not a valid script (missing #!)");
-	}
+    buf[n] = '\0';
 
-	/* Check if the file descriptor is seekable (e.g., a regular file) */
-	if (lseek(src_fd, 0, SEEK_CUR) != (off_t)-1) {
-		/* It is a regular file, we can safely rewind to the beginning */
-		xlseek(src_fd, 0, SEEK_SET);
-	} else {
-		bb_error_msg_and_die("piped stdin isn't supported");
-	}
+    char *nl = strchr(buf, '\n');
+    if (nl) *nl = '\0';
+    nl = strchr(buf, '\r');
+    if (nl) *nl = '\0';
 
-	/* Read the head of the stream into our buffer for parsing */
-	int n = full_read(src_fd, buf, sizeof(buf) - 1);
-	if (n < 0) {
-		bb_perror_msg_and_die("failed to read script header");
-	}
-	buf[n] = '\0';
+    interp = skip_whitespace(buf + 2);
 
-	/* Isolate the first line by stripping newlines and carriage returns */
-	newline = strchr(buf, '\n');
-	if (newline) *newline = '\0';
-	newline = strchr(buf, '\r');
-	if (newline) *newline = '\0';
+    char *p = strpbrk(interp, " \t");
+    if (p) {
+        *p = '\0';
+        interp_arg = skip_whitespace(p + 1);
+        if (!*interp_arg)
+            interp_arg = NULL;
+    }
 
-	/* Skip whitespace after the '#!' tokens */
-	interp = skip_whitespace(buf + 2);
+    char **new_argv = xzalloc(sizeof(char*) * (argc + 2));
+    int i = 0;
 
-	/* Find the first space or tab to isolate an optional interpreter argument */
-	interp_arg = strpbrk(interp, " \t");
-	if (interp_arg) {
-		*interp_arg = '\0';
-		interp_arg = skip_whitespace(interp_arg + 1);
-		if (*interp_arg == '\0') {
-			interp_arg = NULL;
-		}
-	}
+    new_argv[i++] = interp;
+    if (interp_arg)
+        new_argv[i++] = interp_arg;
 
-	/* Close the read descriptor before execve to prevent descriptor leaks */
-	if (src_fd != STDIN_FILENO) {
-		close(src_fd);
-	}
+    while (*argv)
+        new_argv[i++] = *argv++;
 
-	/*
-	 * Calculate the new argv array size:
-	 * 1 (interpreter) + 1 (optional argument) + remaining user arguments + 1 (NULL)
-	 */
-	new_argc = 1 + (interp_arg ? 1 : 0) + (argc - 1) + 1;
-	new_argv = xzalloc(sizeof(char*) * new_argc);
-
-	i = 0;
-	new_argv[i++] = interp;
-	if (interp_arg) {
-		new_argv[i++] = interp_arg;
-	}
-
-	/* Append the original user arguments (including the original script path) */
-	while (*argv) {
-		new_argv[i++] = *argv++;
-	}
-	new_argv[i] = NULL;
-
-	/* Execute the interpreter passing the rebuilt argv and the current environment */
-	execve(new_argv[0], new_argv, environ);
-
-	/* If execve returns, an irreversible execution error occurred */
-	bb_perror_msg_and_die("exec %s failed", new_argv[0]);
+    execve(interp, new_argv, environ);
+    bb_perror_msg_and_die("exec %s failed", interp);
 }
 
