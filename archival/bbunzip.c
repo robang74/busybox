@@ -386,7 +386,8 @@ int gunzip_main(int argc UNUSED_PARAM, char **argv)
 	 * Normally, "zcat" is just "gunzip -c".
 	 * But if seamless magic is enabled, then we are much more clever.
 	 */
-	if (ENABLE_ZCAT && applet_name[1] == 'c')
+	if (ENABLE_ZCAT && applet_name[1] == 'c'
+	|| ENABLE_UZCAT && applet_name[2] == 'c')
 		option_mask32 |= BBUNPK_OPT_STDOUT | BBUNPK_SEAMLESS_MAGIC;
 
 	return bbunpack(argv, unpack_gz_stream, make_new_name_gunzip, /*unused:*/ NULL);
@@ -601,3 +602,25 @@ int unxz_main(int argc UNUSED_PARAM, char **argv)
 	return bbunpack(argv, unpack_xz_stream, make_new_name_generic, "xz");
 }
 #endif
+
+//applet:IF_UZCAT(APPLET_ODDNAME(uzcat, gunzip, BB_DIR_BIN, BB_SUID_DROP, uzcat))
+
+//usage:#define uzcat_trivial_usage
+//usage:	"[-f] [FILE]..."
+//usage:#define uzcat_full_usage "\n\n"
+//usage:	"Decompress any supported format (gz, bz2, xz) to stdout\n"
+//usage:	"	-f	Force plain cat if format is unknown\n"
+
+//config:config UZCAT
+//config:	bool "uzcat (0.1 kb)"
+//config:	default y
+//config:	select FEATURE_SEAMLESS_GZ
+//config:	select FEATURE_SEAMLESS_XZ
+//config:	select FEATURE_SEAMLESS_BZ2
+//config:	select FEATURE_SEAMLESS_LZMA
+//config:	help
+//config:	uzcat allows to decompress any supported format (gz, bz2, xz, lzma)
+//config:	without explicitly specifying the compressor type by auto-detecting
+//config:	the file signature. It requires enabling the inflate algorithms.
+//config: 	It signals by /bin/uzcat that seamless uncompression is active.
+

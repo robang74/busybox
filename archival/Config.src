@@ -26,16 +26,16 @@ config FEATURE_SEAMLESS_Z
 	default n  # it is ancient
 
 config FEATURE_SEAMLESS_ZSTD
-		bool "Make tar, rpm, modprobe etc understand .zst data"
-		default n
-		help
-		This requires external zstd and unzstd binaries.
+	bool "Make tar, rpm, modprobe etc understand .zst data"
+	default y
+	help
+	This requires external zstd and unzstd binaries.
 
 INSERT
 
 config FEATURE_LZMA_FAST
 	bool "Optimize lzma for speed"
-	default n
+	default y # who chooses lzma is for its speed
 	depends on UNLZMA || LZCAT || LZMA || FEATURE_SEAMLESS_LZMA
 	help
 	This option reduces decompression time by about 25% at the cost of
@@ -43,7 +43,7 @@ config FEATURE_LZMA_FAST
 
 config FEATURE_PATH_TRAVERSAL_PROTECTION
 	bool "Prevent extraction of filenames with /../ path component"
-	default n
+	default y
 	help
 	busybox tar and unzip remove "PREFIX/../" (if it exists)
 	from extracted names.
