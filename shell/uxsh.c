@@ -29,45 +29,36 @@ int uxsh_main(int argc, char **argv)
 {
     char buf[256];
     char *interp, *interp_arg = NULL;
-    char *script_path;
-    int fd, n;
+    char *script_path, *nl, *p, **new_argv;
+    int fd, n, i = 0;
 
     script_path = *++argv;
     if (!script_path)
         bb_simple_error_msg_and_die("Missing 1st argument");
 
-    fd = xopen(script_path, O_RDONLY);
-
+    fd = xopen(script_path, O_RDONLY | O_CLOEXEC);
     n = full_read(fd, buf, sizeof(buf) - 1);
-    close(fd);
-    
     if (n < 2 || buf[0] != '#' || buf[1] != '!')
         bb_simple_error_msg_and_die("Invalid shebang (!#)");
-
     buf[n] = '\0';
 
-    char *nl = strchr(buf, '\n');
+    nl = strchr(buf, '\n');
     if (nl) *nl = '\0';
     nl = strchr(buf, '\r');
     if (nl) *nl = '\0';
 
     interp = skip_whitespace(buf + 2);
-
-    char *p = strpbrk(interp, " \t");
+    p = strpbrk(interp, " \t");
     if (p) {
         *p = '\0';
         interp_arg = skip_whitespace(p + 1);
-        if (!*interp_arg)
-            interp_arg = NULL;
+        if (!*interp_arg) interp_arg = NULL;
     }
 
-    char **new_argv = xzalloc(sizeof(char*) * (argc + 2));
-    int i = 0;
-
+    new_argv = xzalloc(sizeof(char*) * (argc + 2));
     new_argv[i++] = interp;
     if (interp_arg)
         new_argv[i++] = interp_arg;
-
     while (*argv)
         new_argv[i++] = *argv++;
 
