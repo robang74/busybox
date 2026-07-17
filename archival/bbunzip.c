@@ -601,3 +601,130 @@ int unxz_main(int argc UNUSED_PARAM, char **argv)
 	return bbunpack(argv, unpack_xz_stream, make_new_name_generic, "xz");
 }
 #endif
+
+#if ENABLE_UZCAT
+static transformer_state_t *FAST_FUNC open_transformer_by_magic(int src_fd)
+{
+	unsigned char magic[4];
+	transformer_state_t *xstate = xzalloc(sizeof(*xstate));
+
+	xstate->src_fd = src_fd;
+
+	// Peek at the first few bytes safely
+	if (full_read(src_fd, magic, 4) < 2) {
+		bb_error_msg("short read or empty file");
+		free(xstate);
+		return NULL;
+	}
+
+	// Seek back to the beginning so the decompressor reads the full header
+	if (lseek(src_fd, 0, SEEK_CUR) != (off_t)-1) {
+		/* It is a regular file, we can safely rewind */
+		xlseek(src_fd, 0, SEEK_SET);
+	} else {
+		/*
+		 * It is a pipe/stdin. dup3() shares the same kernel buffer,
+		 * so consuming bytes drains them permanently. We must fork a
+		 * feeder process to replay the 4 magic bytes into a new pipe.
+		 */
+		int pipe_fds[2];
+		xpipe(pipe_fds);
+
+		if (fork_or_rexec() == 0) {
+			// Processo Figlio: fa da feeder per la pipe inserendo i 4 byte e poi il resto
+			close(pipe_fds[0]); // Chiude il lato di lettura
+			xwrite(pipe_fds[1], magic, 4);
+			bb_copyfd_eof(src_fd, pipe_fds[1]);
+			close(pipe_fds[1]);
+			exit(EXIT_SUCCESS);
+		}
+
+		// Processo Padre: legge dalla nuova pipe che ora contiene l'intero flusso dall'inizio
+		close(pipe_fds[1]); // Chiude il lato di scrittura
+		xstate->src_fd = pipe_fds[0];
+	}
+
+#if ENABLE_FEATURE_SEAMLESS_GZ || ENABLE_GUNZIP
+	if (magic[0] == 0x1f && magic[1] == 0x8b) {
+		xstate->xformer = unpack_gz_stream;
+		return xstate;
+	}
+#endif
+
+#if ENABLE_FEATURE_SEAMLESS_BZ2 || ENABLE_BUNZIP2
+	if (magic[0] == 'B' && magic[1] == 'Z' && magic[2] == 'h') {
+		xstate->xformer = unpack_bz2_stream;
+		return xstate;
+	}
+#endif
+
+#if ENABLE_FEATURE_SEAMLESS_XZ || ENABLE_XZ
+	if (magic[0] == 0xfd && magic[1] == '7' && magic[2] == 'z' && magic[3] == 'X') {
+		xstate->xformer = unpack_xz_stream;
+		return xstate;
+	}
+#endif
+
+#if ENABLE_FEATURE_SEAMLESS_LZMA || ENABLE_LZMA
+	// LZMA doesn't have a rigid universal magic byte, but often starts with properties byte (e.g. 0x5d 0x00)
+	if (magic[0] == 0x5d && magic[1] == 0x00 && magic[2] == 0x00) {
+		xstate->xformer = unpack_lzma_stream;
+		return xstate;
+	}
+#endif
+
+	// Fallback to uncompressed stream copy if nothing matches
+	if (option_mask32 & BBUNPK_OPT_FORCE) {
+		xstate->xformer = NULL;
+		return xstate;
+	}
+
+	bb_error_msg_and_die("unknown compression format (use -f to force plain cat)");
+}
+#endif
+
+//applet:IF_UZCAT(APPLET(uzcat, BB_DIR_USR_BIN, BB_SUID_DROP))
+
+//usage:#define uzcat_trivial_usage
+//usage:	"[-f] [FILE]..."
+//usage:#define uzcat_full_usage "\n\n"
+//usage:	"Decompress any supported format (gz, bz2, xz) to stdout\n"
+//usage:	"	-f	Force plain cat if format is unknown\n"
+
+//config:config UZCAT
+//config:	bool "uzcat (0.7 kb)"
+//config:	default y
+//config:	help
+//config:	uzcat allows to decompress any supported format (gz, bz2, xz, lzma)
+//config:	without explicitly specifying the compressor type by auto-detecting
+//config:	the file signature. It requires enabling the inflate algorithms.
+
+int uzcat_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+int uzcat_main(int argc UNUSED_PARAM, char **argv)
+{
+	int src_fd;
+	transformer_state_t *xstate;
+
+	// Handle standard Busybox option parsing if needed, or simple argument check
+	getopt32(argv, "f");
+	argv += optind;
+	if (!*argv || LONE_DASH(*argv)) {
+		src_fd = STDIN_FILENO;
+	} else {
+		src_fd = xopen(*argv, O_RDONLY);
+	}
+
+	xstate = open_transformer_by_magic(src_fd);
+	if (xstate) {
+		xstate->dst_fd = STDOUT_FILENO;
+		if (xstate->xformer(xstate) < 0)
+			bb_error_msg_and_die("decompression failed");
+		free(xstate);
+	}
+
+	if (src_fd != STDIN_FILENO)
+		close(src_fd);
+
+	return EXIT_SUCCESS;
+}
+
