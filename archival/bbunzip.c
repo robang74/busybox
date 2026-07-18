@@ -608,18 +608,21 @@ int unxz_main(int argc UNUSED_PARAM, char **argv)
 //usage:#define uzcat_trivial_usage
 //usage:	"[-f] [FILE]..."
 //usage:#define uzcat_full_usage "\n\n"
-//usage:	"Decompress any supported format (gz, bz2, xz) to stdout\n"
+//usage:	"Decompress any supported format (gz, xz, ...) to stdout\n"
 //usage:	"	-f	Force plain cat if format is unknown\n"
 
 //config:config UZCAT
 //config:	bool "uzcat (0.1 kb)"
 //config:	default y
+//config:	select FEATURE_SEAMLESS_Z
 //config:	select FEATURE_SEAMLESS_GZ
 //config:	select FEATURE_SEAMLESS_XZ
 //config:	select FEATURE_SEAMLESS_BZ2
 //config:	select FEATURE_SEAMLESS_LZMA
+//config:	select FEATURE_SEAMLESS_ZSTD
+
 //config:	help
-//config:	uzcat allows to decompress any supported format (gz, bz2, xz, lzma)
+//config:	uzcat allows to decompress any supported format (gz, xz, zstd, ...)
 //config:	without explicitly specifying the compressor type by auto-detecting
 //config:	the file signature. It requires enabling the inflate algorithms.
 //config: 	It signals by /bin/uzcat that seamless uncompression is active.
