@@ -37,7 +37,7 @@
 #define OPT_z		(1 << 4)
 #define OPT_STR		"ei:n:o:z"
 
-#define murmul1 0xff51afd7UL
+#define murmul1 0xff51afd7ed558ccdULL
 
 #if 0
 static inline
@@ -51,16 +51,18 @@ unsigned random_in_range(unsigned min, unsigned max)
 }
 #else
 static inline
-unsigned random_in_range(unsigned min, unsigned max)
+uint32_t random_in_range(uint32_t min, uint32_t max)
 {
-	uint32_t r = rand();
+	uint64_t r = rand();
 
 	/* RAND_MAX can be as small as 32767 */
-	r ^= (uint32_t)rand() << 17;
-	r ^= (uint32_t)rand() <<  7;
+	if ((max-min) & 0xff000000)
+	r ^= (uint64_t)rand() << 25;
+	r ^= (uint64_t)rand() << 17;
+	r ^= (uint64_t)rand() <<  7;
 	r *= murmul1;
-	r ^= r >> 16;
-	r %= max-min;
+	r ^= (r >> 32) | (r << 32);
+	r %= max-min; // %-fold ratio 8 bits min.
 	r += min;
 
 	return r;

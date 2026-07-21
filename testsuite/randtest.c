@@ -7,6 +7,7 @@
     for i in $(seq 1 1024); do ./rtest 0 0xf0000000 1024 2>&- | ent |
         grep Carlo| cut -d' ' -f9; sleep 0.0001; done| sort -n | tail
     ./rtest 0 0xffffffff $(( 1 << 31 )) | RNG_test stdin32
+    ./rtest 0 0xffffffff $(( 1 << 20 )) | ent
  */
 
 #include <stdio.h>
@@ -16,7 +17,7 @@
 #include <stdint.h>
 #include <time.h>
 
-#define murmul1 0xff51afd7UL
+#define murmul1 0xff51afd7ed558ccdULL
 
 // RAF: artificially limiting the rand() output for testing the worst case
 #undef  RAND_MAX
@@ -36,14 +37,16 @@ unsigned random_in_range(unsigned min, unsigned max)
 static inline
 uint32_t random_in_range(uint32_t min, uint32_t max)
 {
-	uint32_t r = (rand() % RAND_MAX);
+	uint64_t r = (rand() % RAND_MAX);
 
 	/* RAND_MAX can be as small as 32767 */
-  r ^= (uint32_t)(rand() % RAND_MAX) << 17;
-  r ^= (uint32_t)(rand() % RAND_MAX) <<  7;
+	if ((max-min) & 0xff000000)
+	r ^= (uint64_t)(rand() % RAND_MAX) << 25;
+  r ^= (uint64_t)(rand() % RAND_MAX) << 17;
+  r ^= (uint64_t)(rand() % RAND_MAX) <<  7;
   r *= murmul1;
-  r ^= r >> 16;
-	r %= max-min;
+  r ^= (r >> 32) | (r << 32);
+	r %= max-min; // %-fold ratio 8 bits min.
 	r += min;
 
 	return r;
