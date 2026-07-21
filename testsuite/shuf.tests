@@ -41,17 +41,14 @@ testing "shuf rejects reversed range" \
 # Must not try to allocate an array for the whole range
 # (~17 gigabytes here): www.github.com/mirror/busybox/issues/109
 
-SKIP=
 testing "shuf -i with huge range prints distinct numbers" \
 	"shuf -i 1-2222222222 -n 4 | sort -un | wc -l" \
 	"4\n" "" ""
 
-SKIP=
 testing "shuf -i with huge range prints numbers within it" \
 	"shuf -i 2000000000-2222222222 -n 3 | awk '\$1 < 2000000000 || \$1 > 2222222222'" \
 	"" "" ""
 
-SKIP=
 testing "shuf -i with huge range and -n 0 prints nothing" \
 	"shuf -i 1-2222222222 -n 0" \
 	"" "" ""
