@@ -37,6 +37,44 @@
 #define OPT_z		(1 << 4)
 #define OPT_STR		"ei:n:o:z"
 
+#define murmul1 0xff51afd7UL
+
+#if 0
+static inline
+unsigned random_in_range(unsigned min, unsigned max)
+{
+	unsigned r = rand();
+	/* RAND_MAX can be as small as 32767 */
+	if (max > RAND_MAX)
+		r ^= rand() << 15;
+	return r % max;
+}
+#else
+static inline
+unsigned random_in_range(unsigned min, unsigned max)
+{
+	uint32_t r = rand();
+
+	/* RAND_MAX can be as small as 32767 */
+	r ^= (uint32_t)rand() << 17;
+	r ^= (uint32_t)rand() <<  7;
+	r *= murmul1;
+	r ^= r >> 16;
+	r %= max-min;
+	r += min;
+
+	return r;
+}
+#endif
+
+static inline
+void srand_init(void)
+{
+	struct timespec ts;
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	srand( ts.tv_sec ^ ts.tv_nsec );
+}
+
 /*
  * Use the Fisher-Yates shuffle algorithm on an array of lines.
  * If the required number of output lines is less than the total
@@ -44,20 +82,11 @@
  */
 static void shuffle_lines(char **lines, unsigned numlines, unsigned outlines)
 {
-	srand(monotonic_us());
+	srand_init();
 
 	while (outlines != 0) {
 		char *tmp;
-		unsigned r = rand();
-		/* RAND_MAX can be as small as 32767 */
-		if (numlines > RAND_MAX)
-			r ^= rand() << 15;
-		r %= numlines;
-//TODO: the above method is seriously non-uniform when numlines is very large.
-//For example, with numlines of   0xf0000000,
-//values of (r % numlines) in [0, 0x0fffffff] range
-//are more likely: e.g. r=1 and r=0xf0000001 both map to 1,
-//whereas only one value, r=0xefffffff, maps to 0xefffffff.
+		unsigned r = random_in_range(0, numlines);
 		numlines--;
 		tmp = lines[numlines];
 		lines[numlines] = lines[r];
