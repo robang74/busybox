@@ -68,6 +68,7 @@ uint32_t random_in_range(uint32_t min, uint32_t max)
 	return r;
 }
 #endif
+#define random_numline() random_in_range(0, numlines)
 
 static inline
 void srand_init(void)
@@ -88,7 +89,7 @@ static void shuffle_lines(char **lines, unsigned numlines, unsigned outlines)
 
 	while (outlines != 0) {
 		char *tmp;
-		unsigned r = random_in_range(0, numlines);
+		unsigned r = random_numline();
 		numlines--;
 		tmp = lines[numlines];
 		lines[numlines] = lines[r];
@@ -192,10 +193,8 @@ int shuf_main(int argc, char **argv)
 		}
 
 		numlines = hi + 1;
-		lines = xmalloc((size_t)numlines * sizeof(lines[0]));
-		for (i = 0; i < numlines; i++) {
-			lines[i] = (char*)(uintptr_t)i;
-		}
+		/* lines[] is allocated below, when outlines is known */
+		lines = NULL;
 	} else {
 		/* default - read lines from stdin or the input file */
 		FILE *fp;
@@ -227,7 +226,40 @@ int shuf_main(int argc, char **argv)
 			outlines = numlines;
 	}
 
-	shuffle_lines(lines, numlines, outlines);
+	srand(monotonic_us());
+
+	if ((opts & OPT_i)
+	&& (unsigned long long)outlines * outlines / 2 < numlines
+	) {
+		/* Do not create a "virtual line" for each number in the range:
+		 * a large range with a small -n COUNT would use lots of memory
+		 * and time just to output a few numbers (and worse,
+		 * e.g. "shuf -i 1-2222222222 -n 1" would fail to allocate
+		 * ~17 gigabytes). Instead, pick COUNT distinct random numbers
+		 * from the range. Expected number of comparisons below
+		 * is less than outlines^2 / 2 < numlines - cheaper than
+		 * creating and shuffling the full array.
+		 */
+		lines = xmalloc((size_t)outlines * sizeof(lines[0]));
+		for (i = 0; i < outlines; i++) {
+			unsigned j;
+			uintptr_t v;
+ again:
+			v = random_numline();
+			for (j = 0; j < i; j++)
+				if ((uintptr_t)lines[j] == v)
+						goto again; /* duplicate, pick another */
+			lines[i] = (char*)v;
+		}
+		numlines = outlines;
+	} else {
+		if (opts & OPT_i) {
+			lines = xmalloc((size_t)numlines * sizeof(lines[0]));
+			for (i = 0; i < numlines; i++)
+				lines[i] = (char*)(uintptr_t)i;
+		}
+		shuffle_lines(lines, numlines, outlines);
+	}
 
 	if (opts & OPT_o)
 		xmove_fd(xopen(opt_o_str, O_WRONLY|O_CREAT|O_TRUNC), STDOUT_FILENO);
