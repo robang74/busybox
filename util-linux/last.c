@@ -156,7 +156,7 @@ int last_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
 			time_t t_tmp = (time_t)ut.ut_tv.tv_sec;
 			printf("%-10s %-14s %-18s %-12.12s\n",
 				ut.ut_user, ut.ut_line, ut.ut_host,
-				ctime_r(&t_tmp,tbuf,tbuf) + 4);
+				ctime_r(&t_tmp,tbuf) + 4);
 		}
  next:
 		pos -= sizeof(ut);
