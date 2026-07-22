@@ -19,12 +19,12 @@
 //usage:#define shuf_trivial_usage
 //usage:       "[-n NUM] [-o FILE] [-z] [FILE | -e [ARG...] | -i L-H]"
 //usage:#define shuf_full_usage "\n\n"
-//usage:       "Randomly permute lines\n"
-//usage:     "\n	-n NUM	Output at most NUM lines"
-//usage:     "\n	-o FILE	Write to FILE, not standard output"
-//usage:     "\n	-z	NUL terminated output"
-//usage:     "\n	-e	Treat ARGs as lines"
-//usage:     "\n	-i L-H	Treat numbers L-H as lines"
+//usage:       "Randomly permute lines, arguments or integers\n"
+//usage:     "\n	-n NUM   output at most NUM items"
+//usage:     "\n	-o FILE  write to FILE, not standard output"
+//usage:     "\n	-z       null terminated output"
+//usage:     "\n	-e ARGs  treat each argument as a text line"
+//usage:     "\n	-i L-H   for permuting integers in L-H range"
 
 #include "libbb.h"
 
