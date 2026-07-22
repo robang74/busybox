@@ -19,12 +19,12 @@
 //usage:#define shuf_trivial_usage
 //usage:       "[-n NUM] [-o FILE] [-z] [FILE | -e [ARG...] | -i L-H]"
 //usage:#define shuf_full_usage "\n\n"
-//usage:       "Randomly permute lines\n"
-//usage:     "\n	-n NUM	Output at most NUM lines"
-//usage:     "\n	-o FILE	Write to FILE, not standard output"
-//usage:     "\n	-z	NUL terminated output"
-//usage:     "\n	-e	Treat ARGs as lines"
-//usage:     "\n	-i L-H	Treat numbers L-H as lines"
+//usage:       "Randomly permute lines, arguments or integers\n"
+//usage:     "\n	-n NUM   output at most NUM items"
+//usage:     "\n	-o FILE  write to FILE, not standard output"
+//usage:     "\n	-z       null terminated output"
+//usage:     "\n	-e ARGs  treat each argument as a text line"
+//usage:     "\n	-i L-H   for permuting integers in L-H range"
 
 #include "libbb.h"
 
@@ -222,37 +222,40 @@ int shuf_main(int argc, char **argv)
 
 	srand(monotonic_us());
 
-	if ((opts & OPT_i)
-	&& (unsigned long long)outlines * outlines / 2 < numlines
-	) {
-		/* Do not create a "virtual line" for each number in the range:
-		 * a large range with a small -n COUNT would use lots of memory
-		 * and time just to output a few numbers (and worse,
-		 * e.g. "shuf -i 1-2222222222 -n 1" would fail to allocate
-		 * ~17 gigabytes). Instead, pick COUNT distinct random numbers
-		 * from the range. Expected number of comparisons below
-		 * is less than outlines^2 / 2 < numlines - cheaper than
-		 * creating and shuffling the full array.
-		 */
-		lines = xmalloc((size_t)outlines * sizeof(lines[0]));
-		for (i = 0; i < outlines; i++) {
-			unsigned j;
-			uintptr_t v;
- again:
-			v = random_numline();
-			for (j = 0; j < i; j++)
-				if ((uintptr_t)lines[j] == v)
+	if (opts & OPT_i) {
+		if( (unsigned long long)outlines * outlines / 2 < numlines ) {
+		    /*
+		     * Do not create a "virtual line" for each number in the range:
+		     * a large range with a small -n COUNT would use lots of memory
+		     * and time just to output a few numbers (and worse,
+		     * e.g. "shuf -i 1-2222222222 -n 1" would fail to allocate
+		     * ~17 gigabytes). Instead, pick COUNT distinct random numbers
+		     * from the range. Expected number of comparisons below
+		     * is less than outlines^2 / 2 < numlines - cheaper than
+		     * creating and shuffling the full array.
+		     */
+		    // RAF, RATIONALE
+		    // rejection sampling and partial Fisher-Yates provides in output
+		    // the same distribution: an items permutation without duplicates.
+
+		    lines = xmalloc((size_t)outlines * sizeof(lines[0]));
+		    for (i = 0; i < outlines; i++) {
+			    unsigned j;
+			    uintptr_t v;
+		    again:
+			    v = random_numline();
+			    for (j = 0; j < i; j++)
+				    if ((uintptr_t)lines[j] == v)
 						goto again; /* duplicate, pick another */
-			lines[i] = (char*)v;
-		}
-		numlines = outlines;
-	} else {
-		if (opts & OPT_i) {
+			    lines[i] = (char*)v;
+		    }
+		    numlines = outlines;
+		} else {
 			lines = xmalloc((size_t)numlines * sizeof(lines[0]));
 			for (i = 0; i < numlines; i++)
 				lines[i] = (char*)(uintptr_t)i;
+			shuffle_lines(lines, numlines, outlines);
 		}
-		shuffle_lines(lines, numlines, outlines);
 	}
 
 	if (opts & OPT_o)
