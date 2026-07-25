@@ -186,9 +186,10 @@ void* FAST_FUNC try_to_mmap_module(const char *filename, size_t *image_size_p)
 int FAST_FUNC bb_init_module(const char *filename, const char *options)
 {
 	size_t image_size;
-	char *image;
+	char *image = NULL;
 	int rc;
 	bool mmaped;
+	bool compressed = 0;
 
 	if (!options)
 		options = "";
@@ -207,26 +208,27 @@ int FAST_FUNC bb_init_module(const char *filename, const char *options)
 	 */
 # ifdef __NR_finit_module
 	{
+		uint32_t signature;
 		int fd = open(filename, O_RDONLY | O_CLOEXEC);
-		if (fd >= 0) {
-			int flags = is_suffixed_with(filename, ".ko") ? 0 : MODULE_INIT_COMPRESSED_FILE;
-			for (;;) {
-				rc = finit_module(fd, options, flags);
-				if (rc == 0 || flags == 0)
-					break;
-				/* Loading non-.ko named uncompressed module? Not likely, but let's try it */
-				flags = 0;
-			}
-			close(fd);
-			if (rc == 0)
-				return rc;
-		}
+		if (full_read(fd, &signature, 4) < 0)
+			goto do_mmap;
+		/* Assume compressed module if it is not a valid ELF file */
+		compressed = (signature != SWAP_BE32(0x7f454c46));
+		rc = finit_module(fd, options,
+			compressed ? MODULE_INIT_COMPRESSED_FILE : 0);
+		close(fd);
+		if (rc == 0)
+			return rc;
 	}
 # endif
 
+do_mmap:
+	/* Only try mmap with uncompressed modules */
 	image_size = INT_MAX - 4095;
 	mmaped = 0;
-	image = try_to_mmap_module(filename, &image_size);
+	if (!compressed)
+		image = try_to_mmap_module(filename, &image_size);
+
 	if (image) {
 		mmaped = 1;
 	} else {
