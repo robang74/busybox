@@ -102,10 +102,8 @@ char* FAST_FUNC filename2modname(const char *filename, char *modname)
 		modname[i] = (from[i] == '-') ? '_' : from[i];
 	modname[i] = '\0';
 
-	if (modname == local_modname)
-		return xstrdup(modname);
-
-	return modname;
+	//RAF: always does a copy, it never hurts
+	return xstrdup(modname);
 }
 
 #if ENABLE_FEATURE_CMDLINE_MODULE_OPTIONS
