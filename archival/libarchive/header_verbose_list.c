@@ -29,7 +29,8 @@ void FAST_FUNC header_verbose_list(const file_header_t *file_header)
 		/*sprintf(gid, "%u", (unsigned)file_header->gid);*/
 		group = utoa(file_header->gid);
 	}
-	printf("%s %s/%s %9"OFF_FMT"u %4u-%02u-%02u %02u:%02u:%02u %s",
+	fprintf(file_header->verbose_fp,
+	        "%s %s/%s %9"OFF_FMT"u %4u-%02u-%02u %02u:%02u:%02u %s",
 		bb_mode_string(modestr, file_header->mode),
 		user,
 		group,
@@ -46,7 +47,8 @@ void FAST_FUNC header_verbose_list(const file_header_t *file_header)
 
 	localtime_r(&file_header->mtime, ptm);
 
-	printf("%s %u/%u %9"OFF_FMT"u %4u-%02u-%02u %02u:%02u:%02u %s",
+	fprintf(file_header->verbose_fp,
+	        "%s %u/%u %9"OFF_FMT"u %4u-%02u-%02u %02u:%02u:%02u %s",
 		bb_mode_string(modestr, file_header->mode),
 		(unsigned)file_header->uid,
 		(unsigned)file_header->gid,
@@ -63,7 +65,8 @@ void FAST_FUNC header_verbose_list(const file_header_t *file_header)
 
 	/* NB: GNU tar shows "->" for symlinks and "link to" for hardlinks */
 	if (file_header->link_target) {
-		printf(" -> %s", printable_string(file_header->link_target));
+		fprintf(file_header->verbose_fp, " -> %s", printable_string(file_header->link_target));
 	}
-	bb_putchar('\n');
+	fputc('\n', file_header->verbose_fp);
+	fflush(file_header->verbose_fp);
 }

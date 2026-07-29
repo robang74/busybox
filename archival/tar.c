@@ -1074,8 +1074,11 @@ int tar_main(int argc UNUSED_PARAM, char **argv)
 	if (opt & OPT_EXTRACT)
 		tar_handle->action_data = data_extract_all;
 
-	if (opt & OPT_2STDOUT)
+	if (opt & OPT_2STDOUT) {
 		tar_handle->action_data = data_extract_to_stdout;
+		/* If archive goes to stdout, verbose goes to stderr */
+		tar_handle->file_header->verbose_fp = stderr;
+	}
 
 	if (opt & OPT_2COMMAND) {
 		putenv((char*)"TAR_FILETYPE=f");

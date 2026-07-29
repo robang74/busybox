@@ -41,6 +41,7 @@ typedef struct file_header_t {
 	mode_t mode;
 	time_t mtime;
 	dev_t device;
+	FILE* verbose_fp;
 } file_header_t;
 
 struct hardlinks_t;
