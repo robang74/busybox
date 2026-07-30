@@ -5,6 +5,6 @@
 #include "libbb.h"
 #include "bb_archive.h"
 
-void FAST_FUNC header_skip(const file_header_t *file_header UNUSED_PARAM)
+void FAST_FUNC header_skip(archive_handle_t *archive_handle UNUSED_PARAM)
 {
 }

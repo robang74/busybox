@@ -5,11 +5,14 @@
 #include "libbb.h"
 #include "bb_archive.h"
 
-void FAST_FUNC header_verbose_list(const file_header_t *file_header)
+void FAST_FUNC header_verbose_list(archive_handle_t *archive_handle)
 {
+	const file_header_t *file_header = archive_handle->file_header;
 	struct tm tm_time;
 	struct tm *ptm = &tm_time; //localtime(&file_header->mtime);
 	char modestr[12];
+	/* "tar xvvOf TARFILE >OUTFILE" should use stderr for file list output: */
+	FILE *fp = (archive_handle->action_data == data_extract_to_stdout) ? stderr : stdout;
 
 #if ENABLE_FEATURE_TAR_UNAME_GNAME
 	char uid[sizeof(int)*3 + 2];
@@ -29,7 +32,7 @@ void FAST_FUNC header_verbose_list(const file_header_t *file_header)
 		/*sprintf(gid, "%u", (unsigned)file_header->gid);*/
 		group = utoa(file_header->gid);
 	}
-	printf("%s %s/%s %9"OFF_FMT"u %4u-%02u-%02u %02u:%02u:%02u %s",
+	fprintf(fp, "%s %s/%s %9"OFF_FMT"u %4u-%02u-%02u %02u:%02u:%02u %s",
 		bb_mode_string(modestr, file_header->mode),
 		user,
 		group,
@@ -40,13 +43,13 @@ void FAST_FUNC header_verbose_list(const file_header_t *file_header)
 		ptm->tm_hour,
 		ptm->tm_min,
 		ptm->tm_sec,
-		file_header->name);
+		printable_string(file_header->name));
 
 #else /* !FEATURE_TAR_UNAME_GNAME */
 
 	localtime_r(&file_header->mtime, ptm);
 
-	printf("%s %u/%u %9"OFF_FMT"u %4u-%02u-%02u %02u:%02u:%02u %s",
+	fprintf(fp, "%s %u/%u %9"OFF_FMT"u %4u-%02u-%02u %02u:%02u:%02u %s",
 		bb_mode_string(modestr, file_header->mode),
 		(unsigned)file_header->uid,
 		(unsigned)file_header->gid,
@@ -63,7 +66,7 @@ void FAST_FUNC header_verbose_list(const file_header_t *file_header)
 
 	/* NB: GNU tar shows "->" for symlinks and "link to" for hardlinks */
 	if (file_header->link_target) {
-		printf(" -> %s", printable_string(file_header->link_target));
+		fprintf(fp, " -> %s", printable_string(file_header->link_target));
 	}
-	bb_putchar('\n');
+	putc('\n', fp);
 }

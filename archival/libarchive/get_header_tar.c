@@ -469,7 +469,7 @@ char FAST_FUNC get_header_tar(archive_handle_t *archive_handle)
 	cp = last_char_is(file_header->name, '/');
 
 	if (archive_handle->filter(archive_handle) == EXIT_SUCCESS) {
-		archive_handle->action_header(/*archive_handle->*/ file_header);
+		archive_handle->action_header(archive_handle);
 		/* Note that we kill the '/' only after action_header() */
 		/* (like GNU tar 1.15.1: verbose mode outputs "dir/dir/") */
 		if (cp)

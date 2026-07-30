@@ -68,7 +68,7 @@ typedef struct archive_handle_t {
 	llist_t *link_placeholders;
 
 	/* Process the header component, e.g. tar -t */
-	void FAST_FUNC (*action_header)(const file_header_t *);
+	void FAST_FUNC (*action_header)(struct archive_handle_t *);
 
 	/* Process the data component, e.g. extract to filesystem */
 	void FAST_FUNC (*action_data)(struct archive_handle_t *);
@@ -187,9 +187,9 @@ void data_extract_all(archive_handle_t *archive_handle) FAST_FUNC;
 void data_extract_to_stdout(archive_handle_t *archive_handle) FAST_FUNC;
 void data_extract_to_command(archive_handle_t *archive_handle) FAST_FUNC;
 
-void header_skip(const file_header_t *file_header) FAST_FUNC;
-void header_list(const file_header_t *file_header) FAST_FUNC;
-void header_verbose_list(const file_header_t *file_header) FAST_FUNC;
+void header_skip(archive_handle_t *archive_handle) FAST_FUNC;
+void header_list(archive_handle_t *archive_handle) FAST_FUNC;
+void header_verbose_list(archive_handle_t *archive_handle) FAST_FUNC;
 
 char get_header_ar(archive_handle_t *archive_handle) FAST_FUNC;
 char get_header_cpio(archive_handle_t *archive_handle) FAST_FUNC;

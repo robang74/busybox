@@ -125,7 +125,7 @@ char FAST_FUNC get_header_cpio(archive_handle_t *archive_handle)
 //cpio: etc/hosts not created: newer or same age file exists
 //etc/hosts  <-- should NOT show it
 //2 blocks <-- should say "0 blocks"
-		archive_handle->action_header(file_header);
+		archive_handle->action_header(archive_handle);
 	} else {
 		data_skip(archive_handle);
 	}

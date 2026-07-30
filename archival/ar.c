@@ -194,8 +194,9 @@ static int write_ar_archive(archive_handle_t *handle)
 }
 #endif /* FEATURE_AR_CREATE */
 
-static void FAST_FUNC header_verbose_list_ar(const file_header_t *file_header)
+static void FAST_FUNC header_verbose_list_ar(archive_handle_t *archive_handle)
 {
+	const file_header_t *file_header = archive_handle->file_header;
 	char mode[12];
 	char *mtime;
 

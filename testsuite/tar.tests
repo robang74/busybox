@@ -206,6 +206,30 @@ SKIP=
 cd .. || exit 1; rm -rf tar.tempdir 2>/dev/null
 
 mkdir tar.tempdir && cd tar.tempdir || exit 1
+optional FEATURE_TAR_CREATE
+testing "tar xvO sends file list to stderr" '\
+echo "data1" >file1.txt
+echo "data2" >file2.txt
+echo "data3" >file3.txt
+tar cf test.tar file1.txt file2.txt file3.txt
+tar xvOf test.tar >out 2>err
+echo OUT:; cat out
+echo ERR:; cat err
+' "\
+OUT:
+data1
+data2
+data3
+ERR:
+file1.txt
+file2.txt
+file3.txt
+" \
+"" ""
+SKIP=
+cd .. || exit 1; rm -rf tar.tempdir 2>/dev/null
+
+mkdir tar.tempdir && cd tar.tempdir || exit 1
 # Had a bug where on extract autodetect first "switched off" -z
 # and then failed to recognize .tgz extension
 optional FEATURE_TAR_CREATE FEATURE_SEAMLESS_GZ GUNZIP
