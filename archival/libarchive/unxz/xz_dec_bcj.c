@@ -1,11 +1,10 @@
+// SPDX-License-Identifier: 0BSD
+
 /*
  * Branch/Call/Jump (BCJ) filter decoders
  *
  * Authors: Lasse Collin <lasse.collin@tukaani.org>
- *          Igor Pavlov <http://7-zip.org/>
- *
- * This file has been put into the public domain.
- * You can do whatever you want with this file.
+ *          Igor Pavlov <https://7-zip.org/>
  */
 
 #include "xz_private.h"
@@ -166,7 +165,8 @@ static noinline_for_stack size_t XZ_FUNC bcj_powerpc(
 	size_t i;
 	uint32_t instr;
 
-	for (i = 0; i + 4 <= size; i += 4) {
+	size &= ~(size_t)3;
+	for (i = 0; i < size; i += 4) {
 		instr = get_unaligned_be32(buf + i);
 		if ((instr & 0xFC000003) == 0x48000001) {
 			instr &= 0x03FFFFFC;
@@ -224,7 +224,8 @@ static noinline_for_stack size_t XZ_FUNC bcj_ia64(
 	/* Instruction normalized with bit_res for easier manipulation */
 	uint64_t norm;
 
-	for (i = 0; i + 16 <= size; i += 16) {
+	size &= ~(size_t)15;
+	for (i = 0; i < size; i += 16) {
 		mask = branch_table[buf[i] & 0x1F];
 		for (slot = 0, bit_pos = 5; slot < 3; ++slot, bit_pos += 41) {
 			if (((mask >> slot) & 1) == 0)
@@ -273,7 +274,8 @@ static noinline_for_stack size_t XZ_FUNC bcj_arm(
 	size_t i;
 	uint32_t addr;
 
-	for (i = 0; i + 4 <= size; i += 4) {
+	size &= ~(size_t)3;
+	for (i = 0; i < size; i += 4) {
 		if (buf[i + 3] == 0xEB) {
 			addr = (uint32_t)buf[i] | ((uint32_t)buf[i + 1] << 8)
 					| ((uint32_t)buf[i + 2] << 16);
@@ -326,7 +328,8 @@ static noinline_for_stack size_t XZ_FUNC bcj_sparc(
 	size_t i;
 	uint32_t instr;
 
-	for (i = 0; i + 4 <= size; i += 4) {
+	size &= ~(size_t)3;
+	for (i = 0; i < size; i += 4) {
 		instr = get_unaligned_be32(buf + i);
 		if ((instr >> 22) == 0x100 || (instr >> 22) == 0x1FF) {
 			instr <<= 2;
@@ -343,13 +346,15 @@ static noinline_for_stack size_t XZ_FUNC bcj_sparc(
 #endif
 
 #ifdef XZ_DEC_ARM64
-static size_t bcj_arm64(struct xz_dec_bcj *s, uint8_t *buf, size_t size)
+static size_t noinline_for_stack
+bcj_arm64(struct xz_dec_bcj *s, uint8_t *buf, size_t size)
 {
 	size_t i;
 	uint32_t instr;
 	uint32_t addr;
 
-	for (i = 0; i + 4 <= size; i += 4) {
+	size &= ~(size_t)3;
+	for (i = 0; i < size; i += 4) {
 		instr = get_unaligned_le32(buf + i);
 
 		if ((instr >> 26) == 0x25) {
@@ -382,7 +387,8 @@ static size_t bcj_arm64(struct xz_dec_bcj *s, uint8_t *buf, size_t size)
 #endif
 
 #ifdef XZ_DEC_RISCV
-static size_t bcj_riscv(struct xz_dec_bcj *s, uint8_t *buf, size_t size)
+static size_t noinline_for_stack
+bcj_riscv(struct xz_dec_bcj *s, uint8_t *buf, size_t size)
 {
 	size_t i;
 	uint32_t b1;
