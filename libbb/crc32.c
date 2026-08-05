@@ -52,7 +52,8 @@ uint32_t* FAST_FUNC global_crc32_new_table_le(void)
 	return global_crc32_table;
 }
 
-uint32_t FAST_FUNC crc32_block_endian1(uint32_t val, const void *buf, unsigned len, uint32_t *crc_table)
+uint32_t FAST_FUNC
+crc32_block_endian1(uint32_t val, const void *buf, unsigned len, uint32_t *crc_table)
 {
 	const void *end = (uint8_t*)buf + len;
 
@@ -63,7 +64,38 @@ uint32_t FAST_FUNC crc32_block_endian1(uint32_t val, const void *buf, unsigned l
 	return val;
 }
 
-uint32_t FAST_FUNC crc32_block_endian0(uint32_t val, const void *buf, unsigned len, uint32_t *crc_table)
+#if defined(__x86_64__) && defined(__SSE4_2__)
+#include <nmmintrin.h>
+uint32_t FAST_FUNC
+crc32_block_endian0(uint32_t crc, const void *data, unsigned len,
+        uint32_t *table UNUSED_PARAM)
+{
+    const uint8_t *p = data;
+    crc = ~crc;
+
+    /* Align to 8 bytes */
+    while (len && ((uintptr_t)p & 7)) {
+        crc = _mm_crc32_u8(crc, *p++);
+        len--;
+    }
+
+    /* 8-byte chunks */
+    const uint64_t *q = (const uint64_t *)p;
+    while (len >= 8) {
+        crc = _mm_crc32_u64(crc, *q++);
+        len -= 8;
+    }
+
+    /* Tail */
+    p = (const uint8_t *)q;
+    while (len--)
+        crc = _mm_crc32_u8(crc, *p++);
+
+    return ~crc;
+}
+#else
+uint32_t FAST_FUNC
+crc32_block_endian0(uint32_t val, const void *buf, unsigned len, uint32_t *crc_table)
 {
 	const void *end = (uint8_t*)buf + len;
 
@@ -73,3 +105,5 @@ uint32_t FAST_FUNC crc32_block_endian0(uint32_t val, const void *buf, unsigned l
 	}
 	return val;
 }
+#endif
+
