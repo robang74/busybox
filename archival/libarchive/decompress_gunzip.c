@@ -256,7 +256,8 @@ static void abort_unzip(STATE_PARAM_ONLY)
 	longjmp(error_jmp, 1);
 }
 
-static unsigned fill_bitbuffer(STATE_PARAM unsigned bitbuffer, unsigned *current, const unsigned required)
+static ALWAYS_INLINE unsigned
+fill_bitbuffer(STATE_PARAM unsigned bitbuffer, unsigned *current, const unsigned required)
 {
 	while (*current < required) {
 		if (bytebuffer_offset >= bytebuffer_size) {
@@ -513,7 +514,8 @@ static huft_t* huft_build(const unsigned *b, const unsigned n,
 #define bd inflate_codes_bd
 #define nn inflate_codes_nn
 #define dd inflate_codes_dd
-static void inflate_codes_setup(STATE_PARAM unsigned my_bl, unsigned my_bd)
+static ALWAYS_INLINE void
+inflate_codes_setup(STATE_PARAM unsigned my_bl, unsigned my_bd)
 {
 	bl = my_bl;
 	bd = my_bd;
@@ -526,7 +528,8 @@ static void inflate_codes_setup(STATE_PARAM unsigned my_bl, unsigned my_bd)
 	md = mask_bits[bd];
 }
 /* called once from inflate_get_next_window */
-static NOINLINE int inflate_codes(STATE_PARAM_ONLY)
+static NOINLINE int
+inflate_codes(STATE_PARAM_ONLY)
 {
 	unsigned e;	/* table entry flag/number of extra bits */
 	huft_t *t;	/* pointer to table entry */
