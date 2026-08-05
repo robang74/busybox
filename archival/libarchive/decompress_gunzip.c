@@ -609,8 +609,11 @@ static NOINLINE int inflate_codes(STATE_PARAM_ONLY)
 				nn -= e;
 
 				/* copy to new buffer to prevent possible overwrite */
-				if (delta >= e) {
-					memcpy(gunzip_window + w, gunzip_window + dd, e);
+				if (delta >> 3 && delta >= e) {
+				    /* memmove() and memcpy() are faster but the call starts
+				     * to be more convenient for a chunk longer than 8 bytes
+				     */
+					memmove(gunzip_window + w, gunzip_window + dd, e);
 					w += e;
 					dd += e;
 				} else {
