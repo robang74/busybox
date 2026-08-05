@@ -2494,7 +2494,8 @@ unsigned FAST_FUNC hmac_peek_hash(hmac_ctx_t *ctx, uint8_t *out, ...);
 
 extern uint32_t *global_crc32_table;
 uint32_t *crc32_filltable(uint32_t *tbl256, int endian) FAST_FUNC;
-uint32_t *crc32_new_table_le(void) FAST_FUNC;
+//RAF: only global table
+//uint32_t *crc32_new_table_le(void) FAST_FUNC;
 uint32_t *global_crc32_new_table_le(void) FAST_FUNC;
 uint32_t crc32_block_endian1(uint32_t val, const void *buf, unsigned len, uint32_t *crc_table) FAST_FUNC;
 uint32_t crc32_block_endian0(uint32_t val, const void *buf, unsigned len, uint32_t *crc_table) FAST_FUNC;

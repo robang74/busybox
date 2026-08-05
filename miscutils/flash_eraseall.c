@@ -99,9 +99,6 @@ int flash_eraseall_main(int argc UNUSED_PARAM, char **argv)
 	clmpos = 0;
 	clmlen = 8;
 	if (flags & OPTION_J) {
-		uint32_t *crc32_table;
-
-		crc32_table = crc32_new_table_le();
 
 		cleanmarker.magic = cpu_to_je16(JFFS2_MAGIC_BITMASK);
 		cleanmarker.nodetype = cpu_to_je16(JFFS2_NODETYPE_CLEANMARKER);
@@ -142,7 +139,7 @@ int flash_eraseall_main(int argc UNUSED_PARAM, char **argv)
 		}
 
 		cleanmarker.hdr_crc = cpu_to_je32(
-			crc32_block_endian0(0, &cleanmarker, sizeof(struct jffs2_unknown_node) - 4, crc32_table)
+			crc32_block_endian0(0, &cleanmarker, sizeof(struct jffs2_unknown_node) - 4, global_crc32_new_table_le())
 		);
 	}
 

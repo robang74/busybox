@@ -76,8 +76,6 @@ typedef struct state_t {
 
 	unsigned char *gunzip_window;
 
-	uint32_t *gunzip_crc_table;
-
 	/* bitbuffer */
 	unsigned gunzip_bb; /* bit buffer */
 	unsigned char gunzip_bk; /* bits in bit buffer */
@@ -123,7 +121,6 @@ typedef struct state_t {
 #define gunzip_src_fd       (S()gunzip_src_fd      )
 #define gunzip_outbuf_count (S()gunzip_outbuf_count)
 #define gunzip_window       (S()gunzip_window      )
-#define gunzip_crc_table    (S()gunzip_crc_table   )
 #define gunzip_bb           (S()gunzip_bb          )
 #define gunzip_bk           (S()gunzip_bk          )
 #define to_read             (S()to_read            )
@@ -961,7 +958,8 @@ static int inflate_block(STATE_PARAM smallint *e)
 /* Two callsites, both in inflate_get_next_window */
 static void calculate_gunzip_crc(STATE_PARAM_ONLY)
 {
-	gunzip_crc = crc32_block_endian0(gunzip_crc, gunzip_window, gunzip_outbuf_count, gunzip_crc_table);
+	gunzip_crc = crc32_block_endian0(gunzip_crc, gunzip_window,
+					gunzip_outbuf_count, global_crc32_table);
 	gunzip_bytes_out += gunzip_outbuf_count;
 }
 
@@ -1026,7 +1024,7 @@ inflate_unzip_internal(STATE_PARAM transformer_state_t *xstate)
 	gunzip_bb = 0;
 
 	/* Create the crc table */
-	gunzip_crc_table = crc32_new_table_le();
+	global_crc32_new_table_le();
 	gunzip_crc = ~0;
 
 	error_msg = "corrupted data";
@@ -1060,7 +1058,6 @@ inflate_unzip_internal(STATE_PARAM transformer_state_t *xstate)
  ret:
 	/* Cleanup */
 	free(gunzip_window);
-	free(gunzip_crc_table);
 	return n;
 }
 

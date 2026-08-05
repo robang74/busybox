@@ -17,7 +17,7 @@
  */
 #include "libbb.h"
 
-uint32_t *global_crc32_table;
+uint32_t *global_crc32_table = NULL;
 
 static ALWAYS_INLINE uint32_t*
 crc32_filltable_endian0(uint32_t *crc_table)
@@ -66,13 +66,14 @@ uint32_t* FAST_FUNC crc32_filltable(uint32_t *crc_table, int endian)
 	return crc_table;
 }
 /* Common uses: */
-uint32_t* FAST_FUNC crc32_new_table_le(void)
+static ALWAYS_INLINE uint32_t* crc32_new_table_le(void)
 {
 	return crc32_filltable(NULL, 0);
 }
 uint32_t* FAST_FUNC global_crc32_new_table_le(void)
 {
-	global_crc32_table = crc32_new_table_le();
+	if (!global_crc32_table)
+	    global_crc32_table = crc32_new_table_le();
 	return global_crc32_table;
 }
 
