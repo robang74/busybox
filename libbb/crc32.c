@@ -19,27 +19,51 @@
 
 uint32_t *global_crc32_table;
 
-uint32_t* FAST_FUNC crc32_filltable(uint32_t *crc_table, int endian)
+static ALWAYS_INLINE uint32_t*
+crc32_filltable_endian0(uint32_t *crc_table)
 {
-	uint32_t polynomial = endian ? 0x04c11db7 : 0xedb88320;
+	uint32_t polynomial = 0xedb88320;
 	uint32_t c;
 	unsigned i, j;
 
-	if (!crc_table)
-		crc_table = xmalloc(256 * sizeof(uint32_t));
-
 	for (i = 0; i < 256; i++) {
-		c = endian ? (i << 24) : i;
+		c = i;
 		for (j = 8; j; j--) {
-			if (endian)
-				c = (c&0x80000000) ? ((c << 1) ^ polynomial) : (c << 1);
-			else
-				c = (c&1) ? ((c >> 1) ^ polynomial) : (c >> 1);
+			c = (c&1) ? ((c >> 1) ^ polynomial) : (c >> 1);
 		}
 		*crc_table++ = c;
 	}
 
-	return crc_table - 256;
+	return crc_table;
+}
+static ALWAYS_INLINE uint32_t*
+crc32_filltable_endian1(uint32_t *crc_table)
+{
+	uint32_t polynomial = 0x04c11db7;
+	uint32_t c;
+	unsigned i, j;
+
+	for (i = 0; i < 256; i++) {
+		c = (i << 24);
+		for (j = 8; j; j--) {
+			c = (c&0x80000000) ? ((c << 1) ^ polynomial) : (c << 1);
+		}
+		*crc_table++ = c;
+	}
+
+	return crc_table;
+}
+uint32_t* FAST_FUNC crc32_filltable(uint32_t *crc_table, int endian)
+{
+	if (!crc_table)
+		crc_table = xmalloc(256 * sizeof(uint32_t));
+
+	if(endian)
+		crc32_filltable_endian1(crc_table);
+	else
+		crc32_filltable_endian0(crc_table);
+
+	return crc_table;
 }
 /* Common uses: */
 uint32_t* FAST_FUNC crc32_new_table_le(void)
