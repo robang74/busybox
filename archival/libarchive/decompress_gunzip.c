@@ -126,7 +126,7 @@ typedef struct state_t {
 #define to_read             (S()to_read            )
 // #define bytebuffer_max   (S()bytebuffer_max     )
 // Both gunzip and unzip can use constant buffer size now (16k):
-#define bytebuffer_max      0x4000
+#define bytebuffer_max      0x10000
 #define bytebuffer          (S()bytebuffer         )
 #define bytebuffer_offset   (S()bytebuffer_offset  )
 #define bytebuffer_size     (S()bytebuffer_size    )
@@ -263,7 +263,7 @@ fill_bitbuffer(STATE_PARAM unsigned bitbuffer, unsigned *current, const unsigned
 				sz = to_read;
 			/* Leave the first 4 bytes empty so we can always unwind the bitbuffer
 			 * to the front of the bytebuffer */
-			bytebuffer_size = safe_read(gunzip_src_fd, &bytebuffer[4], sz);
+			bytebuffer_size = full_read(gunzip_src_fd, &bytebuffer[4], sz);
 			if ((int)bytebuffer_size < 1) {
 				error_msg = "unexpected end of file";
 				abort_unzip(PASS_STATE_ONLY);
@@ -499,6 +499,8 @@ static huft_t* huft_build(const unsigned *b, const unsigned n,
  */
 /* called once from inflate_block */
 
+#define FAST_LITERALS 2  /* max num. of literals available before refill */
+
 /* map formerly local static variables to globals */
 #define ml inflate_codes_ml
 #define md inflate_codes_md
@@ -511,7 +513,7 @@ static huft_t* huft_build(const unsigned *b, const unsigned n,
 #define bd inflate_codes_bd
 #define nn inflate_codes_nn
 #define dd inflate_codes_dd
-static ALWAYS_INLINE void
+static FAST_FUNC void
 inflate_codes_setup(STATE_PARAM unsigned my_bl, unsigned my_bd)
 {
 	bl = my_bl;
@@ -528,6 +530,7 @@ inflate_codes_setup(STATE_PARAM unsigned my_bl, unsigned my_bd)
 static NOINLINE int
 inflate_codes(STATE_PARAM_ONLY)
 {
+	unsigned char try_lt = 0;
 	unsigned e;	/* table entry flag/number of extra bits */
 	huft_t *t;	/* pointer to table entry */
 
@@ -535,6 +538,7 @@ inflate_codes(STATE_PARAM_ONLY)
 		goto do_copy;
 
 	while (1) {			/* do until end of block */
+	    try_lt = 0;
 		bb = fill_bitbuffer(PASS_STATE bb, &k, bl);
 		t = tl + ((unsigned) bb & ml);
 		e = t->e;
@@ -550,15 +554,24 @@ inflate_codes(STATE_PARAM_ONLY)
 				t = t->v.t + ((unsigned) bb & mask_bits[e]);
 				e = t->e;
 			} while (e > 16);
+try_gain:
 		bb >>= t->b;
 		k -= t->b;
 		if (e == 16) {	/* then it's a literal */
 			gunzip_window[w++] = (unsigned char) t->v.n;
 			if (w == GUNZIP_WSIZE) {
-				gunzip_outbuf_count = w;
-				//flush_gunzip_window();
-				w = 0;
+                gunzip_outbuf_count = w;
+                w = 0;
 				return 1; // We have a block to read
+			}
+			/* === FAST PATH: decode another literal without refill === */
+			if (try_lt < FAST_LITERALS && k >= bl) {
+				t = tl + ((unsigned) bb & ml);
+				e = t->e;
+				if (e <= 16) {  /* direct lookup, no subtable */
+					try_lt++;
+					goto try_gain;
+				}
 			}
 		} else {		/* it's an EOB or a length */
 			/* exit if end of block */
@@ -598,8 +611,6 @@ inflate_codes(STATE_PARAM_ONLY)
 			/* do the copy */
  do_copy:
 			do {
-				/* Was: nn -= (e = (e = GUNZIP_WSIZE - ((dd &= GUNZIP_WSIZE - 1) > w ? dd : w)) > nn ? nn : e); */
-				/* Who wrote THAT?? rewritten as: */
 				unsigned delta;
 
 				dd &= GUNZIP_WSIZE - 1;
