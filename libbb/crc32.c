@@ -20,8 +20,14 @@
 #define TBL_ELM 256
 #define crc32_table_slice_size (TBL_ELM * sizeof(uint32_t))
 
-#ifndef ENABLE_CRC32_4BYTES
-#define ENABLE_CRC32_4BYTES 1
+#if defined(__x86_64__) && defined(__SSE4_2__) /////////////////////////////////
+#include <nmmintrin.h>
+# undef ENABLE_CRC32_4BYTES
+# define ENABLE_CRC32_4BYTES 0
+#else
+# ifndef ENABLE_CRC32_4BYTES
+# define ENABLE_CRC32_4BYTES 1
+# endif
 #endif
 
 #if ENABLE_CRC32_4BYTES
@@ -222,18 +228,6 @@ uint32_t* FAST_FUNC crc32_filltable(uint32_t *crc_table, int endian)
 	return crc_table;
 }
 
-static ALWAYS_INLINE uint32_t* crc32_new_table_le(void)
-{
-	return crc32_filltable(NULL, 0);
-}
-
-uint32_t* FAST_FUNC global_crc32_new_table_le(void)
-{
-	if (!global_crc32_table)
-	    global_crc32_table = crc32_new_table_le();
-	return global_crc32_table;
-}
-
 uint32_t FAST_FUNC
 crc32_block_endian1(uint32_t val, const void *buf, unsigned len, uint32_t *crc_table)
 {
@@ -248,6 +242,8 @@ crc32_block_endian1(uint32_t val, const void *buf, unsigned len, uint32_t *crc_t
 
 #if defined(__x86_64__) && defined(__SSE4_2__) /////////////////////////////////
 #include <nmmintrin.h>
+
+uint32_t* FAST_FUNC global_crc32_new_table_le(void) { return NULL; }
 
 uint32_t FAST_FUNC
 crc32_block_endian0(uint32_t crc, const void *data, unsigned len,
@@ -278,6 +274,18 @@ crc32_block_endian0(uint32_t crc, const void *data, unsigned len,
 }
 
 #else //////////////////////////////////////////////////////////////////////////
+
+static ALWAYS_INLINE uint32_t* crc32_new_table_le(void)
+{
+	return crc32_filltable(NULL, 0);
+}
+
+uint32_t* FAST_FUNC global_crc32_new_table_le(void)
+{
+	if (!global_crc32_table)
+	    global_crc32_table = crc32_new_table_le();
+	return global_crc32_table;
+}
 
 #if ENABLE_CRC32_4BYTES && __BYTE_ORDER == __BIG_ENDIAN
 static ALWAYS_INLINE
