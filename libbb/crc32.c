@@ -22,11 +22,13 @@
 
 #if defined(__x86_64__) && defined(__SSE4_2__) /////////////////////////////////
 #include <nmmintrin.h>
-# undef ENABLE_CRC32_4BYTES
+# undef  ENABLE_CRC32_4BYTES
 # define ENABLE_CRC32_4BYTES 0
 #else
-# ifndef ENABLE_CRC32_4BYTES
+# ifdef  CONFIG_FEATURE_CRC32_4BYTES
 # define ENABLE_CRC32_4BYTES 1
+# else
+# define ENABLE_CRC32_4BYTES 0
 # endif
 #endif
 

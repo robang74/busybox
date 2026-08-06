@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Busybox version: 1.38.0.ucs
-# Sun Aug  2 09:09:09 2026
+# Thu Aug  6 15:59:15 2026
 #
 CONFIG_HAVE_DOT_CONFIG=y
 
@@ -209,6 +209,7 @@ CONFIG_FEATURE_UNZIP_LZMA=y
 CONFIG_FEATURE_UNZIP_XZ=y
 CONFIG_FEATURE_LZMA_FAST=y
 CONFIG_FEATURE_PATH_TRAVERSAL_PROTECTION=y
+CONFIG_FEATURE_CRC32_4BYTES=y
 
 #
 # Coreutils
