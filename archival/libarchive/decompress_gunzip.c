@@ -117,7 +117,11 @@ typedef struct state_t {
 
 	/* private data of inflate_stored() */
 	unsigned inflate_stored_n;
+#if 0
 	unsigned inflate_stored_b;
+#else
+	uint64_t inflate_stored_b;
+#endif
 	unsigned inflate_stored_k;
 	unsigned inflate_stored_w;
 
@@ -262,11 +266,12 @@ static void abort_unzip(STATE_PARAM_ONLY)
 }
 
 static ALWAYS_INLINE uint64_t
-fill_bitbuffer(STATE_PARAM unsigned bitbuffer, unsigned *current, const unsigned required)
+fill_bitbuffer(STATE_PARAM uint64_t bitbuffer, unsigned *current, const unsigned required)
 {
+    unsigned sz;
 	while (*current < required) {
 		if (bytebuffer_offset >= bytebuffer_size) {
-			unsigned sz = bytebuffer_max - 8;
+			sz = bytebuffer_max - 8;
 			if (to_read >= 0 && to_read < sz) /* unzip only */
 				sz = to_read;
 			/* Leave the first 4 bytes empty so we can always unwind the bitbuffer
@@ -281,9 +286,16 @@ fill_bitbuffer(STATE_PARAM unsigned bitbuffer, unsigned *current, const unsigned
 			bytebuffer_size += 8;
 			bytebuffer_offset = 8;
 		}
-		bitbuffer |= ((uint64_t) bytebuffer[bytebuffer_offset]) << *current;
-		bytebuffer_offset++;
-		*current += 8;
+        //fprintf(stderr, "%u ", *current);
+        /* FAST PATH: byte-aligned, enough bytes, and we need 64+ bits */
+        sz = *current;
+        while(sz <= 24 && bytebuffer_offset < bytebuffer_size)
+        {
+            bitbuffer |= ((uint64_t)bytebuffer[bytebuffer_offset]) << sz;
+		    bytebuffer_offset++;
+		    sz += 8;
+        }
+        *current = sz;
 	}
 	return bitbuffer;
 }
