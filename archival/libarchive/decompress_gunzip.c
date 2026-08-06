@@ -77,7 +77,11 @@ typedef struct state_t {
 	unsigned char *gunzip_window;
 
 	/* bitbuffer */
+#if 0
 	unsigned gunzip_bb; /* bit buffer */
+#else
+    uint64_t gunzip_bb; /* bit buffer */
+#endif
 	unsigned char gunzip_bk; /* bits in bit buffer */
 
 	/* input (compressed) data */
@@ -90,7 +94,11 @@ typedef struct state_t {
 	/* private data of inflate_codes() */
 	unsigned inflate_codes_ml; /* masks for bl and bd bits */
 	unsigned inflate_codes_md; /* masks for bl and bd bits */
+#if 0
 	unsigned inflate_codes_bb; /* bit buffer */
+#else
+    uint64_t inflate_codes_bb; /* bit buffer */
+#endif
 	unsigned inflate_codes_k; /* number of bits in bit buffer */
 	unsigned inflate_codes_w; /* current gunzip_window position */
 	huft_t *inflate_codes_tl;
@@ -258,20 +266,20 @@ fill_bitbuffer(STATE_PARAM unsigned bitbuffer, unsigned *current, const unsigned
 {
 	while (*current < required) {
 		if (bytebuffer_offset >= bytebuffer_size) {
-			unsigned sz = bytebuffer_max - 4;
+			unsigned sz = bytebuffer_max - 8;
 			if (to_read >= 0 && to_read < sz) /* unzip only */
 				sz = to_read;
-			/* Leave the first 4 bytes empty so we can always unwind the bitbuffer
+			/* Leave the first 8 bytes empty so we can always unwind the bitbuffer
 			 * to the front of the bytebuffer */
-			bytebuffer_size = full_read(gunzip_src_fd, &bytebuffer[4], sz);
+			bytebuffer_size = full_read(gunzip_src_fd, &bytebuffer[8], sz);
 			if ((int)bytebuffer_size < 1) {
 				error_msg = "unexpected end of file";
 				abort_unzip(PASS_STATE_ONLY);
 			}
 			if (to_read >= 0) /* unzip only */
 				to_read -= bytebuffer_size;
-			bytebuffer_size += 4;
-			bytebuffer_offset = 4;
+			bytebuffer_size += 8;
+			bytebuffer_offset = 8;
 		}
 		bitbuffer |= ((unsigned) bytebuffer[bytebuffer_offset]) << *current;
 		bytebuffer_offset++;
@@ -279,7 +287,6 @@ fill_bitbuffer(STATE_PARAM unsigned bitbuffer, unsigned *current, const unsigned
 	}
 	return bitbuffer;
 }
-
 
 /* Given a list of code lengths and a maximum table size, make a set of
  * tables to decode that set of codes.
@@ -499,7 +506,7 @@ static huft_t* huft_build(const unsigned *b, const unsigned n,
  */
 /* called once from inflate_block */
 
-#define FAST_LITERALS 2  /* max num. of literals available before refill */
+#define FAST_LITERALS 4  /* max num. of literals available before refill */
 
 /* map formerly local static variables to globals */
 #define ml inflate_codes_ml
@@ -530,7 +537,7 @@ inflate_codes_setup(STATE_PARAM unsigned my_bl, unsigned my_bd)
 static NOINLINE int
 inflate_codes(STATE_PARAM_ONLY)
 {
-	unsigned char try_lt = 0;
+	unsigned char try_lt = 0, on_copy = 0;
 	unsigned e;	/* table entry flag/number of extra bits */
 	huft_t *t;	/* pointer to table entry */
 
@@ -539,10 +546,12 @@ inflate_codes(STATE_PARAM_ONLY)
 
 	while (1) {			/* do until end of block */
 	    try_lt = 0;
-		bb = fill_bitbuffer(PASS_STATE bb, &k, bl);
+	    //if (k < bl)
+	    bb = fill_bitbuffer(PASS_STATE bb, &k, bl);
 		t = tl + ((unsigned) bb & ml);
 		e = t->e;
-		if (e > 16)
+		if (e > 16) {
+do_e_loop:
 			do {
 				if (e == 99) {
 					abort_unzip(PASS_STATE_ONLY);
@@ -550,11 +559,12 @@ inflate_codes(STATE_PARAM_ONLY)
 				bb >>= t->b;
 				k -= t->b;
 				e -= 16;
-                if (k < e)  // <-- only refill when necessary
-                    bb = fill_bitbuffer(PASS_STATE bb, &k, e);
+                if (k < e) bb = fill_bitbuffer(PASS_STATE bb, &k, e);
 				t = t->v.t + ((unsigned) bb & mask_bits[e]);
 				e = t->e;
 			} while (e > 16);
+		}
+		if(on_copy) goto back_on_copy;
 try_gain:
 		bb >>= t->b;
 		k -= t->b;
@@ -574,34 +584,24 @@ try_gain:
 					goto try_gain;
 				}
 			}
-		} else {		/* it's an EOB or a length */
-			/* exit if end of block */
-			if (e == 15) {
-				break;
-			}
-
+		} else
+		if (e == 15) { /* exit if end of block */
+			break;
+		} else { /* it's an EOB or a length */
 			/* get length of block to copy */
-			bb = fill_bitbuffer(PASS_STATE bb, &k, e);
-			nn = t->v.n + ((unsigned) bb & mask_bits[e]);
+			//if (k < e)
+			bb = fill_bitbuffer(PASS_STATE bb, &k, e + bd);
+    	    nn = t->v.n + ((unsigned) bb & mask_bits[e]);
 			bb >>= e;
 			k -= e;
 
 			/* decode distance of block to copy */
-			bb = fill_bitbuffer(PASS_STATE bb, &k, bd);
+			//if(k < bd) bb = fill_bitbuffer(PASS_STATE bb, &k, bd);
 			t = td + ((unsigned) bb & md);
 			e = t->e;
-			if (e > 16)
-				do {
-					if (e == 99) {
-						abort_unzip(PASS_STATE_ONLY);
-					}
-					bb >>= t->b;
-					k -= t->b;
-					e -= 16;
-					bb = fill_bitbuffer(PASS_STATE bb, &k, e);
-					t = t->v.t + ((unsigned) bb & mask_bits[e]);
-					e = t->e;
-				} while (e > 16);
+			if (e > 16) { on_copy = 1; goto do_e_loop; }
+back_on_copy:
+	        on_copy = 0;
 			bb >>= t->b;
 			k -= t->b;
 			bb = fill_bitbuffer(PASS_STATE bb, &k, e);
@@ -610,7 +610,7 @@ try_gain:
 			k -= e;
 
 			/* do the copy */
- do_copy:
+do_copy:
 			do {
 				unsigned delta;
 
