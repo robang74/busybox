@@ -265,31 +265,34 @@ static void abort_unzip(STATE_PARAM_ONLY)
 	longjmp(error_jmp, 1);
 }
 
+static NOINLINE FAST_FUNC
+void fill_bitbuffer_read(STATE_PARAM_ONLY)
+{
+	unsigned sz = bytebuffer_max - 8;
+	if (to_read >= 0 && to_read < sz) /* unzip only */
+		sz = to_read;
+	/* Leave the first 4 bytes empty so we can always unwind the bitbuffer
+	 * to the front of the bytebuffer */
+	bytebuffer_size = full_read(gunzip_src_fd, &bytebuffer[8], sz);
+	if ((int)bytebuffer_size < 1) {
+		error_msg = "unexpected end of file";
+		abort_unzip(PASS_STATE_ONLY);
+	}
+	if (to_read >= 0) /* unzip only */
+		to_read -= bytebuffer_size;
+	bytebuffer_size += 8;
+	bytebuffer_offset = 8;
+}
+
 static ALWAYS_INLINE uint64_t
 fill_bitbuffer(STATE_PARAM uint64_t bitbuffer, unsigned *current, const unsigned required)
 {
-    unsigned sz;
-	while (*current < required) {
-		if (bytebuffer_offset >= bytebuffer_size) {
-			sz = bytebuffer_max - 8;
-			if (to_read >= 0 && to_read < sz) /* unzip only */
-				sz = to_read;
-			/* Leave the first 4 bytes empty so we can always unwind the bitbuffer
-			 * to the front of the bytebuffer */
-			bytebuffer_size = full_read(gunzip_src_fd, &bytebuffer[8], sz);
-			if ((int)bytebuffer_size < 1) {
-				error_msg = "unexpected end of file";
-				abort_unzip(PASS_STATE_ONLY);
-			}
-			if (to_read >= 0) /* unzip only */
-				to_read -= bytebuffer_size;
-			bytebuffer_size += 8;
-			bytebuffer_offset = 8;
-		}
-        //fprintf(stderr, "%u ", *current);
+    unsigned sz = *current;
+	while (sz < required) {
+		if (bytebuffer_offset >= bytebuffer_size)
+			fill_bitbuffer_read(PASS_STATE_ONLY);
         /* FAST PATH: byte-aligned, enough bytes, and we need 64+ bits */
-        sz = *current;
-        while(sz <= 24 && bytebuffer_offset < bytebuffer_size)
+        while(sz <= 32 && bytebuffer_offset < bytebuffer_size)
         {
             bitbuffer |= ((uint64_t)bytebuffer[bytebuffer_offset]) << sz;
 		    bytebuffer_offset++;
@@ -685,7 +688,8 @@ do_copy:
 
 
 /* called once from inflate_block */
-static void inflate_stored_setup(STATE_PARAM int my_n, int my_b, int my_k)
+static ALWAYS_INLINE void
+inflate_stored_setup(STATE_PARAM int my_n, uint64_t my_b, int my_k)
 {
 	inflate_stored_n = my_n;
 	inflate_stored_b = my_b;
@@ -694,7 +698,9 @@ static void inflate_stored_setup(STATE_PARAM int my_n, int my_b, int my_k)
 	inflate_stored_w = gunzip_outbuf_count;
 }
 /* called once from inflate_get_next_window */
-static int inflate_stored(STATE_PARAM_ONLY)
+
+static ALWAYS_INLINE int
+inflate_stored(STATE_PARAM_ONLY)
 {
 	/* read and output the compressed data */
 	while (inflate_stored_n--) {
