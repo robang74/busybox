@@ -261,7 +261,7 @@ static void abort_unzip(STATE_PARAM_ONLY)
 	longjmp(error_jmp, 1);
 }
 
-static ALWAYS_INLINE unsigned
+static ALWAYS_INLINE uint64_t
 fill_bitbuffer(STATE_PARAM unsigned bitbuffer, unsigned *current, const unsigned required)
 {
 	while (*current < required) {
@@ -269,7 +269,7 @@ fill_bitbuffer(STATE_PARAM unsigned bitbuffer, unsigned *current, const unsigned
 			unsigned sz = bytebuffer_max - 8;
 			if (to_read >= 0 && to_read < sz) /* unzip only */
 				sz = to_read;
-			/* Leave the first 8 bytes empty so we can always unwind the bitbuffer
+			/* Leave the first 4 bytes empty so we can always unwind the bitbuffer
 			 * to the front of the bytebuffer */
 			bytebuffer_size = full_read(gunzip_src_fd, &bytebuffer[8], sz);
 			if ((int)bytebuffer_size < 1) {
@@ -281,7 +281,7 @@ fill_bitbuffer(STATE_PARAM unsigned bitbuffer, unsigned *current, const unsigned
 			bytebuffer_size += 8;
 			bytebuffer_offset = 8;
 		}
-		bitbuffer |= ((unsigned) bytebuffer[bytebuffer_offset]) << *current;
+		bitbuffer |= ((uint64_t) bytebuffer[bytebuffer_offset]) << *current;
 		bytebuffer_offset++;
 		*current += 8;
 	}
@@ -720,7 +720,7 @@ static int inflate_block(STATE_PARAM smallint *e)
 {
 	unsigned ll[286 + 30];  /* literal/length and distance code lengths */
 	unsigned t;     /* block type */
-	unsigned b;     /* bit buffer */
+	uint64_t b;     /* bit buffer */
 	unsigned k;     /* number of bits in bit buffer */
 
 	/* make local bit buffer */
@@ -753,7 +753,7 @@ static int inflate_block(STATE_PARAM smallint *e)
 	case 0: /* Inflate stored */
 	{
 		unsigned n;	/* number of bytes in block */
-		unsigned b_stored;	/* bit buffer */
+		uint64_t b_stored;	/* bit buffer */
 		unsigned k_stored;	/* number of bits in bit buffer */
 
 		/* make local copies of globals */
@@ -841,7 +841,7 @@ static int inflate_block(STATE_PARAM smallint *e)
 		unsigned nd;            /* number of distance codes */
 
 		//unsigned ll[286 + 30];/* literal/length and distance code lengths */
-		unsigned b_dynamic;     /* bit buffer */
+		uint64_t b_dynamic;     /* bit buffer */
 		unsigned k_dynamic;     /* number of bits in bit buffer */
 
 		/* make local bit buffer */
@@ -850,17 +850,17 @@ static int inflate_block(STATE_PARAM smallint *e)
 
 		/* read in table lengths */
 		b_dynamic = fill_bitbuffer(PASS_STATE b_dynamic, &k_dynamic, 5);
-		nl = 257 + ((unsigned) b_dynamic & 0x1f);	/* number of literal/length codes */
+		nl = 257 + ((uint64_t) b_dynamic & 0x1f);	/* number of literal/length codes */
 
 		b_dynamic >>= 5;
 		k_dynamic -= 5;
 		b_dynamic = fill_bitbuffer(PASS_STATE b_dynamic, &k_dynamic, 5);
-		nd = 1 + ((unsigned) b_dynamic & 0x1f);	/* number of distance codes */
+		nd = 1 + ((uint64_t) b_dynamic & 0x1f);	/* number of distance codes */
 
 		b_dynamic >>= 5;
 		k_dynamic -= 5;
 		b_dynamic = fill_bitbuffer(PASS_STATE b_dynamic, &k_dynamic, 4);
-		nb = 4 + ((unsigned) b_dynamic & 0xf);	/* number of bit length codes */
+		nb = 4 + ((uint64_t) b_dynamic & 0xf);	/* number of bit length codes */
 
 		b_dynamic >>= 4;
 		k_dynamic -= 4;
@@ -871,7 +871,7 @@ static int inflate_block(STATE_PARAM smallint *e)
 		/* read in bit-length-code lengths */
 		for (j = 0; j < nb; j++) {
 			b_dynamic = fill_bitbuffer(PASS_STATE b_dynamic, &k_dynamic, 3);
-			ll[border[j]] = (unsigned) b_dynamic & 7;
+			ll[border[j]] = (uint64_t) b_dynamic & 7;
 			b_dynamic >>= 3;
 			k_dynamic -= 3;
 		}
@@ -891,7 +891,7 @@ static int inflate_block(STATE_PARAM smallint *e)
 		i = l = 0;
 		while ((unsigned) i < n) {
 			b_dynamic = fill_bitbuffer(PASS_STATE b_dynamic, &k_dynamic, (unsigned)bl);
-			td = inflate_codes_tl + ((unsigned) b_dynamic & m);
+			td = inflate_codes_tl + ((uint64_t) b_dynamic & m);
 			j = td->b;
 			b_dynamic >>= j;
 			k_dynamic -= j;
