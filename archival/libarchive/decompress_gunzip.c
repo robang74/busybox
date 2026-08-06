@@ -605,13 +605,13 @@ try_gain:
 		} else { /* it's an EOB or a length */
 			/* get length of block to copy */
 			//if (k < e)
-			bb = fill_bitbuffer(PASS_STATE bb, &k, e + bd);
+			bb = fill_bitbuffer(PASS_STATE bb, &k, e);
     	    nn = t->v.n + ((unsigned) bb & mask_bits[e]);
 			bb >>= e;
 			k -= e;
 
 			/* decode distance of block to copy */
-			//if(k < bd) bb = fill_bitbuffer(PASS_STATE bb, &k, bd);
+			if(k < bd) bb = fill_bitbuffer(PASS_STATE bb, &k, bd);
 			t = td + ((unsigned) bb & md);
 			e = t->e;
 			if (e > 16) { on_copy = 1; goto do_e_loop; }
@@ -747,13 +747,13 @@ static int inflate_block(STATE_PARAM smallint *e)
 	k = gunzip_bk;
 
 	/* read in last block bit */
-	b = fill_bitbuffer(PASS_STATE b, &k, 1);
+	b = fill_bitbuffer(PASS_STATE b, &k, 3);
 	*e = b & 1;
 	b >>= 1;
 	k -= 1;
 
 	/* read in block type */
-	b = fill_bitbuffer(PASS_STATE b, &k, 2);
+	//b = fill_bitbuffer(PASS_STATE b, &k, 2);
 	t = (unsigned) b & 3;
 	b >>= 2;
 	k -= 2;
@@ -867,17 +867,17 @@ static int inflate_block(STATE_PARAM smallint *e)
 		k_dynamic = gunzip_bk;
 
 		/* read in table lengths */
-		b_dynamic = fill_bitbuffer(PASS_STATE b_dynamic, &k_dynamic, 5);
+		b_dynamic = fill_bitbuffer(PASS_STATE b_dynamic, &k_dynamic, 14);
 		nl = 257 + ((uint64_t) b_dynamic & 0x1f);	/* number of literal/length codes */
 
 		b_dynamic >>= 5;
 		k_dynamic -= 5;
-		b_dynamic = fill_bitbuffer(PASS_STATE b_dynamic, &k_dynamic, 5);
+		//b_dynamic = fill_bitbuffer(PASS_STATE b_dynamic, &k_dynamic, 5);
 		nd = 1 + ((uint64_t) b_dynamic & 0x1f);	/* number of distance codes */
 
 		b_dynamic >>= 5;
 		k_dynamic -= 5;
-		b_dynamic = fill_bitbuffer(PASS_STATE b_dynamic, &k_dynamic, 4);
+		//b_dynamic = fill_bitbuffer(PASS_STATE b_dynamic, &k_dynamic, 4);
 		nb = 4 + ((uint64_t) b_dynamic & 0xf);	/* number of bit length codes */
 
 		b_dynamic >>= 4;
