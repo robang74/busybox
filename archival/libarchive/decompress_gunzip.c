@@ -35,15 +35,21 @@
 #include "libbb.h"
 #include "bb_archive.h"
 
+#ifndef USE_32BIT_BUF
+#define USE_32BIT_BUF (UINTPTR_MAX == 0xFFFFFFFF)
+#endif
+
+#if USE_32BIT_BUF
+typedef unsigned bitbuf_t;
+#else
+typedef uint64_t bitbuf_t;
+#endif
+
 typedef struct huft_t {
 	unsigned char e;	/* number of extra bits or operation */
 	unsigned char b;	/* number of bits in this code or subcode */
 	union {
-#if 0
-		unsigned n;	/* literal, length base, or distance base */
-#else
-		uint64_t n;	/* literal, length base, or distance base */
-#endif
+		bitbuf_t n;	/* literal, length base, or distance base */
 		/* ^^^^^ was "unsigned short", but that results in larger code */
 		struct huft_t *t;	/* pointer to next level of table */
 	} v;
@@ -81,11 +87,7 @@ typedef struct state_t {
 	unsigned char *gunzip_window;
 
 	/* bitbuffer */
-#if 0
-	unsigned gunzip_bb; /* bit buffer */
-#else
-    uint64_t gunzip_bb; /* bit buffer */
-#endif
+    bitbuf_t gunzip_bb; /* bit buffer */
 	unsigned char gunzip_bk; /* bits in bit buffer */
 
 	/* input (compressed) data */
@@ -98,11 +100,7 @@ typedef struct state_t {
 	/* private data of inflate_codes() */
 	unsigned inflate_codes_ml; /* masks for bl and bd bits */
 	unsigned inflate_codes_md; /* masks for bl and bd bits */
-#if 0
-	unsigned inflate_codes_bb; /* bit buffer */
-#else
-    uint64_t inflate_codes_bb; /* bit buffer */
-#endif
+    bitbuf_t inflate_codes_bb; /* bit buffer */
 	unsigned inflate_codes_k; /* number of bits in bit buffer */
 	unsigned inflate_codes_w; /* current gunzip_window position */
 	huft_t *inflate_codes_tl;
@@ -121,11 +119,7 @@ typedef struct state_t {
 
 	/* private data of inflate_stored() */
 	unsigned inflate_stored_n;
-#if 0
-	unsigned inflate_stored_b;
-#else
-	uint64_t inflate_stored_b;
-#endif
+	bitbuf_t inflate_stored_b;
 	unsigned inflate_stored_k;
 	unsigned inflate_stored_w;
 
@@ -288,21 +282,21 @@ void fill_bitbuffer_read(STATE_PARAM_ONLY)
 	bytebuffer_offset = 8;
 }
 
-static ALWAYS_INLINE uint64_t
-fill_bitbuffer(STATE_PARAM uint64_t bitbuffer, unsigned *current, const unsigned required)
+static ALWAYS_INLINE bitbuf_t
+fill_bitbuffer(STATE_PARAM bitbuf_t bitbuffer, unsigned *current, const unsigned required)
 {
     unsigned sz = *current;
 	while (sz < required) {
 		if (bytebuffer_offset >= bytebuffer_size)
 			fill_bitbuffer_read(PASS_STATE_ONLY);
         /* FAST PATH: byte-aligned, enough bytes, and we need 64+ bits */
-#if 1   // RAF, TODO
-        while(sz <= 32 && bytebuffer_offset < bytebuffer_size)
+#if USE_32BIT_BUF
+        while(sz <= 24 && bytebuffer_offset < bytebuffer_size)
 #else
         while(sz <= 56 && bytebuffer_offset < bytebuffer_size)
 #endif
         {
-            bitbuffer |= ((uint64_t)bytebuffer[bytebuffer_offset]) << sz;
+            bitbuffer |= ((bitbuf_t)bytebuffer[bytebuffer_offset]) << sz;
 		    bytebuffer_offset++;
 		    sz += 8;
         }
@@ -571,7 +565,7 @@ inflate_codes(STATE_PARAM_ONLY)
 	    try_lt = 0;
 	    //if (k < bl)
 	    bb = fill_bitbuffer(PASS_STATE bb, &k, bl);
-		t = tl + ((uint64_t) bb & ml);
+		t = tl + ((bitbuf_t) bb & ml);
 		e = t->e;
 		if (e > 16) {
 do_e_loop:
@@ -583,7 +577,7 @@ do_e_loop:
 				k -= t->b;
 				e -= 16;
                 /*if (k < e)*/ bb = fill_bitbuffer(PASS_STATE bb, &k, e);
-				t = t->v.t + ((uint64_t) bb & mask_bits[e]);
+				t = t->v.t + ((bitbuf_t) bb & mask_bits[e]);
 				e = t->e;
 			} while (e > 16);
 		}
@@ -696,7 +690,7 @@ do_copy:
 
 /* called once from inflate_block */
 static ALWAYS_INLINE void
-inflate_stored_setup(STATE_PARAM int my_n, uint64_t my_b, int my_k)
+inflate_stored_setup(STATE_PARAM int my_n, bitbuf_t my_b, int my_k)
 {
 	inflate_stored_n = my_n;
 	inflate_stored_b = my_b;
@@ -745,7 +739,7 @@ static int inflate_block(STATE_PARAM smallint *e)
 {
 	unsigned ll[286 + 30];  /* literal/length and distance code lengths */
 	unsigned t;     /* block type */
-	uint64_t b;     /* bit buffer */
+	bitbuf_t b;     /* bit buffer */
 	unsigned k;     /* number of bits in bit buffer */
 
 	/* make local bit buffer */
@@ -778,7 +772,7 @@ static int inflate_block(STATE_PARAM smallint *e)
 	case 0: /* Inflate stored */
 	{
 		unsigned n;	/* number of bytes in block */
-		uint64_t b_stored;	/* bit buffer */
+		bitbuf_t b_stored;	/* bit buffer */
 		unsigned k_stored;	/* number of bits in bit buffer */
 
 		/* make local copies of globals */
@@ -866,7 +860,7 @@ static int inflate_block(STATE_PARAM smallint *e)
 		unsigned nd;            /* number of distance codes */
 
 		//unsigned ll[286 + 30];/* literal/length and distance code lengths */
-		uint64_t b_dynamic;     /* bit buffer */
+		bitbuf_t b_dynamic;     /* bit buffer */
 		unsigned k_dynamic;     /* number of bits in bit buffer */
 
 		/* make local bit buffer */
@@ -1086,11 +1080,11 @@ inflate_unzip_internal(STATE_PARAM transformer_state_t *xstate)
 	}
 
 	/* Store unused bytes in a global buffer so calling applets can access it */
-	if (gunzip_bk >= 8) {
+	while (gunzip_bk >= 8) {
 		/* Undo too much lookahead. The next read will be byte aligned
 		 * so we can discard unused bits in the last meaningful byte. */
 		bytebuffer_offset--;
-		bytebuffer[bytebuffer_offset] = gunzip_bb & 0xff;
+		bytebuffer[bytebuffer_offset] = (uint8_t)gunzip_bb;
 		gunzip_bb >>= 8;
 		gunzip_bk -= 8;
 	}
@@ -1156,7 +1150,7 @@ static uint16_t buffer_read_le_u16(STATE_PARAM_ONLY)
 #if BB_LITTLE_ENDIAN
 	move_from_unaligned16(res, &bytebuffer[bytebuffer_offset]);
 #else
-	res = bytebuffer[bytebuffer_offset];
+	res  = bytebuffer[bytebuffer_offset + 0];
 	res |= bytebuffer[bytebuffer_offset + 1] << 8;
 #endif
 	bytebuffer_offset += 2;
@@ -1169,14 +1163,35 @@ static uint32_t buffer_read_le_u32(STATE_PARAM_ONLY)
 #if BB_LITTLE_ENDIAN
 	move_from_unaligned32(res, &bytebuffer[bytebuffer_offset]);
 #else
-	res = bytebuffer[bytebuffer_offset];
-	res |= bytebuffer[bytebuffer_offset + 1] << 8;
+	res  = bytebuffer[bytebuffer_offset + 0];
+	res |= bytebuffer[bytebuffer_offset + 1] <<  8;
 	res |= bytebuffer[bytebuffer_offset + 2] << 16;
 	res |= bytebuffer[bytebuffer_offset + 3] << 24;
 #endif
 	bytebuffer_offset += 4;
 	return res;
 }
+
+#if 0
+static bitbuf_t buffer_read_le_u64(STATE_PARAM_ONLY)
+{
+	bitbuf_t res;
+#if BB_LITTLE_ENDIAN
+	move_from_unaligned64(res, &bytebuffer[bytebuffer_offset]);
+#else
+	res  = bytebuffer[bytebuffer_offset + 0];
+	res |= bytebuffer[bytebuffer_offset + 1] <<  8;
+	res |= bytebuffer[bytebuffer_offset + 2] << 16;
+	res |= bytebuffer[bytebuffer_offset + 3] << 24;
+	res |= bytebuffer[bytebuffer_offset + 4] << 32;
+	res |= bytebuffer[bytebuffer_offset + 5] << 40;
+	res |= bytebuffer[bytebuffer_offset + 6] << 48;
+	res |= bytebuffer[bytebuffer_offset + 7] << 56;
+#endif
+	bytebuffer_offset += 8;
+	return res;
+}
+#endif
 
 static int check_header_gzip(STATE_PARAM transformer_state_t *xstate)
 {
@@ -1307,7 +1322,16 @@ unpack_gz_stream(transformer_state_t *xstate)
 
 	/* Validate decompression - crc */
 	v32 = buffer_read_le_u32(PASS_STATE_ONLY);
-	if ((~gunzip_crc) != v32) {
+#if USE_32BIT_BUF
+#else
+	v32 = (((uint8_t)(v32 >>  0)) << 24)
+	    | (((uint8_t)(v32 >>  8)) << 16)
+	    | (((uint8_t)(v32 >> 16)) <<  8)
+	    | (((uint8_t)(v32 >> 24)) <<  0);
+#endif
+	if ((~gunzip_crc) != (uint32_t)v32) {
+	    //fprintf(stderr, "gunzip_crc: 0x%08x, val: 0x%08x\n",
+	    //      ~gunzip_crc, v32);
 		bb_simple_error_msg("crc error");
 		total = -1;
 		goto ret;
@@ -1316,6 +1340,8 @@ unpack_gz_stream(transformer_state_t *xstate)
 	/* Validate decompression - size */
 	v32 = buffer_read_le_u32(PASS_STATE_ONLY);
 	if ((uint32_t)gunzip_bytes_out != v32) {
+	    //fprintf(stderr, "bytes_out : 0x%08x, val: 0x%08x\n",
+	    //      (uint32_t)gunzip_bytes_out, v32);
 		bb_simple_error_msg("incorrect length");
 		total = -1;
 	}
