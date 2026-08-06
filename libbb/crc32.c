@@ -179,7 +179,7 @@ static ALWAYS_INLINE uint32_t*
 crc32_filltable_endian0(uint32_t *crc_table)
 {
     if(global_crc32_table) {
-		crc_table = memmove(crc_table,
+		crc_table = __builtin_memmove(crc_table,
 			global_crc32_table, crc32_table_slice_size);
 	} else {
 		uint32_t polynomial = 0xedb88320;
