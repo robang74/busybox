@@ -48,7 +48,7 @@ typedef struct huft_t {
 enum {
 	/* gunzip_window size--must be a power of two, and
 	 * at least 32K for zip's deflate method */
-	GUNZIP_WSIZE = 0x8000,
+	GUNZIP_WSIZE = 0x10000,
 	/* If BMAX needs to be larger than 16, then h and x[] should be ulg. */
 	BMAX = 16,	/* maximum bit length of any code (16 for explode) */
 	N_MAX = 288,	/* maximum number of codes in any set */
@@ -550,7 +550,8 @@ inflate_codes(STATE_PARAM_ONLY)
 				bb >>= t->b;
 				k -= t->b;
 				e -= 16;
-				bb = fill_bitbuffer(PASS_STATE bb, &k, e);
+                if (k < e)  // <-- only refill when necessary
+                    bb = fill_bitbuffer(PASS_STATE bb, &k, e);
 				t = t->v.t + ((unsigned) bb & mask_bits[e]);
 				e = t->e;
 			} while (e > 16);
@@ -1086,7 +1087,6 @@ inflate_unzip(transformer_state_t *xstate)
 	ALLOC_STATE;
 
 	to_read = xstate->bytes_in;
-//	bytebuffer_max = 0x8000;
 	bytebuffer_offset = 4;
 	bytebuffer = xmalloc(bytebuffer_max);
 	n = inflate_unzip_internal(PASS_STATE xstate);
@@ -1255,7 +1255,6 @@ unpack_gz_stream(transformer_state_t *xstate)
 
 	ALLOC_STATE;
 	to_read = -1;
-//	bytebuffer_max = 0x8000;
 	bytebuffer = xmalloc(bytebuffer_max);
 	gunzip_src_fd = xstate->src_fd;
 
