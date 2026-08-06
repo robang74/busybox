@@ -302,22 +302,34 @@ int uncompress_main(int argc UNUSED_PARAM, char **argv)
 //config:	bool "gunzip (11 kb)"
 //config:	default y
 //config:	select FEATURE_GZIP_DECOMPRESS
+//config:	select ZCAT
 //config:	help
 //config:	gunzip is used to decompress archives created by gzip.
 //config:	You can use the '-t' option to test the integrity of
 //config:	an archive, without decompressing it.
 //config:
 //config:config ZCAT
-//config:	bool "zcat (24 kb)"
+//config:	bool "zcat (alias for 'gunzip -c')"
 //config:	default y
+//config:	depends on GUNZIP
 //config:	select FEATURE_GZIP_DECOMPRESS
 //config:	help
-//config:	Alias to "gunzip -c".
+//config:	Alias for "gunzip -c".
 //config:
 //config:config FEATURE_GUNZIP_LONG_OPTIONS
 //config:	bool "Enable long options"
 //config:	default y
 //config:	depends on (GUNZIP || ZCAT) && LONG_OPTS
+//config:
+//config:config FEATURE_GUNZIP_FAST
+//config:	bool "Optimize for speed (+0.6Kb)"
+//config:	default y
+//config:	depends on GUNZIP && FEATURE_GZIP_DECOMPRESS
+//config:	help
+//config:	A raw estimation indicates the speed increases by 30% on i5.
+//config:	Say N if you are compiling for a very constrained tiny system.
+//config:	Say Y if you want faster gunzip/zcat or for running on desktops.
+
 
 //applet:IF_GUNZIP(APPLET(gunzip, BB_DIR_BIN, BB_SUID_DROP))
 //               APPLET_ODDNAME:name  main    location    suid_type     help
@@ -488,6 +500,8 @@ int bunzip2_main(int argc UNUSED_PARAM, char **argv)
 //config:config UNLZMA
 //config:	bool "unlzma (7.8 kb)"
 //config:	default y
+//config:	select LZCAT
+//config:	select LZMA
 //config:	help
 //config:	unlzma is a compression utility using the Lempel-Ziv-Markov chain
 //config:	compression algorithm, and range coding. Compression
@@ -495,17 +509,26 @@ int bunzip2_main(int argc UNUSED_PARAM, char **argv)
 //config:	compressors.
 //config:
 //config:config LZCAT
-//config:	bool "lzcat (7.8 kb)"
+//config:	bool "lzcat (alias for 'unlzma -d')"
+//config:	depends on LZMA || UNLZMA || FEATURE_SEAMLESS_LZMA
 //config:	default y
 //config:	help
-//config:	Alias to "unlzma -c".
+//config:	Alias for "unlzma -c".
 //config:
 //config:config LZMA
-//config:	bool "lzma -d"
+//config:	bool "Allows the option -d (decompression)"
+//config:	depends on UNLZMA || LZCAT
 //config:	default y
 //config:	help
 //config:	Enable this option if you want commands like "lzma -d" to work.
 //config:	IOW: you'll get lzma applet, but it will always require -d option.
+//config:
+//config:config FEATURE_LZMA_FAST
+//config:	bool "Optimize for speed (+1.0Kb)"
+//config:	default y
+//config:	depends on LZMA || UNLZMA || LZCAT || FEATURE_SEAMLESS_LZMA
+//config:	help
+//config:	This option reduces decompression time by about 25%.
 
 //applet:IF_UNLZMA(APPLET(unlzma, BB_DIR_USR_BIN, BB_SUID_DROP))
 //                APPLET_ODDNAME:name   main    location        suid_type     help

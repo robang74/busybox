@@ -35,14 +35,35 @@
 #include "libbb.h"
 #include "bb_archive.h"
 
+#ifndef CONFIG_FEATURE_GUNZIP_FAST
+# pragma message "gunzip: size over speed"
+# define GUNZIP_SIZE_FOR_SPEED 0
+# define GUNZIP_INPUT_BUFSZ 0x4000
+# define GUNZIP_WINDOW_SIZE 0x8000
+// RAF, set FAST_LITERALS to 1 to gain +3% speed for less than 100 bytes
+# define FAST_LITERALS 0
+# define USE_32BIT_BUF 1
+#else
+# pragma message "gunzip: speed over size"
+# define GUNZIP_SIZE_FOR_SPEED 1
+# define GUNZIP_INPUT_BUFSZ 0x10000
+# define GUNZIP_WINDOW_SIZE 0x10000
+#endif
+
 #ifndef USE_32BIT_BUF
 #define USE_32BIT_BUF (UINTPTR_MAX == 0xFFFFFFFF)
 #endif
 
 #if USE_32BIT_BUF
 typedef unsigned bitbuf_t;
+# ifndef FAST_LITERALS
+# define MAX_BITS_TO_FILL 24
+# define FAST_LITERALS 2
+# endif
 #else
 typedef uint64_t bitbuf_t;
+# define MAX_BITS_TO_FILL 56
+# define FAST_LITERALS 4
 #endif
 
 typedef struct huft_t {
@@ -58,7 +79,7 @@ typedef struct huft_t {
 enum {
 	/* gunzip_window size--must be a power of two, and
 	 * at least 32K for zip's deflate method */
-	GUNZIP_WSIZE = 0x10000,
+	GUNZIP_WSIZE = GUNZIP_WINDOW_SIZE,
 	/* If BMAX needs to be larger than 16, then h and x[] should be ulg. */
 	BMAX = 16,	/* maximum bit length of any code (16 for explode) */
 	N_MAX = 288,	/* maximum number of codes in any set */
@@ -135,8 +156,8 @@ typedef struct state_t {
 #define gunzip_bk           (S()gunzip_bk          )
 #define to_read             (S()to_read            )
 // #define bytebuffer_max   (S()bytebuffer_max     )
-// Both gunzip and unzip can use constant buffer size now (16k):
-#define bytebuffer_max      0x10000
+// Both gunzip and unzip can use constant buffer size:
+#define bytebuffer_max      GUNZIP_INPUT_BUFSZ
 #define bytebuffer          (S()bytebuffer         )
 #define bytebuffer_offset   (S()bytebuffer_offset  )
 #define bytebuffer_size     (S()bytebuffer_size    )
@@ -263,7 +284,11 @@ static void abort_unzip(STATE_PARAM_ONLY)
 	longjmp(error_jmp, 1);
 }
 
+#if GUNZIP_SIZE_FOR_SPEED
 static NOINLINE FAST_FUNC
+#else
+static ALWAYS_INLINE
+#endif
 void fill_bitbuffer_read(STATE_PARAM_ONLY)
 {
 	unsigned sz = bytebuffer_max - 8;
@@ -282,18 +307,21 @@ void fill_bitbuffer_read(STATE_PARAM_ONLY)
 	bytebuffer_offset = 8;
 }
 
-static ALWAYS_INLINE bitbuf_t
-fill_bitbuffer(STATE_PARAM bitbuf_t bitbuffer, unsigned *current, const unsigned required)
+#if GUNZIP_SIZE_FOR_SPEED
+static ALWAYS_INLINE
+#else
+static NOINLINE FAST_FUNC
+#endif
+bitbuf_t fill_bitbuffer(STATE_PARAM bitbuf_t bitbuffer,
+		unsigned *current, const unsigned required)
 {
     unsigned sz = *current;
 	while (sz < required) {
 		if (bytebuffer_offset >= bytebuffer_size)
 			fill_bitbuffer_read(PASS_STATE_ONLY);
         /* FAST PATH: byte-aligned, enough bytes, and we need 64+ bits */
-#if USE_32BIT_BUF
-        while(sz <= 24 && bytebuffer_offset < bytebuffer_size)
-#else
-        while(sz <= 56 && bytebuffer_offset < bytebuffer_size)
+#if FAST_LITERALS
+        while(sz <= MAX_BITS_TO_FILL && bytebuffer_offset < bytebuffer_size)
 #endif
         {
             bitbuffer |= ((bitbuf_t)bytebuffer[bytebuffer_offset]) << sz;
@@ -523,8 +551,6 @@ static huft_t* huft_build(const unsigned *b, const unsigned n,
  */
 /* called once from inflate_block */
 
-#define FAST_LITERALS 4  /* max num. of literals available before refill */
-
 /* map formerly local static variables to globals */
 #define ml inflate_codes_ml
 #define md inflate_codes_md
@@ -554,7 +580,10 @@ inflate_codes_setup(STATE_PARAM unsigned my_bl, unsigned my_bd)
 static NOINLINE int
 inflate_codes(STATE_PARAM_ONLY)
 {
-	unsigned char try_lt = 0, on_copy = 0;
+#if FAST_LITERALS
+	unsigned char try_lt = 0;
+#endif
+	unsigned char on_copy = 0;
 	unsigned e;	/* table entry flag/number of extra bits */
 	huft_t *t;	/* pointer to table entry */
 
@@ -562,7 +591,9 @@ inflate_codes(STATE_PARAM_ONLY)
 		goto do_copy;
 
 	while (1) {			/* do until end of block */
+#if FAST_LITERALS
 	    try_lt = 0;
+#endif
 	    //if (k < bl)
 	    bb = fill_bitbuffer(PASS_STATE bb, &k, bl);
 		t = tl + ((bitbuf_t) bb & ml);
@@ -582,7 +613,9 @@ do_e_loop:
 			} while (e > 16);
 		}
 		if(on_copy) goto back_on_copy;
+#if FAST_LITERALS
 try_gain:
+#endif
 		bb >>= t->b;
 		k -= t->b;
 		if (e == 16) {	/* then it's a literal */
@@ -592,6 +625,7 @@ try_gain:
                 w = 0;
 				return 1; // We have a block to read
 			}
+#if FAST_LITERALS
 			/* === FAST PATH: decode another literal without refill === */
 			if (try_lt < FAST_LITERALS && k >= bl) {
 				t = tl + ((unsigned) bb & ml);
@@ -601,6 +635,7 @@ try_gain:
 					goto try_gain;
 				}
 			}
+#endif
 		} else
 		if (e == 15) { /* exit if end of block */
 			break;
@@ -1080,7 +1115,11 @@ inflate_unzip_internal(STATE_PARAM transformer_state_t *xstate)
 	}
 
 	/* Store unused bytes in a global buffer so calling applets can access it */
-	while (gunzip_bk >= 8) {
+#if FAST_LITERALS
+	while (gunzip_bk >> 3) {
+#else
+	if    (gunzip_bk >= 8) {
+#endif
 		/* Undo too much lookahead. The next read will be byte aligned
 		 * so we can discard unused bits in the last meaningful byte. */
 		bytebuffer_offset--;
