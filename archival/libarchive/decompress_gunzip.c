@@ -1213,27 +1213,6 @@ static uint32_t buffer_read_le_u32(STATE_PARAM_ONLY)
 	return res;
 }
 
-#if 0
-static bitbuf_t buffer_read_le_u64(STATE_PARAM_ONLY)
-{
-	bitbuf_t res;
-#if BB_LITTLE_ENDIAN
-	move_from_unaligned64(res, &bytebuffer[bytebuffer_offset]);
-#else
-	res  = bytebuffer[bytebuffer_offset + 0];
-	res |= bytebuffer[bytebuffer_offset + 1] <<  8;
-	res |= bytebuffer[bytebuffer_offset + 2] << 16;
-	res |= bytebuffer[bytebuffer_offset + 3] << 24;
-	res |= bytebuffer[bytebuffer_offset + 4] << 32;
-	res |= bytebuffer[bytebuffer_offset + 5] << 40;
-	res |= bytebuffer[bytebuffer_offset + 6] << 48;
-	res |= bytebuffer[bytebuffer_offset + 7] << 56;
-#endif
-	bytebuffer_offset += 8;
-	return res;
-}
-#endif
-
 static int check_header_gzip(STATE_PARAM transformer_state_t *xstate)
 {
 	union {
@@ -1363,16 +1342,7 @@ unpack_gz_stream(transformer_state_t *xstate)
 
 	/* Validate decompression - crc */
 	v32 = buffer_read_le_u32(PASS_STATE_ONLY);
-#if USE_32BIT_BUF
-#else
-	v32 = (((uint8_t)(v32 >>  0)) << 24)
-	    | (((uint8_t)(v32 >>  8)) << 16)
-	    | (((uint8_t)(v32 >> 16)) <<  8)
-	    | (((uint8_t)(v32 >> 24)) <<  0);
-#endif
 	if ((~gunzip_crc) != (uint32_t)v32) {
-	    //fprintf(stderr, "gunzip_crc: 0x%08x, val: 0x%08x\n",
-	    //      ~gunzip_crc, v32);
 		bb_simple_error_msg("crc error");
 		total = -1;
 		goto ret;
@@ -1381,8 +1351,6 @@ unpack_gz_stream(transformer_state_t *xstate)
 	/* Validate decompression - size */
 	v32 = buffer_read_le_u32(PASS_STATE_ONLY);
 	if ((uint32_t)gunzip_bytes_out != v32) {
-	    //fprintf(stderr, "bytes_out : 0x%08x, val: 0x%08x\n",
-	    //      (uint32_t)gunzip_bytes_out, v32);
 		bb_simple_error_msg("incorrect length");
 		total = -1;
 		goto ret;
