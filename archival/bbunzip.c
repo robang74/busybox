@@ -225,10 +225,10 @@ char* FAST_FUNC make_new_name_generic(char *filename, const char *expected_ext)
 
 //config:config UNCOMPRESS
 //config:	bool "uncompress (7.1 kb)"
-//config:	default n  # ancient
+//config:	default n
 //config:	help
 //config:	uncompress is used to decompress archives created by compress.
-//config:	Not much used anymore, replaced by gzip/gunzip.
+//config:	Not much used anymore, ancient and replaced by gzip/gunzip.
 
 //applet:IF_UNCOMPRESS(APPLET(uncompress, BB_DIR_BIN, BB_SUID_DROP))
 //kbuild:lib-$(CONFIG_UNCOMPRESS) += bbunzip.o
@@ -311,18 +311,17 @@ int uncompress_main(int argc UNUSED_PARAM, char **argv)
 //config:config ZCAT
 //config:	bool "zcat (alias for 'gunzip -c')"
 //config:	default y
-//config:	depends on GUNZIP
-//config:	select FEATURE_GZIP_DECOMPRESS
+//config:	depends on GUNZIP || FEATURE_SEAMLESS_GZ
 //config:	help
 //config:	Alias for "gunzip -c".
 //config:
 //config:config FEATURE_GUNZIP_LONG_OPTIONS
-//config:	bool "Enable long options"
+//config:	bool "Enable long options for gunzip"
 //config:	default y
 //config:	depends on (GUNZIP || ZCAT) && LONG_OPTS
 //config:
 //config:config FEATURE_GUNZIP_FAST
-//config:	bool "Optimize for speed (+0.6Kb)"
+//config:	bool "Optimize gunzip for speed (+0.6Kb)"
 //config:	default y
 //config:	depends on GUNZIP && FEATURE_GZIP_DECOMPRESS
 //config:	help
@@ -442,11 +441,11 @@ int gunzip_main(int argc UNUSED_PARAM, char **argv)
 //config:	should probably say N here.
 //config:
 //config:config BZCAT
-//config:	bool "bzcat (9 kb)"
+//config:	bool "bzcat (alias for 'bunzip2 -c')"
 //config:	default y
-//config:	select FEATURE_BZIP2_DECOMPRESS
+//config:	depends on BUNZIP2 || FEATURE_SEAMLESS_BZ2
 //config:	help
-//config:	Alias to "bunzip2 -c".
+//config:	Alias for "bunzip2 -c".
 
 //applet:IF_BUNZIP2(APPLET(bunzip2, BB_DIR_USR_BIN, BB_SUID_DROP))
 //                APPLET_ODDNAME:name   main     location        suid_type     help
@@ -503,14 +502,14 @@ int bunzip2_main(int argc UNUSED_PARAM, char **argv)
 //config:	select LZCAT
 //config:	select LZMA
 //config:	help
-//config:	unlzma is a compression utility using the Lempel-Ziv-Markov chain
-//config:	compression algorithm, and range coding. Compression
-//config:	is generally considerably better than that achieved by the bzip2
-//config:	compressors.
+//config:	unlzma is a compression utility using the Lempel-Ziv-Markov
+//config:	chain compression algorithm, and range coding. Compression
+//config:	is generally considerably better than that achieved by the
+//config:	bzip2 compressors.
 //config:
 //config:config LZCAT
 //config:	bool "lzcat (alias for 'unlzma -d')"
-//config:	depends on LZMA || UNLZMA || FEATURE_SEAMLESS_LZMA
+//config:	depends on UNLZMA || FEATURE_SEAMLESS_LZMA
 //config:	default y
 //config:	help
 //config:	Alias for "unlzma -c".
@@ -524,9 +523,9 @@ int bunzip2_main(int argc UNUSED_PARAM, char **argv)
 //config:	IOW: you'll get lzma applet, but it will always require -d option.
 //config:
 //config:config FEATURE_LZMA_FAST
-//config:	bool "Optimize for speed (+1.0Kb)"
+//config:	bool "Optimize lzma for speed (+1.0Kb)"
 //config:	default y
-//config:	depends on LZMA || UNLZMA || LZCAT || FEATURE_SEAMLESS_LZMA
+//config:	depends on UNLZMA || LZCAT
 //config:	help
 //config:	This option reduces decompression time by about 25%.
 
@@ -588,14 +587,16 @@ int unlzma_main(int argc UNUSED_PARAM, char **argv)
 //config:	unxz is a unlzma successor.
 //config:
 //config:config XZCAT
-//config:	bool "xzcat (13 kb)"
+//config:	bool "xzcat (alias for 'unxz -c')"
 //config:	default y
+//config:	depends on UNXZ
 //config:	help
 //config:	Alias to "unxz -c".
 //config:
 //config:config XZ
 //config:	bool "xz -d"
 //config:	default y
+//config:	depends on UNXZ
 //config:	help
 //config:	Enable this option if you want commands like "xz -d" to work.
 //config:	IOW: you'll get xz applet, but it will always require -d option.
