@@ -1383,6 +1383,7 @@ unpack_gz_stream(transformer_state_t *xstate)
 	    //      (uint32_t)gunzip_bytes_out, v32);
 		bb_simple_error_msg("incorrect length");
 		total = -1;
+		goto ret;
 	}
 
 	if (!top_up(PASS_STATE 2))
