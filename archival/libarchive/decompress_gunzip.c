@@ -23,10 +23,20 @@
  *
  * gzip (GNU zip) -- compress files with zip algorithm and 'compress' interface
  * Copyright (C) 1992-1993 Jean-loup Gailly
+ *
  * The unzip code was written and put in the public domain by Mark Adler.
  * Portions of the lzw code are derived from the public domain 'compress'
  * written by Spencer Thomas, Joe Orost, James Woods, Jim McKie, Steve Davies,
  * Ken Turkowski, Dave Mack and Peter Jannesen.
+ *
+ * Code refactoring for speeding up inflate and reduce binary footprint in
+ * 2026 by Robrto A. Foglietta. Leveraging 4-slicing look-up table CRC32, on
+ * a i5-8365 DDR4 moved from 120MB/s to 200MB/s by average (1.67x).
+ * The overall foot-print increase is under 5KB considering 4KiB of CRC32 tables
+ * which supports speeding up also other decompressors like bzip2 and xz. While
+ * the minimal size version got +10% in speed with saving more than 100 bytes,
+ * or at the same size of the original +13% speed, with 0.6Kb estra gets +30%.
+ * Support for SSE4.2 added but not tested, yet (TODO).
  *
  * See the file algorithm.doc for the compression algorithms and file formats.
  *
