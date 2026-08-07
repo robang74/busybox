@@ -45,6 +45,10 @@
 #include "libbb.h"
 #include "bb_archive.h"
 
+#ifndef USE_STATIC_ALLOC
+#define USE_STATIC_ALLOC 1
+#endif
+
 #ifndef CONFIG_FEATURE_GUNZIP_FAST
 # pragma message "gunzip: size over speed"
 # define GUNZIP_SIZE_FOR_SPEED 0
@@ -53,6 +57,7 @@
 // RAF, set FAST_LITERALS to 1 to gain +3% speed for less than 100 bytes
 # define FAST_LITERALS 0
 # define USE_32BIT_BUF 1
+# define STATE_IN_BSS  0
 #else
 # pragma message "gunzip: speed over size"
 # define GUNZIP_SIZE_FOR_SPEED 1
@@ -104,9 +109,15 @@ enum {
  * 5256       0     108    5364    14f4 - bss
  * 4915       0       0    4915    1333 - malloc
  */
-#define STATE_IN_BSS 0
-#define STATE_IN_MALLOC 1
 
+#ifndef STATE_IN_BSS
+#define STATE_IN_BSS 0
+#endif
+#if STATE_IN_BSS
+#define STATE_IN_MALLOC 0
+#else
+#define STATE_IN_MALLOC 1
+#endif
 
 typedef struct state_t {
 	off_t gunzip_bytes_out; /* number of output bytes */
@@ -1085,11 +1096,20 @@ static int inflate_get_next_window(STATE_PARAM_ONLY)
 static IF_DESKTOP(long long) int
 inflate_unzip_internal(STATE_PARAM transformer_state_t *xstate)
 {
+
 	IF_DESKTOP(long long) int n = 0;
 	ssize_t nwrote;
 
-	/* Allocate all global buffers (for DYN_ALLOC option) */
-	gunzip_window = xmalloc(GUNZIP_WSIZE);
+	/* Allocate all global buffers */
+#if USE_STATIC_ALLOC
+	static unsigned char *_gunzip_window = NULL;
+	if(!_gunzip_window) {
+		_gunzip_window = xmalloc(GUNZIP_WSIZE);
+		 gunzip_window = _gunzip_window;
+	}
+#else
+	 gunzip_window = xmalloc(GUNZIP_WSIZE);
+#endif
 	gunzip_outbuf_count = 0;
 	gunzip_bytes_out = 0;
 	gunzip_src_fd = xstate->src_fd;
@@ -1141,7 +1161,10 @@ inflate_unzip_internal(STATE_PARAM transformer_state_t *xstate)
 	}
  ret:
 	/* Cleanup */
+#if USE_STATIC_ALLOC
+#else
 	free(gunzip_window);
+#endif
 	return n;
 }
 
@@ -1167,6 +1190,7 @@ inflate_unzip(transformer_state_t *xstate)
 	xstate->crc32 = gunzip_crc;
 	xstate->bytes_out = gunzip_bytes_out;
 	DEALLOC_STATE;
+
 	return n;
 }
 
@@ -1379,7 +1403,7 @@ unpack_gz_stream(transformer_state_t *xstate)
 	/*bb_error_msg("decompression OK, trailing garbage ignored");*/
 
  ret:
-	free(bytebuffer);
+ 	free(bytebuffer);
 	DEALLOC_STATE;
 	return total;
 }
