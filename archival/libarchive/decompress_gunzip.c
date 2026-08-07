@@ -1123,7 +1123,9 @@ inflate_unzip_internal(STATE_PARAM transformer_state_t *xstate)
 		/* Undo too much lookahead. The next read will be byte aligned
 		 * so we can discard unused bits in the last meaningful byte. */
 		bytebuffer_offset--;
-		bytebuffer[bytebuffer_offset] = (uint8_t)gunzip_bb;
+		/* RAF: data is already in the byte buffer, just rewind
+		 * bytebuffer[bytebuffer_offset] = (uint8_t)gunzip_bb;
+		 */
 		gunzip_bb >>= 8;
 		gunzip_bk -= 8;
 	}
