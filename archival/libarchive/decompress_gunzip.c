@@ -89,7 +89,7 @@ typedef struct huft_t {
 		/* ^^^^^ was "unsigned short", but that results in larger code */
 		struct huft_t *t;	/* pointer to next level of table */
 	} v;
-} huft_t;
+} huft_t ALIGNED(8);
 
 enum {
 	/* gunzip_window size--must be a power of two, and
@@ -167,7 +167,7 @@ typedef struct state_t {
 
 	const char *error_msg;
 	jmp_buf error_jmp;
-} state_t;
+} state_t ALIGNED(8);
 #define gunzip_bytes_out    (S()gunzip_bytes_out   )
 #define gunzip_crc          (S()gunzip_crc         )
 #define gunzip_src_fd       (S()gunzip_src_fd      )
@@ -392,8 +392,7 @@ bitbuf_t _fill_bitbuffer(STATE_PARAM register bitbuf_t bitbuffer, unsigned *curr
  * is given: "fixed inflate" decoder feeds us such data.
  */
 static huft_t* huft_build(const unsigned *b, const unsigned n,
-			const unsigned s, const struct cp_ext *cp_ext,
-			unsigned *m)
+		const unsigned s, const struct cp_ext *cp_ext, unsigned *m)
 {
 #if USE_STATIC_ALLOC
 	static huft_t q0[3] = { {.v.t = NULL },{.e = 99,.b = 1},{.e = 99,.b = 1} };
@@ -613,8 +612,8 @@ static huft_t* huft_build(const unsigned *b, const unsigned n,
 #define bd inflate_codes_bd
 #define nn inflate_codes_nn
 #define dd inflate_codes_dd
-static FAST_FUNC void
-inflate_codes_setup(STATE_PARAM unsigned my_bl, unsigned my_bd)
+static FAST_FUNC
+void inflate_codes_setup(STATE_PARAM unsigned my_bl, unsigned my_bd)
 {
 	bl = my_bl;
 	bd = my_bd;
