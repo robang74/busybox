@@ -60,7 +60,6 @@
 # define GUNZIP_INPUT_BUFSZ  0x10000
 # define GUNZIP_WINDOW_SIZE  0x10000
 # define FILL_REQUIRED_BITS  1
-#define USE_STATIC_ALLOC     1
 # define USE_STD_MALLOC      1
 #endif
 
@@ -69,7 +68,7 @@
 #endif
 
 #ifndef USE_STATIC_ALLOC
-#define USE_STATIC_ALLOC     0
+#define USE_STATIC_ALLOC     0 /* never 1, just for test */
 #endif
 
 #ifndef USE_32BIT_BUF
@@ -433,6 +432,20 @@ static huft_t* huft_build(const unsigned *b, const unsigned n,
 		p++;     /* can't combine with above line (Solaris bug) */
 	} while (--i);
 	if (c[0] == n) {  /* null input - all zero length codes */
+
+        /*
+         * This block handles a degenerate Huffman tree case: when all symbols
+         * have zero-length codes (a null or empty input scenario). It is never
+         * used in normal gzip streams because valid gzip data always contains
+         * actual Huffman-encoded symbols. However, it is a defensive code path
+         * for malformed/corrupted input, empty blocks and fuzzer/security
+         * hardening/scanners that craft malicious inputs.
+         * Calling free() on a pointer to static storage, it is undefined
+         * behavior and usually lead to a crash (expecially during debug).
+         * Since this code branch is traversed only by degenerated cases is fine
+         * to have USE_STATIC_ALLOC enabled, until corner case matches with a
+         * null/corrupted segment, and then q0 is returned as free-able *q.
+         */
 #if USE_STATIC_ALLOC
 		q = q0;
 #else
