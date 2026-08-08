@@ -340,7 +340,7 @@ static NOINLINE FAST_FUNC
 bitbuf_t fill_bitbuffer(STATE_PARAM bitbuf_t bitbuffer,
 		unsigned *current, const unsigned required)
 {
-    unsigned sz = *current;
+	register unsigned sz = *current;
 	while (sz < required) {
 		if (bytebuffer_offset >= bytebuffer_size)
 			fill_bitbuffer_read(PASS_STATE_ONLY);
@@ -353,8 +353,8 @@ bitbuf_t fill_bitbuffer(STATE_PARAM bitbuf_t bitbuffer,
 		    bytebuffer_offset++;
 		    sz += 8;
         }
-        *current = sz;
 	}
+	*current = sz;
 	return bitbuffer;
 }
 
@@ -632,7 +632,7 @@ do_e_loop:
 				bb >>= t->b;
 				k -= t->b;
 				e -= 16;
-                /*if (k < e)*/ bb = fill_bitbuffer(PASS_STATE bb, &k, e);
+                bb = fill_bitbuffer(PASS_STATE bb, &k, e);
 				t = t->v.t + ((bitbuf_t) bb & mask_bits[e]);
 				e = t->e;
 			} while (e > 16);
