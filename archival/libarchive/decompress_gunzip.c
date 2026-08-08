@@ -322,7 +322,7 @@ void fill_bitbuffer_read(STATE_PARAM_ONLY)
 #endif
 	/* Leave the first 4 bytes empty so we can always unwind the bitbuffer
 	 * to the front of the bytebuffer */
-	bytebuffer_size = full_read(gunzip_src_fd, &bytebuffer[8], sz);
+	bytebuffer_size = safe_read(gunzip_src_fd, &bytebuffer[8], sz);
 	if ((int)bytebuffer_size < 1) {
 		error_msg = "unexpected end of file";
 		abort_unzip(PASS_STATE_ONLY);
@@ -1237,7 +1237,8 @@ static int top_up(STATE_PARAM unsigned n)
 	if (count < (int)n) {
 		memmove(bytebuffer, &bytebuffer[bytebuffer_offset], count);
 		bytebuffer_offset = 0;
-		bytebuffer_size = full_read(gunzip_src_fd, &bytebuffer[count], bytebuffer_max - count);
+		bytebuffer_size = full_read(gunzip_src_fd, &bytebuffer[count],
+		    bytebuffer_max - count);
 		if ((int)bytebuffer_size < 0) {
 			bb_simple_error_msg(bb_msg_read_error);
 			return 0;
