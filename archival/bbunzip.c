@@ -321,11 +321,12 @@ int uncompress_main(int argc UNUSED_PARAM, char **argv)
 //config:	depends on (GUNZIP || ZCAT) && LONG_OPTS
 //config:
 //config:config FEATURE_GUNZIP_FAST
-//config:	bool "Optimize gunzip for speed (+0.6Kb)"
+//config:	bool "Optimize gunzip for speed (+0.9Kb)"
 //config:	default y
 //config:	depends on GUNZIP && FEATURE_GZIP_DECOMPRESS
 //config:	help
-//config:	A raw estimation indicates the speed increases by 30% on i5.
+//config:	A raw estimation indicates the speed increases by 25% on i5,
+//config:	for the maximum speed also enable the CRC32 4-slices (+4.2Kb).
 //config:	Say N if you are compiling for a very constrained tiny system.
 //config:	Say Y if you want faster gunzip/zcat or for running on desktops.
 

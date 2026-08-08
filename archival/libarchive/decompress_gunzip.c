@@ -45,42 +45,47 @@
 #include "libbb.h"
 #include "bb_archive.h"
 
-#ifndef USE_STATIC_ALLOC
-#define USE_STATIC_ALLOC 1
-#endif
-
 #ifndef CONFIG_FEATURE_GUNZIP_FAST
 # pragma message "gunzip: size over speed"
-# define GUNZIP_SIZE_FOR_SPEED 0
-# define GUNZIP_INPUT_BUFSZ 0x4000
-# define GUNZIP_WINDOW_SIZE 0x8000
-// RAF, set FAST_LITERALS to 1 to gain +3% speed for less than 100 bytes
-# define FAST_LITERALS  0
-# define USE_32BIT_BUF  1
-# define STATE_IN_BSS   0
-# define USE_STD_MALLOC 0
+# define GUNZIP_SIZE_FOR_SPEED     0
+# define GUNZIP_INPUT_BUFSZ  0x04000
+# define GUNZIP_WINDOW_SIZE  0x08000
+# define FAST_LITERALS       0
+# define USE_STD_MALLOC      0
+# define USE_32BIT_BUF       1
+# define STATE_IN_BSS        0
 #else
 # pragma message "gunzip: speed over size"
-# define GUNZIP_SIZE_FOR_SPEED 1
-# define GUNZIP_INPUT_BUFSZ 0x10000
-# define GUNZIP_WINDOW_SIZE 0x10000
-# define USE_STD_MALLOC 1
+# define GUNZIP_SIZE_FOR_SPEED     1
+# define GUNZIP_INPUT_BUFSZ  0x10000
+# define GUNZIP_WINDOW_SIZE  0x10000
+# define FILL_REQUIRED_BITS  1
+#define USE_STATIC_ALLOC     1
+# define USE_STD_MALLOC      1
+#endif
+
+#ifndef FILL_REQUIRED_BITS
+#define FILL_REQUIRED_BITS   1
+#endif
+
+#ifndef USE_STATIC_ALLOC
+#define USE_STATIC_ALLOC     0
 #endif
 
 #ifndef USE_32BIT_BUF
 #define USE_32BIT_BUF (UINTPTR_MAX == 0xFFFFFFFF)
 #endif
 
-#if USE_32BIT_BUF
-typedef unsigned bitbuf_t;
+#if     USE_32BIT_BUF
+typedef uint32_t bitbuf_t;
 # ifndef FAST_LITERALS
-# define MAX_BITS_TO_FILL 24
-# define FAST_LITERALS 2
+# define MAX_BITS_TO_FILL   24
+# define FAST_LITERALS       2
 # endif
 #else
 typedef uint64_t bitbuf_t;
-# define MAX_BITS_TO_FILL 56
-# define FAST_LITERALS 4
+# define MAX_BITS_TO_FILL   56
+# define FAST_LITERALS       4
 #endif
 
 typedef struct huft_t {
@@ -224,7 +229,7 @@ static state_t state;
 #define STATE_PARAM_ONLY state_t *state
 #endif
 
-#if GUNZIP_SIZE_FOR_SPEED
+#if FILL_REQUIRED_BITS
 #define refill_bitbuffer(_a, _b, _c) do { \
 	_a = _fill_bitbuffer(PASS_STATE _a, &_b, _c); } while(0)
 #else
@@ -341,16 +346,16 @@ static ALWAYS_INLINE
 static NOINLINE FAST_FUNC
 #endif
 bitbuf_t _fill_bitbuffer(STATE_PARAM register bitbuf_t bitbuffer, unsigned *current
-    #if GUNZIP_SIZE_FOR_SPEED
+    #if FILL_REQUIRED_BITS
     , const unsigned required
     #endif
 ){
 	register unsigned sz = *current;
-#if GUNZIP_SIZE_FOR_SPEED
+    #if FILL_REQUIRED_BITS
 	while (sz <= required)
-#else
+    #else
 	do
-#endif
+    #endif
 	{
 		if (bytebuffer_offset >= bytebuffer_size)
 			fill_bitbuffer_read(PASS_STATE_ONLY);
@@ -364,10 +369,10 @@ bitbuf_t _fill_bitbuffer(STATE_PARAM register bitbuf_t bitbuffer, unsigned *curr
 		    sz += 8;
         }
 	}
-#if GUNZIP_SIZE_FOR_SPEED
-#else
+    #if FILL_REQUIRED_BITS
+    #else
 	while (sz <= MAX_BITS_TO_FILL);
-#endif
+    #endif
 	*current = sz;
 	return bitbuffer;
 }

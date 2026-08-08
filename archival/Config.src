@@ -44,7 +44,7 @@ config FEATURE_PATH_TRAVERSAL_PROTECTION
 	GNU cpio 2.15 has NO such sanity check.
 
 config FEATURE_CRC32_4BYTES
-	bool "Use 4-slice CRC32 table (4KB, 3x faster)"
+	bool "Use 4-slice CRC32 table, 3x faster (5Kb)"
 	default y
 	depends on GUNZIP || GZIP || UNZIP || BUNZIP2 || LZOP || XZ
 	help
@@ -53,10 +53,7 @@ config FEATURE_CRC32_4BYTES
 
 	The 4-slice algorithm processes 4 bytes in parallel using
 	bitwise operations, which is significantly faster on modern
-	CPUs but requires 3KB more static memory.
-
-	- Total CRC32 table size: 4KB (vs 1KB default)
-	- Typical speedup: 3x on x86_64 and ARM64
+	CPUs (gunzip +25% faster) but requires 4KiB of look-up tables.
 
 	This option has no effect on compression (gzip -c), only on
 	decompression paths that verify CRC32.
