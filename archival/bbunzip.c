@@ -398,8 +398,8 @@ int gunzip_main(int argc UNUSED_PARAM, char **argv)
 	 * Normally, "zcat" is just "gunzip -c".
 	 * But if seamless magic is enabled, then we are much more clever.
 	 */
-	if (ENABLE_ZCAT && applet_name[1] == 'c'
-	|| ENABLE_UZCAT && applet_name[2] == 'c')
+	if ((ENABLE_ZCAT  && applet_name[1] == 'c')
+	||  (ENABLE_UZCAT && applet_name[2] == 'c'))
 		option_mask32 |= BBUNPK_OPT_STDOUT | BBUNPK_SEAMLESS_MAGIC;
 
 	return bbunpack(argv, unpack_gz_stream, make_new_name_gunzip, /*unused:*/ NULL);
