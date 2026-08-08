@@ -228,8 +228,13 @@ static state_t state;
 #define STATE_PARAM_ONLY state_t *state
 #endif
 
+#if GUNZIP_SIZE_FOR_SPEED
+#define refill_bitbuffer(_a, _b, _c) do { \
+	_a = _fill_bitbuffer(PASS_STATE _a, &_b, _c); } while(0)
+#else
 #define refill_bitbuffer(_a, _b, _c) do { if(_b < _c) \
 	_a = _fill_bitbuffer(PASS_STATE _a, &_b); } while(0)
+#endif
 
 static const uint16_t mask_bits[] ALIGN2 = {
 	0x0000, 0x0001, 0x0003, 0x0007, 0x000f, 0x001f, 0x003f, 0x007f, 0x00ff,
@@ -307,7 +312,7 @@ static void abort_unzip(STATE_PARAM_ONLY)
 	longjmp(error_jmp, 1);
 }
 
-#if 0 //GUNZIP_SIZE_FOR_SPEED
+#if GUNZIP_SIZE_FOR_SPEED
 static NOINLINE FAST_FUNC
 #else
 static ALWAYS_INLINE
@@ -334,16 +339,23 @@ void fill_bitbuffer_read(STATE_PARAM_ONLY)
 	bytebuffer_offset = 8;
 }
 
-#if 0 //GUNZIP_SIZE_FOR_SPEED
+#if GUNZIP_SIZE_FOR_SPEED
 static ALWAYS_INLINE
 #else
 static NOINLINE FAST_FUNC
 #endif
-bitbuf_t _fill_bitbuffer(STATE_PARAM register bitbuf_t bitbuffer, unsigned *current)
-{
+bitbuf_t _fill_bitbuffer(STATE_PARAM register bitbuf_t bitbuffer, unsigned *current
+    #if GUNZIP_SIZE_FOR_SPEED
+    , const unsigned required
+    #endif
+){
 	register unsigned sz = *current;
-
-	do {
+#if GUNZIP_SIZE_FOR_SPEED
+	while (sz <= required)
+#else
+	do
+#endif
+	{
 		if (bytebuffer_offset >= bytebuffer_size)
 			fill_bitbuffer_read(PASS_STATE_ONLY);
         /* FAST PATH: byte-aligned, enough bytes, and we need 64+ bits */
@@ -355,8 +367,11 @@ bitbuf_t _fill_bitbuffer(STATE_PARAM register bitbuf_t bitbuffer, unsigned *curr
 		    bytebuffer_offset++;
 		    sz += 8;
         }
-	} while (sz <= MAX_BITS_TO_FILL);
-
+	}
+#if GUNZIP_SIZE_FOR_SPEED
+#else
+	while (sz <= MAX_BITS_TO_FILL);
+#endif
 	*current = sz;
 	return bitbuffer;
 }
