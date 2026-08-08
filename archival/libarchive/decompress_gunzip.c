@@ -228,6 +228,8 @@ static state_t state;
 #define STATE_PARAM_ONLY state_t *state
 #endif
 
+#define refill_bitbuffer(_a, _b, _c) do { if(_b < _c) \
+	_a = _fill_bitbuffer(PASS_STATE _a, &_b); } while(0)
 
 static const uint16_t mask_bits[] ALIGN2 = {
 	0x0000, 0x0001, 0x0003, 0x0007, 0x000f, 0x001f, 0x003f, 0x007f, 0x00ff,
@@ -305,7 +307,7 @@ static void abort_unzip(STATE_PARAM_ONLY)
 	longjmp(error_jmp, 1);
 }
 
-#if GUNZIP_SIZE_FOR_SPEED
+#if 0 //GUNZIP_SIZE_FOR_SPEED
 static NOINLINE FAST_FUNC
 #else
 static ALWAYS_INLINE
@@ -332,16 +334,16 @@ void fill_bitbuffer_read(STATE_PARAM_ONLY)
 	bytebuffer_offset = 8;
 }
 
-#if GUNZIP_SIZE_FOR_SPEED
+#if 0 //GUNZIP_SIZE_FOR_SPEED
 static ALWAYS_INLINE
 #else
 static NOINLINE FAST_FUNC
 #endif
-bitbuf_t fill_bitbuffer(STATE_PARAM bitbuf_t bitbuffer,
-		unsigned *current, const unsigned required)
+bitbuf_t _fill_bitbuffer(STATE_PARAM register bitbuf_t bitbuffer, unsigned *current)
 {
 	register unsigned sz = *current;
-	while (sz < required) {
+
+	do {
 		if (bytebuffer_offset >= bytebuffer_size)
 			fill_bitbuffer_read(PASS_STATE_ONLY);
         /* FAST PATH: byte-aligned, enough bytes, and we need 64+ bits */
@@ -353,7 +355,8 @@ bitbuf_t fill_bitbuffer(STATE_PARAM bitbuf_t bitbuffer,
 		    bytebuffer_offset++;
 		    sz += 8;
         }
-	}
+	} while (sz <= MAX_BITS_TO_FILL);
+
 	*current = sz;
 	return bitbuffer;
 }
@@ -619,8 +622,8 @@ inflate_codes(STATE_PARAM_ONLY)
 #if FAST_LITERALS
 	    try_lt = 0;
 #endif
-	    //if (k < bl)
-	    bb = fill_bitbuffer(PASS_STATE bb, &k, bl);
+	    //refill_bitbuffer(bb, k, bl);
+	    refill_bitbuffer(bb, k, bl);
 		t = tl + ((bitbuf_t) bb & ml);
 		e = t->e;
 		if (e > 16) {
@@ -632,7 +635,7 @@ do_e_loop:
 				bb >>= t->b;
 				k -= t->b;
 				e -= 16;
-                bb = fill_bitbuffer(PASS_STATE bb, &k, e);
+                refill_bitbuffer(bb, k, e);
 				t = t->v.t + ((bitbuf_t) bb & mask_bits[e]);
 				e = t->e;
 			} while (e > 16);
@@ -666,13 +669,13 @@ try_gain:
 			break;
 		} else { /* it's an EOB or a length */
 			/* get length of block to copy */
-			bb = fill_bitbuffer(PASS_STATE bb, &k, e);
+			refill_bitbuffer(bb, k, e);
 			nn = t->v.n + ((unsigned) bb & mask_bits[e]);
 			bb >>= e;
 			k -= e;
 
 			/* decode distance of block to copy */
-			bb = fill_bitbuffer(PASS_STATE bb, &k, bd);
+			refill_bitbuffer(bb, k, bd);
 			t = td + ((unsigned) bb & md);
 			e = t->e;
 			if (e > 16) { on_copy = 1; goto do_e_loop; }
@@ -680,7 +683,7 @@ back_on_copy:
 	        on_copy = 0;
 			bb >>= t->b;
 			k -= t->b;
-			bb = fill_bitbuffer(PASS_STATE bb, &k, e);
+			refill_bitbuffer(bb, k, e);
 			dd = w - t->v.n - ((unsigned) bb & mask_bits[e]);
 			bb >>= e;
 			k -= e;
@@ -765,7 +768,7 @@ inflate_stored(STATE_PARAM_ONLY)
 {
 	/* read and output the compressed data */
 	while (inflate_stored_n--) {
-		inflate_stored_b = fill_bitbuffer(PASS_STATE inflate_stored_b, &inflate_stored_k, 8);
+		refill_bitbuffer(inflate_stored_b, inflate_stored_k, 8);
 		gunzip_window[inflate_stored_w++] = (unsigned char) inflate_stored_b;
 		if (inflate_stored_w == GUNZIP_WSIZE) {
 			gunzip_outbuf_count = inflate_stored_w;
@@ -808,13 +811,13 @@ static int inflate_block(STATE_PARAM smallint *e)
 	k = gunzip_bk;
 
 	/* read in last block bit */
-	b = fill_bitbuffer(PASS_STATE b, &k, 3);
+	refill_bitbuffer(b, k, 3);
 	*e = b & 1;
 	b >>= 1;
 	k -= 1;
 
 	/* read in block type */
-	//b = fill_bitbuffer(PASS_STATE b, &k, 2);
+	//refill_bitbuffer(b, k, 2);
 	t = (unsigned) b & 3;
 	b >>= 2;
 	k -= 2;
@@ -845,12 +848,12 @@ static int inflate_block(STATE_PARAM smallint *e)
 		k_stored -= n;
 
 		/* get the length and its complement */
-		b_stored = fill_bitbuffer(PASS_STATE b_stored, &k_stored, 16);
+		refill_bitbuffer(b_stored, k_stored, 16);
 		n = ((unsigned) b_stored & 0xffff);
 		b_stored >>= 16;
 		k_stored -= 16;
 
-		b_stored = fill_bitbuffer(PASS_STATE b_stored, &k_stored, 16);
+		refill_bitbuffer(b_stored, k_stored, 16);
 		if (n != (unsigned) ((~b_stored) & 0xffff)) {
 			abort_unzip(PASS_STATE_ONLY);	/* error in compressed data */
 		}
@@ -928,17 +931,17 @@ static int inflate_block(STATE_PARAM smallint *e)
 		k_dynamic = gunzip_bk;
 
 		/* read in table lengths */
-		b_dynamic = fill_bitbuffer(PASS_STATE b_dynamic, &k_dynamic, 14);
+		refill_bitbuffer(b_dynamic, k_dynamic, 14);
 		nl = 257 + ((unsigned) b_dynamic & 0x1f);	/* number of literal/length codes */
 
 		b_dynamic >>= 5;
 		k_dynamic -= 5;
-		//b_dynamic = fill_bitbuffer(PASS_STATE b_dynamic, &k_dynamic, 5);
+		//refill_bitbuffer(b_dynamic, k_dynamic, 5);
 		nd = 1 + ((unsigned) b_dynamic & 0x1f);	/* number of distance codes */
 
 		b_dynamic >>= 5;
 		k_dynamic -= 5;
-		//b_dynamic = fill_bitbuffer(PASS_STATE b_dynamic, &k_dynamic, 4);
+		//refill_bitbuffer(b_dynamic, k_dynamic, 4);
 		nb = 4 + ((unsigned) b_dynamic & 0xf);	/* number of bit length codes */
 
 		b_dynamic >>= 4;
@@ -949,7 +952,7 @@ static int inflate_block(STATE_PARAM smallint *e)
 
 		/* read in bit-length-code lengths */
 		for (j = 0; j < nb; j++) {
-			b_dynamic = fill_bitbuffer(PASS_STATE b_dynamic, &k_dynamic, 3);
+			refill_bitbuffer(b_dynamic, k_dynamic, 3);
 			ll[border[j]] = (unsigned) b_dynamic & 7;
 			b_dynamic >>= 3;
 			k_dynamic -= 3;
@@ -969,18 +972,18 @@ static int inflate_block(STATE_PARAM smallint *e)
 		m = mask_bits[bl];
 		i = l = 0;
 		while ((unsigned) i < n) {
-			b_dynamic = fill_bitbuffer(PASS_STATE b_dynamic, &k_dynamic, (unsigned)bl);
+			refill_bitbuffer(b_dynamic, k_dynamic, (unsigned)bl);
 			td = inflate_codes_tl + ((unsigned) b_dynamic & m);
 			j = td->b;
 			b_dynamic >>= j;
 			k_dynamic -= j;
 			j = td->v.n;
 			if (j >> 4)
-				b_dynamic = fill_bitbuffer(PASS_STATE b_dynamic, &k_dynamic, 7);
+				refill_bitbuffer(b_dynamic, k_dynamic, 7);
 			if (j < 16) {	/* length of code in bits (0..15) */
 				ll[i++] = l = j;	/* save last length in l */
 			} else if (j == 16) {	/* repeat last length 3 to 6 times */
-				//b_dynamic = fill_bitbuffer(PASS_STATE b_dynamic, &k_dynamic, 2);
+				//refill_bitbuffer(b_dynamic, k_dynamic, 2);
 				j = 3 + ((unsigned) b_dynamic & 3);
 				b_dynamic >>= 2;
 				k_dynamic -= 2;
@@ -991,7 +994,7 @@ static int inflate_block(STATE_PARAM smallint *e)
 					ll[i++] = l;
 				}
 			} else if (j == 17) {	/* 3 to 10 zero length codes */
-				//b_dynamic = fill_bitbuffer(PASS_STATE b_dynamic, &k_dynamic, 3);
+				//refill_bitbuffer(b_dynamic, k_dynamic, 3);
 				j = 3 + ((unsigned) b_dynamic & 7);
 				b_dynamic >>= 3;
 				k_dynamic -= 3;
@@ -1003,7 +1006,7 @@ static int inflate_block(STATE_PARAM smallint *e)
 				}
 				l = 0;
 			} else {	/* j == 18: 11 to 138 zero length codes */
-				//b_dynamic = fill_bitbuffer(PASS_STATE b_dynamic, &k_dynamic, 7);
+				//refill_bitbuffer(b_dynamic, k_dynamic, 7);
 				j = 11 + ((unsigned) b_dynamic & 0x7f);
 				b_dynamic >>= 7;
 				k_dynamic -= 7;
