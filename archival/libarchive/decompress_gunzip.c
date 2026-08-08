@@ -313,8 +313,10 @@ static ALWAYS_INLINE
 void fill_bitbuffer_read(STATE_PARAM_ONLY)
 {
 	unsigned sz = bytebuffer_max - 8;
+#ifdef CONFIG_UNZIP
 	if (to_read >= 0 && to_read < sz) /* unzip only */
 		sz = to_read;
+#endif
 	/* Leave the first 4 bytes empty so we can always unwind the bitbuffer
 	 * to the front of the bytebuffer */
 	bytebuffer_size = full_read(gunzip_src_fd, &bytebuffer[8], sz);
@@ -322,8 +324,10 @@ void fill_bitbuffer_read(STATE_PARAM_ONLY)
 		error_msg = "unexpected end of file";
 		abort_unzip(PASS_STATE_ONLY);
 	}
+#ifdef CONFIG_UNZIP
 	if (to_read >= 0) /* unzip only */
 		to_read -= bytebuffer_size;
+#endif
 	bytebuffer_size += 8;
 	bytebuffer_offset = 8;
 }
@@ -1172,7 +1176,7 @@ inflate_unzip_internal(STATE_PARAM transformer_state_t *xstate)
 /* External entry points */
 
 /* For unzip */
-
+#ifdef CONFIG_UNZIP
 IF_DESKTOP(long long) int FAST_FUNC
 inflate_unzip(transformer_state_t *xstate)
 {
@@ -1193,7 +1197,7 @@ inflate_unzip(transformer_state_t *xstate)
 
 	return n;
 }
-
+#endif
 
 /* For gunzip */
 
