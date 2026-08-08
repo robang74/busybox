@@ -55,14 +55,16 @@
 # define GUNZIP_INPUT_BUFSZ 0x4000
 # define GUNZIP_WINDOW_SIZE 0x8000
 // RAF, set FAST_LITERALS to 1 to gain +3% speed for less than 100 bytes
-# define FAST_LITERALS 0
-# define USE_32BIT_BUF 1
-# define STATE_IN_BSS  0
+# define FAST_LITERALS  0
+# define USE_32BIT_BUF  1
+# define STATE_IN_BSS   0
+# define USE_STD_MALLOC 0
 #else
 # pragma message "gunzip: speed over size"
 # define GUNZIP_SIZE_FOR_SPEED 1
 # define GUNZIP_INPUT_BUFSZ 0x10000
 # define GUNZIP_WINDOW_SIZE 0x10000
+# define USE_STD_MALLOC 1
 #endif
 
 #ifndef USE_32BIT_BUF
@@ -112,11 +114,6 @@ enum {
 
 #ifndef STATE_IN_BSS
 #define STATE_IN_BSS 0
-#endif
-#if STATE_IN_BSS
-#define STATE_IN_MALLOC 0
-#else
-#define STATE_IN_MALLOC 1
 #endif
 
 typedef struct state_t {
@@ -168,6 +165,7 @@ typedef struct state_t {
 	const char *error_msg;
 	jmp_buf error_jmp;
 } state_t ALIGNED(8);
+
 #define gunzip_bytes_out    (S()gunzip_bytes_out   )
 #define gunzip_crc          (S()gunzip_crc         )
 #define gunzip_src_fd       (S()gunzip_src_fd      )
@@ -215,9 +213,7 @@ typedef struct state_t {
 #define STATE_PARAM /*nothing*/
 #define STATE_PARAM_ONLY void
 static state_t state;
-#endif
-
-#if STATE_IN_MALLOC /* Use malloc space */
+#else
 #define DECLARE_STATE state_t *state
 #define ALLOC_STATE (state = xzalloc(sizeof(*state)))
 #define DEALLOC_STATE free(state)
@@ -531,7 +527,13 @@ static huft_t* huft_build(const unsigned *b, const unsigned n,
 				ws[htl+1] = w + j;	/* set bits decoded in stack */
 
 				/* allocate and link in new table */
+#if USE_STD_MALLOC
+				q = malloc((z + 1) * sizeof(huft_t));
+				if(!q) bb_simple_error_msg("malloc fails");
+				q->v.t = NULL;
+#else
 				q = xzalloc((z + 1) * sizeof(huft_t));
+#endif
 				*t = q + 1;	/* link to list for huft_free() */
 				t = &(q->v.t);
 				u[htl] = ++q;	/* table starts after link */
@@ -1379,7 +1381,12 @@ unpack_gz_stream(transformer_state_t *xstate)
 
 	ALLOC_STATE;
 	to_read = -1;
+#if USE_STD_MALLOC
+	bytebuffer = malloc(bytebuffer_max);
+	if(!bytebuffer) bb_simple_error_msg("malloc fails");
+#else
 	bytebuffer = xmalloc(bytebuffer_max);
+#endif
 	gunzip_src_fd = xstate->src_fd;
 
  again:
