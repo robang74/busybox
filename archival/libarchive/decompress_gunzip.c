@@ -96,7 +96,7 @@ typedef struct huft_t {
 		/* ^^^^^ was "unsigned short", but that results in larger code */
 		struct huft_t *t;	/* pointer to next level of table */
 	} v;
-} huft_t ALIGNED(8);
+} huft_t ALIGN_PTR;
 
 enum {
 	/* gunzip_window size--must be a power of two, and
