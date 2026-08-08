@@ -395,6 +395,9 @@ static huft_t* huft_build(const unsigned *b, const unsigned n,
 			const unsigned s, const struct cp_ext *cp_ext,
 			unsigned *m)
 {
+#if USE_STATIC_ALLOC
+	static huft_t q0[3] = { {.v.t = NULL },{.e = 99,.b = 1},{.e = 99,.b = 1} };
+#endif
 	unsigned a;             /* counter for codes of length k */
 	unsigned c[BMAX + 1];   /* bit length count table */
 	unsigned eob_len;       /* length of end-of-block code (value 256) */
@@ -430,12 +433,16 @@ static huft_t* huft_build(const unsigned *b, const unsigned n,
 		p++;     /* can't combine with above line (Solaris bug) */
 	} while (--i);
 	if (c[0] == n) {  /* null input - all zero length codes */
+#if USE_STATIC_ALLOC
+		q = q0;
+#else
 		q = xzalloc(3 * sizeof(*q));
 		//q[0].v.t = NULL;
 		q[1].e = 99;    /* invalid code marker */
 		q[1].b = 1;
 		q[2].e = 99;    /* invalid code marker */
 		q[2].b = 1;
+#endif
 		*m = 1;
 		return q + 1;
 	}
