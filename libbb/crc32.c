@@ -60,7 +60,7 @@ static ALWAYS_INLINE
 uint32_t* crc32_filltable_endian0(uint32_t *crc_table)
 {
 
-    if(global_crc32_table) {
+	if(global_crc32_table) {
 		crc_table = __builtin_memmove(crc_table,
 			global_crc32_table, crc32_table_slice_size);
 	} else {
@@ -90,10 +90,10 @@ uint32_t* crc32_filltable_endian0(uint32_t *crc_table)
 {
 	/* After computing the base table[0..255], derive the others */
 	for (short s = 0; s < 7; s++) {
-	    for (short i = 0; i < 256; i++) {
-	        register uint32_t tbl = table[s-1][i];
-	        table[s][i] = (tbl >> 8) ^ table[0][(uint8_t)tbl];
-	    }
+		for (short i = 0; i < 256; i++) {
+		    register uint32_t tbl = table[s-1][i];
+		    table[s][i] = (tbl >> 8) ^ table[0][(uint8_t)tbl];
+		}
 	}
 }
 #endif
@@ -152,30 +152,30 @@ uint32_t* global_crc32_new_table_le(void) { return NULL; }
 
 FAST_FUNC
 uint32_t crc32_block_endian0(uint32_t crc, const void *data, unsigned len,
-        uint32_t *table UNUSED_PARAM)
+	    uint32_t *table UNUSED_PARAM)
 {
-    const uint8_t *p = data;
-    crc = ~crc;
+	const uint8_t *p = data;
+	crc = ~crc;
 
-    /* Align to 8 bytes */
-    while (len && ((uintptr_t)p & 7)) {
-        crc = _mm_crc32_u8(crc, *p++);
-        len--;
-    }
+	/* Align to 8 bytes */
+	while (len && ((uintptr_t)p & 7)) {
+	    crc = _mm_crc32_u8(crc, *p++);
+	    len--;
+	}
 
-    /* 8-byte chunks */
-    const uint64_t *q = (const uint64_t *)p;
-    while (len >= 8) {
-        crc = _mm_crc32_u64(crc, *q++);
-        len -= 8;
-    }
+	/* 8-byte chunks */
+	const uint64_t *q = (const uint64_t *)p;
+	while (len >= 8) {
+	    crc = _mm_crc32_u64(crc, *q++);
+	    len -= 8;
+	}
 
-    /* Tail */
-    p = (const uint8_t *)q;
-    while (len--)
-        crc = _mm_crc32_u8(crc, *p++);
+	/* Tail */
+	p = (const uint8_t *)q;
+	while (len--)
+	    crc = _mm_crc32_u8(crc, *p++);
 
-    return ~crc;
+	return ~crc;
 }
 
 #else //////////////////////////////////////////////////////////////////////////////////////
@@ -191,7 +191,7 @@ uint32_t* global_crc32_new_table_le(void)
 {
 #if !USE_CRC32_X86_ASM
 	if (!global_crc32_table)
-	    global_crc32_table = crc32_new_table_le();
+		global_crc32_table = crc32_new_table_le();
 #endif
 	return global_crc32_table;
 }
@@ -200,15 +200,15 @@ uint32_t* global_crc32_new_table_le(void)
 static ALWAYS_INLINE
 uint32_t swap(uint32_t x)
 {
-    // swap endianess
-    #if defined(__GNUC__) || defined(__clang__)
-    return __builtin_bswap32(x);
-    #else
-    return (x >> 24) |
-          ((x >>  8) & 0x0000FF00) |
-          ((x <<  8) & 0x00FF0000) |
-           (x << 24);
-    #endif
+	// swap endianess
+	#if defined(__GNUC__) || defined(__clang__)
+	return __builtin_bswap32(x);
+	#else
+	return (x >> 24) |
+	      ((x >>  8) & 0x0000FF00) |
+	      ((x <<  8) & 0x00FF0000) |
+	       (x << 24);
+	#endif
 }
 #endif
 
@@ -222,79 +222,79 @@ uint32_t swap(uint32_t x)
 static ALWAYS_INLINE
 uint32_t crc32_ref_asm(uint32_t crc, const uint8_t *data, uint64_t len)
 {
-    uint32_t result;
+	uint32_t result;
 
-    __asm__ volatile (
-        "mov    %1, %%eax\n\t"           /* incoming crc -> eax */
-        "mov    %2, %%rsi\n\t"           /* data -> rsi */
-        "mov    %3, %%rcx\n\t"           /* len -> rcx */
-        "jrcxz  2f\n\t"                  /* if len==0, skip */
-        "lea    (%%rsi, %%rcx), %%rdi\n" /* rdi = end pointer */
-        "1:\n\t"
-        "xorb   (%%rsi), %%al\n\t"
-        "inc    %%rsi\n\t"
-        "movl   $8, %%ecx\n\t"
-        "3:\n\t"
-        "movl   %%eax, %%edx\n\t"
-        "andl   $1, %%edx\n\t"
-        "negl   %%edx\n\t"
-        "andl   $0xEDB88320, %%edx\n\t"
-        "shrl   $1, %%eax\n\t"
-        "xorl   %%edx, %%eax\n\t"
-        "loop   3b\n\t"
-        "cmp    %%rdi, %%rsi\n\t"
-        "jne    1b\n"
-        "2:\n\t"
-        "movl   %%eax, %0"               /* eax -> result */
-        : "=r" (result)
-        : "r" (crc), "r" (data), "r" (len)
-        : "rax", "rcx", "rdx", "rsi", "rdi", "cc", "memory"
-    );
+	__asm__ volatile (
+	    "mov    %1, %%eax\n\t"           /* incoming crc -> eax */
+	    "mov    %2, %%rsi\n\t"           /* data -> rsi */
+	    "mov    %3, %%rcx\n\t"           /* len -> rcx */
+	    "jrcxz  2f\n\t"                  /* if len==0, skip */
+	    "lea    (%%rsi, %%rcx), %%rdi\n" /* rdi = end pointer */
+	    "1:\n\t"
+	    "xorb   (%%rsi), %%al\n\t"
+	    "inc    %%rsi\n\t"
+	    "movl   $8, %%ecx\n\t"
+	    "3:\n\t"
+	    "movl   %%eax, %%edx\n\t"
+	    "andl   $1, %%edx\n\t"
+	    "negl   %%edx\n\t"
+	    "andl   $0xEDB88320, %%edx\n\t"
+	    "shrl   $1, %%eax\n\t"
+	    "xorl   %%edx, %%eax\n\t"
+	    "loop   3b\n\t"
+	    "cmp    %%rdi, %%rsi\n\t"
+	    "jne    1b\n"
+	    "2:\n\t"
+	    "movl   %%eax, %0"               /* eax -> result */
+	    : "=r" (result)
+	    : "r" (crc), "r" (data), "r" (len)
+	    : "rax", "rcx", "rdx", "rsi", "rdi", "cc", "memory"
+	);
 
-    return result;
+	return result;
 }
 #endif
 
 FAST_FUNC
 uint32_t crc32_block_endian0(uint32_t val, const void *buf,
-    unsigned len, uint32_t *table UNUSED_PARAM)
+	unsigned len, uint32_t *table UNUSED_PARAM)
 {
 #if USE_CRC32_X86_ASM
-    val = crc32_ref_asm(val, buf, len);
+	val = crc32_ref_asm(val, buf, len);
 #else
-    #if ENABLE_CRC32_4BYTES // compute CRC32 by slicing-by-4 algorithm
-    const uint32_t *cur = (const uint32_t *)buf;
-    const uint32_t *end = cur + (len >> 2);
+	#if ENABLE_CRC32_4BYTES // compute CRC32 by slicing-by-4 algorithm
+	const uint32_t *cur = (const uint32_t *)buf;
+	const uint32_t *end = cur + (len >> 2);
 
-    // process four bytes each cycle
-    while (end != cur)
-    {
-        #if __BYTE_ORDER == __BIG_ENDIAN
-        uint32_t one = *cur++ ^ swap(val);
-        val = crc32_lookup_table[0][(uint8_t) one     ] ^
-              crc32_lookup_table[1][(uint8_t)(one>> 8)] ^
-              crc32_lookup_table[2][(uint8_t)(one>>16)] ^
-              crc32_lookup_table[3][(uint8_t)(one>>24)];
-        #else
-        uint32_t one = *cur++ ^      val;
-        val = crc32_lookup_table[0][(uint8_t)(one>>24)] ^
-              crc32_lookup_table[1][(uint8_t)(one>>16)] ^
-              crc32_lookup_table[2][(uint8_t)(one>> 8)] ^
-              crc32_lookup_table[3][(uint8_t) one     ];
-        #endif
-    } // possibly 1 to 3 bytes remain, fallback
-    #else
-    #define cur buf
-    #endif
-    {
-        const uint8_t *curc = (const uint8_t *) cur;
-        uint8_t *endc = (uint8_t *)buf + len;
-        while (curc != endc)
-          val = global_crc32_table[(uint8_t)val
-                           ^ *(uint8_t*)curc++] ^ (val >> 8);
-    }
+	// process four bytes each cycle
+	while (end != cur)
+	{
+	    #if __BYTE_ORDER == __BIG_ENDIAN
+	    uint32_t one = *cur++ ^ swap(val);
+	    val = crc32_lookup_table[0][(uint8_t) one     ] ^
+	          crc32_lookup_table[1][(uint8_t)(one>> 8)] ^
+	          crc32_lookup_table[2][(uint8_t)(one>>16)] ^
+	          crc32_lookup_table[3][(uint8_t)(one>>24)];
+	    #else
+	    uint32_t one = *cur++ ^      val;
+	    val = crc32_lookup_table[0][(uint8_t)(one>>24)] ^
+	          crc32_lookup_table[1][(uint8_t)(one>>16)] ^
+	          crc32_lookup_table[2][(uint8_t)(one>> 8)] ^
+	          crc32_lookup_table[3][(uint8_t) one     ];
+	    #endif
+	} // possibly 1 to 3 bytes remain, fallback
+	#else
+	#define cur buf
+	#endif
+	{
+	    const uint8_t *curc = (const uint8_t *) cur;
+	    uint8_t *endc = (uint8_t *)buf + len;
+	    while (curc != endc)
+	      val = global_crc32_table[(uint8_t)val
+	                       ^ *(uint8_t*)curc++] ^ (val >> 8);
+	}
 #endif
-    return val;
+	return val;
 }
 
 

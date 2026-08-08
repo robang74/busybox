@@ -131,7 +131,7 @@ typedef struct state_t {
 	unsigned char *gunzip_window;
 
 	/* bitbuffer */
-    bitbuf_t gunzip_bb; /* bit buffer */
+	bitbuf_t gunzip_bb; /* bit buffer */
 	unsigned char gunzip_bk; /* bits in bit buffer */
 
 	/* input (compressed) data */
@@ -144,7 +144,7 @@ typedef struct state_t {
 	/* private data of inflate_codes() */
 	unsigned inflate_codes_ml; /* masks for bl and bd bits */
 	unsigned inflate_codes_md; /* masks for bl and bd bits */
-    bitbuf_t inflate_codes_bb; /* bit buffer */
+	bitbuf_t inflate_codes_bb; /* bit buffer */
 	unsigned inflate_codes_k; /* number of bits in bit buffer */
 	unsigned inflate_codes_w; /* current gunzip_window position */
 	huft_t *inflate_codes_tl;
@@ -346,33 +346,33 @@ static ALWAYS_INLINE
 static NOINLINE FAST_FUNC
 #endif
 bitbuf_t _fill_bitbuffer(STATE_PARAM register bitbuf_t bitbuffer, unsigned *current
-    #if FILL_REQUIRED_BITS
-    , const unsigned required
-    #endif
+	#if FILL_REQUIRED_BITS
+	, const unsigned required
+	#endif
 ){
 	register unsigned sz = *current;
-    #if FILL_REQUIRED_BITS
+	#if FILL_REQUIRED_BITS
 	while (sz <= required)
-    #else
+	#else
 	do
-    #endif
+	#endif
 	{
 		if (bytebuffer_offset >= bytebuffer_size)
 			fill_bitbuffer_read(PASS_STATE_ONLY);
-        /* FAST PATH: byte-aligned, enough bytes, and we need 64+ bits */
+	    /* FAST PATH: byte-aligned, enough bytes, and we need 64+ bits */
 #if FAST_LITERALS
-        while(sz <= MAX_BITS_TO_FILL && bytebuffer_offset < bytebuffer_size)
+	    while(sz <= MAX_BITS_TO_FILL && bytebuffer_offset < bytebuffer_size)
 #endif
-        {
-            bitbuffer |= ((bitbuf_t)bytebuffer[bytebuffer_offset]) << sz;
-		    bytebuffer_offset++;
-		    sz += 8;
-        }
+	    {
+	        bitbuffer |= ((bitbuf_t)bytebuffer[bytebuffer_offset]) << sz;
+			bytebuffer_offset++;
+			sz += 8;
+	    }
 	}
-    #if FILL_REQUIRED_BITS
-    #else
+	#if FILL_REQUIRED_BITS
+	#else
 	while (sz <= MAX_BITS_TO_FILL);
-    #endif
+	#endif
 	*current = sz;
 	return bitbuffer;
 }
@@ -393,7 +393,7 @@ bitbuf_t _fill_bitbuffer(STATE_PARAM register bitbuf_t bitbuffer, unsigned *curr
  * is given: "fixed inflate" decoder feeds us such data.
  */
 static huft_t* huft_build(const unsigned *b, const unsigned n,
-		const unsigned s, const struct cp_ext *cp_ext, unsigned *m)
+	const unsigned s, const struct cp_ext *cp_ext, unsigned *m)
 {
 #if USE_STATIC_ALLOC
 	static huft_t q0[3] = { {.v.t = NULL },{.e = 99,.b = 1},{.e = 99,.b = 1} };
@@ -648,10 +648,10 @@ inflate_codes(STATE_PARAM_ONLY)
 
 	while (1) {			/* do until end of block */
 #if FAST_LITERALS
-	    try_lt = 0;
+		try_lt = 0;
 #endif
-	    //refill_bitbuffer(bb, k, bl);
-	    refill_bitbuffer(bb, k, bl);
+		//refill_bitbuffer(bb, k, bl);
+		refill_bitbuffer(bb, k, bl);
 		t = tl + ((bitbuf_t) bb & ml);
 		e = t->e;
 		if (e > 16) {
@@ -663,7 +663,7 @@ do_e_loop:
 				bb >>= t->b;
 				k -= t->b;
 				e -= 16;
-                refill_bitbuffer(bb, k, e);
+	            refill_bitbuffer(bb, k, e);
 				t = t->v.t + ((bitbuf_t) bb & mask_bits[e]);
 				e = t->e;
 			} while (e > 16);
@@ -677,8 +677,8 @@ try_gain:
 		if (e == 16) {	/* then it's a literal */
 			gunzip_window[w++] = (unsigned char) t->v.n;
 			if (w == GUNZIP_WSIZE) {
-                gunzip_outbuf_count = w;
-                w = 0;
+	            gunzip_outbuf_count = w;
+	            w = 0;
 				return 1; // We have a block to read
 			}
 #if FAST_LITERALS
@@ -708,7 +708,7 @@ try_gain:
 			e = t->e;
 			if (e > 16) { on_copy = 1; goto do_e_loop; }
 back_on_copy:
-	        on_copy = 0;
+		    on_copy = 0;
 			bb >>= t->b;
 			k -= t->b;
 			refill_bitbuffer(bb, k, e);
@@ -1243,7 +1243,7 @@ static int top_up(STATE_PARAM unsigned n)
 		memmove(bytebuffer, &bytebuffer[bytebuffer_offset], count);
 		bytebuffer_offset = 0;
 		bytebuffer_size = full_read(gunzip_src_fd, &bytebuffer[count],
-		    bytebuffer_max - count);
+			bytebuffer_max - count);
 		if ((int)bytebuffer_size < 0) {
 			bb_simple_error_msg(bb_msg_read_error);
 			return 0;
@@ -1445,7 +1445,7 @@ unpack_gz_stream(transformer_state_t *xstate)
 	/*bb_error_msg("decompression OK, trailing garbage ignored");*/
 
  ret:
- 	free(bytebuffer);
+	free(bytebuffer);
 	DEALLOC_STATE;
 	return total;
 }
