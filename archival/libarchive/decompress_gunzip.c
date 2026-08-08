@@ -169,7 +169,7 @@ typedef struct state_t {
 
 	const char *error_msg;
 	jmp_buf error_jmp;
-} state_t ALIGNED(8);
+} state_t ALIGN_PTR;
 
 #define gunzip_bytes_out    (S()gunzip_bytes_out   )
 #define gunzip_crc          (S()gunzip_crc         )
@@ -1418,6 +1418,7 @@ unpack_gz_stream(transformer_state_t *xstate)
 	/* Validate decompression - crc */
 	v32 = buffer_read_le_u32(PASS_STATE_ONLY);
 	if ((~gunzip_crc) != (uint32_t)v32) {
+//		fprintf(stderr, "gunzip_crc: 0x%08x, v32: 0x%08x\n", gunzip_crc, v32);
 		bb_simple_error_msg("crc error");
 		total = -1;
 		goto ret;
@@ -1434,9 +1435,9 @@ unpack_gz_stream(transformer_state_t *xstate)
 	if (!top_up(PASS_STATE 2))
 		goto ret; /* EOF */
 
-	if (bytebuffer[bytebuffer_offset] == 0x1f
-	 && bytebuffer[bytebuffer_offset + 1] == 0x8b
-	) {
+	if (bytebuffer[bytebuffer_offset + 0] == 0x1f
+	&&  bytebuffer[bytebuffer_offset + 1] == 0x8b
+	){
 		bytebuffer_offset += 2;
 		goto again;
 	}

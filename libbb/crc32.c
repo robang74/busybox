@@ -20,7 +20,21 @@
 #define TBL_ELM 256
 #define crc32_table_slice_size (TBL_ELM * sizeof(uint32_t))
 
-#if defined(__x86_64__) && defined(__SSE4_2__) /////////////////////////////////
+#ifndef USE_CRC32_X86_ASM
+# if __BYTE_ORDER == __BIG_ENDIAN
+# warning "USE_CRC32_X86_ASM is incompatible with BIG_ENDIAN"
+# define USE_CRC32_X86_ASM 0
+# else
+# define USE_CRC32_X86_ASM 0 /* 1, for testing */
+# endif
+#endif
+
+#if USE_CRC32_X86_ASM
+#undef  ENABLE_CRC32_4BYTES
+#define ENABLE_CRC32_4BYTES 0
+#endif
+
+#if !USE_CRC32_X86_ASM && defined(__x86_64__) && defined(__SSE4_2__) ///////////////////////
 #include <nmmintrin.h>
 # undef  ENABLE_CRC32_4BYTES
 # define ENABLE_CRC32_4BYTES 0
@@ -33,9 +47,8 @@
 #endif
 
 #if ENABLE_CRC32_4BYTES
-const uint32_t crc32_lookup_table[4][TBL_ELM] = {
+const uint32_t crc32_lookup_table[4][TBL_ELM] ALIGN_PTR = {
   {
-    // note: the first number of every second row corresponds to the half-byte look-up table !
     0x00000000,0x77073096,0xEE0E612C,0x990951BA,0x076DC419,0x706AF48F,0xE963A535,0x9E6495A3,
     0x0EDB8832,0x79DCB8A4,0xE0D5E91E,0x97D2D988,0x09B64C2B,0x7EB17CBD,0xE7B82D07,0x90BF1D91,
     0x1DB71064,0x6AB020F2,0xF3B97148,0x84BE41DE,0x1ADAD47D,0x6DDDE4EB,0xF4D4B551,0x83D385C7,
@@ -172,14 +185,15 @@ const uint32_t crc32_lookup_table[4][TBL_ELM] = {
     0x43D23E48,0xFB6E592D,0xE9DBF6C3,0x516791A6,0xCCB0A91F,0x740CCE7A,0x66B96194,0xDE0506F1,
  }
 };
-uint32_t *global_crc32_table = (uint32_t *)crc32_lookup_table[0];
+uint32_t *global_crc32_table ALIGN_PTR = (uint32_t *)crc32_lookup_table[0];
 #else
-uint32_t *global_crc32_table = NULL;
+uint32_t *global_crc32_table ALIGN_PTR = NULL;
 #endif
 
 static ALWAYS_INLINE uint32_t*
 crc32_filltable_endian0(uint32_t *crc_table)
 {
+
     if(global_crc32_table) {
 		crc_table = __builtin_memmove(crc_table,
 			global_crc32_table, crc32_table_slice_size);
@@ -198,6 +212,25 @@ crc32_filltable_endian0(uint32_t *crc_table)
 	}
 	return crc_table;
 }
+
+#if 0
+/* RAF, TODO: testing populated-on-the-fly 4 and 8-slice CRC32 against big files
+ *
+ * When populating a table on-the-fly, the start time delay is competing with the
+ * faster usage. The outcome is file size dependent. However small files take a
+ * little time, and the difference can be noticed on the bigger ones. Those for which
+ * pre-computing a 8-slice table and using it, can be faster in throughput (CPU).
+ */
+{
+	/* After computing the base table[0..255], derive the others */
+	for (short s = 0; s < 7; s++) {
+	    for (short i = 0; i < 256; i++) {
+	        register uint32_t tbl = table[s-1][i];
+	        table[s][i] = (tbl >> 8) ^ table[0][(uint8_t)tbl];
+	    }
+	}
+}
+#endif
 
 static ALWAYS_INLINE uint32_t*
 crc32_filltable_endian1(uint32_t *crc_table)
@@ -219,6 +252,7 @@ crc32_filltable_endian1(uint32_t *crc_table)
 
 uint32_t* FAST_FUNC crc32_filltable(uint32_t *crc_table, int endian)
 {
+#if !USE_CRC32_X86_ASM
 	if (!crc_table)
 		crc_table = xmalloc(crc32_table_slice_size);
 
@@ -226,7 +260,7 @@ uint32_t* FAST_FUNC crc32_filltable(uint32_t *crc_table, int endian)
 		crc32_filltable_endian1(crc_table);
 	else
 		crc32_filltable_endian0(crc_table);
-
+#endif
 	return crc_table;
 }
 
@@ -239,10 +273,11 @@ crc32_block_endian1(uint32_t val, const void *buf, unsigned len, uint32_t *crc_t
 		val = (val << 8) ^ crc_table[(val >> 24) ^ *(uint8_t*)buf];
 		buf = (uint8_t*)buf + 1;
 	}
+
 	return val;
 }
 
-#if defined(__x86_64__) && defined(__SSE4_2__) /////////////////////////////////
+#if defined(__x86_64__) && defined(__SSE4_2__) /////////////////////////////////////////////
 #include <nmmintrin.h>
 
 uint32_t* FAST_FUNC global_crc32_new_table_le(void) { return NULL; }
@@ -275,7 +310,7 @@ crc32_block_endian0(uint32_t crc, const void *data, unsigned len,
     return ~crc;
 }
 
-#else //////////////////////////////////////////////////////////////////////////
+#else //////////////////////////////////////////////////////////////////////////////////////
 
 static ALWAYS_INLINE uint32_t* crc32_new_table_le(void)
 {
@@ -284,8 +319,10 @@ static ALWAYS_INLINE uint32_t* crc32_new_table_le(void)
 
 uint32_t* FAST_FUNC global_crc32_new_table_le(void)
 {
+#if !USE_CRC32_X86_ASM
 	if (!global_crc32_table)
 	    global_crc32_table = crc32_new_table_le();
+#endif
 	return global_crc32_table;
 }
 
@@ -305,10 +342,56 @@ uint32_t swap(uint32_t x)
 }
 #endif
 
+#if USE_CRC32_X86_ASM
+/*
+ * RAF: this branch has no practical use (-164b) apart from checking the
+ *      impact of a CRC32 performance degration on varios decompressors.
+ *
+ * Source: https://wiki.osdev.org/CRC32#Without_table
+ */
+static ALWAYS_INLINE
+uint32_t crc32_ref_asm(uint32_t crc, const uint8_t *data, uint64_t len)
+{
+    uint32_t result;
+
+    __asm__ volatile (
+        "mov    %1, %%eax\n\t"           /* incoming crc -> eax */
+        "mov    %2, %%rsi\n\t"           /* data -> rsi */
+        "mov    %3, %%rcx\n\t"           /* len -> rcx */
+        "jrcxz  2f\n\t"                  /* if len==0, skip */
+        "lea    (%%rsi, %%rcx), %%rdi\n" /* rdi = end pointer */
+        "1:\n\t"
+        "xorb   (%%rsi), %%al\n\t"
+        "inc    %%rsi\n\t"
+        "movl   $8, %%ecx\n\t"
+        "3:\n\t"
+        "movl   %%eax, %%edx\n\t"
+        "andl   $1, %%edx\n\t"
+        "negl   %%edx\n\t"
+        "andl   $0xEDB88320, %%edx\n\t"
+        "shrl   $1, %%eax\n\t"
+        "xorl   %%edx, %%eax\n\t"
+        "loop   3b\n\t"
+        "cmp    %%rdi, %%rsi\n\t"
+        "jne    1b\n"
+        "2:\n\t"
+        "movl   %%eax, %0"               /* eax -> result */
+        : "=r" (result)
+        : "r" (crc), "r" (data), "r" (len)
+        : "rax", "rcx", "rdx", "rsi", "rdi", "cc", "memory"
+    );
+
+    return result;
+}
+#endif
+
 uint32_t FAST_FUNC
 crc32_block_endian0(uint32_t val, const void *buf, unsigned len,
         uint32_t *table UNUSED_PARAM)
 {
+#if USE_CRC32_X86_ASM
+    val = crc32_ref_asm(val, buf, len);
+#else
     #if ENABLE_CRC32_4BYTES // compute CRC32 by slicing-by-4 algorithm
     const uint32_t *cur = (const uint32_t *)buf;
     const uint32_t *end = cur + (len >> 2);
@@ -340,8 +423,10 @@ crc32_block_endian0(uint32_t val, const void *buf, unsigned len,
           val = global_crc32_table[(uint8_t)val
                            ^ *(uint8_t*)curc++] ^ (val >> 8);
     }
+#endif
     return val;
 }
 
-#endif /////////////////////////////////////////////////////////////////////////
+
+#endif /////////////////////////////////////////////////////////////////////////////////////
 
