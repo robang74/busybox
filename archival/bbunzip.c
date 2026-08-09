@@ -329,6 +329,16 @@ int uncompress_main(int argc UNUSED_PARAM, char **argv)
 //config:	for the maximum speed also enable the CRC32 4-slices (+4.2Kb).
 //config:	Say N if you are compiling for a very constrained tiny system.
 //config:	Say Y if you want faster gunzip/zcat or for running on desktops.
+//config:
+//config:config FEATURE_GUNZIP_O2
+//config:	bool "Compiles gunzip for speed (-O2, +1.7KB)"
+//config:	default n
+//config:	depends on GUNZIP && FEATURE_GZIP_DECOMPRESS
+//config:	help
+//config:	Compiles decompress_gunzip.o with -O2 instead of -Os as per
+//config:	busybox default. It has a little impact on performance when
+//config:	a glibc dynamic linked (+2%) ELF is created but for who are
+ //config:	building for musl-static the increase is sensitive (+9%).
 
 
 //applet:IF_GUNZIP(APPLET(gunzip, BB_DIR_BIN, BB_SUID_DROP))

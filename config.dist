@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Busybox version: 1.38.0.ucs
-# Thu Aug  6 17:19:01 2026
+# Sun Aug  9 23:21:02 2026
 #
 CONFIG_HAVE_DOT_CONFIG=y
 
@@ -153,6 +153,7 @@ CONFIG_GUNZIP=y
 CONFIG_ZCAT=y
 CONFIG_FEATURE_GUNZIP_LONG_OPTIONS=y
 CONFIG_FEATURE_GUNZIP_FAST=y
+# CONFIG_FEATURE_GUNZIP_O2 is not set
 CONFIG_BUNZIP2=y
 CONFIG_BZCAT=y
 CONFIG_UNLZMA=y

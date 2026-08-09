@@ -43,6 +43,11 @@ DPKG_FILES:= \
 
 INSERT
 
+ifdef CONFIG_FEATURE_GUNZIP_O2
+CFLAGS_decompress_gunzip.o += -O2
+CFLAGS_REMOVE_decompress_gunzip.o = -Os -O0 -O1
+endif
+
 lib-$(CONFIG_DPKG)                      += $(DPKG_FILES)
 lib-$(CONFIG_DPKG_DEB)                  += $(DPKG_FILES)
 
