@@ -10,6 +10,9 @@ lib-y:=
 
 INSERT
 
+CFLAGS_crc32.o += -O2
+CFLAGS_REMOVE_crc32.o = -Os -O0 -O1
+
 lib-y += alloc_affinity.o
 lib-y += appletlib.o
 lib-y += ask_confirmation.o
