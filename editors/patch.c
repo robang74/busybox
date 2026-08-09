@@ -168,7 +168,8 @@ static void finish_oldfile(char no_newline)
 			// Once it is determined +/- verse, checking should be superflous
 			//read(TT.fileout, &no_newline, 1);
 			//if(no_newline == '\n')
-			no_newline = ftruncate(TT.fileout, size) & 0; // to skip the warning
+			no_newline = ftruncate(TT.fileout, size);
+			no_newline &= 0; // to skip the warning
 			// Since the busybox create a temproary file from the original, then
 			// adding a file-ending newline is necessary, and it happens always
 			// at the end of the file wherever the "no new line" happens because
@@ -179,7 +180,7 @@ static void finish_oldfile(char no_newline)
 		if (!ENABLE_LONG_OPTS || TT.tempname[0]) { /* not --dry-run? */
 			temp = xstrdup(TT.tempname);
 			temp[strlen(temp) - 6] = '\0';
-			rename(TT.tempname, temp);
+			xrename(TT.tempname, temp);
 			if(ENABLE_FEATURE_CLEAN_UP) {
 			    free(temp);
 			    free(TT.tempname);
