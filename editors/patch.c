@@ -180,8 +180,10 @@ static void finish_oldfile(char no_newline)
 			temp = xstrdup(TT.tempname);
 			temp[strlen(temp) - 6] = '\0';
 			rename(TT.tempname, temp);
-			free(temp);
-			free(TT.tempname);
+			if(ENABLE_FEATURE_CLEAN_UP) {
+			    free(temp);
+			    free(TT.tempname);
+			}
 		}
 
 		TT.tempname = NULL;
@@ -488,7 +490,8 @@ int patch_main(int argc UNUSED_PARAM, char **argv)
 			finish_oldfile(no_newline);
 
 			if (!argv[0]) {
-				free(*name);
+				if(ENABLE_FEATURE_CLEAN_UP)
+					free(*name);
 				// Trim date from end of filename (if any).  We don't care.
 				for (s = patchline+4; *s && *s!='\t'; s++)
 					if (*s == '\\' && s[1]) s++;
