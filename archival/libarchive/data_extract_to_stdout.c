@@ -7,9 +7,6 @@
 
 void FAST_FUNC data_extract_to_stdout(archive_handle_t *archive_handle)
 {
-	// flush buffered stdout before writing directly to STDOUT_FILENO
-	fflush(stdout);
-
 	bb_copyfd_exact_size(archive_handle->src_fd,
 			STDOUT_FILENO,
 			archive_handle->file_header->size);

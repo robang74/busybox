@@ -41,7 +41,7 @@ void FAST_FUNC header_verbose_list(const file_header_t *file_header)
 		ptm->tm_hour,
 		ptm->tm_min,
 		ptm->tm_sec,
-		file_header->name);
+		printable_string(file_header->name));
 
 #else /* !FEATURE_TAR_UNAME_GNAME */
 
