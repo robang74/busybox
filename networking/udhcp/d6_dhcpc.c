@@ -550,38 +550,53 @@ static uint8_t *init_d6_packet(struct d6_packet *packet, char type)
 	return ptr;
 }
 
-static uint8_t *add_d6_client_options(uint8_t *ptr)
+static uint8_t *d6_append(uint8_t *ptr, const void *src, unsigned len, uint8_t *end)
+{
+	if (len > (unsigned)(end - ptr))
+		return NULL;
+	return mempcpy(ptr, src, len);
+}
+
+static uint8_t *add_d6_client_options(uint8_t *ptr, uint8_t *end)
 {
 	struct option_set *curr;
-	uint8_t *start = ptr;
 	unsigned option;
 	uint16_t len;
+	unsigned oro_len = 0;
 
-	ptr += 4;
 	for (option = 1; option < 256; option++) {
-		if (client_data.opt_mask[option >> 3] & (1 << (option & 7))) {
-			ptr[0] = (option >> 8);
-			ptr[1] = option;
-			ptr += 2;
+		if (client_data.opt_mask[option >> 3] & (1 << (option & 7)))
+			oro_len += 2;
+	}
+
+	if (oro_len) {
+		if (oro_len + 4 > (unsigned)(end - ptr))
+			return NULL;
+		ptr[0] = (D6_OPT_ORO >> 8);
+		ptr[1] = D6_OPT_ORO;
+		ptr[2] = (oro_len >> 8);
+		ptr[3] = oro_len;
+		ptr += 4;
+		for (option = 1; option < 256; option++) {
+			if (client_data.opt_mask[option >> 3] & (1 << (option & 7))) {
+				*ptr++ = (option >> 8);
+				*ptr++ = option;
+			}
 		}
 	}
 
-	if ((ptr - start - 4) != 0) {
-		start[0] = (D6_OPT_ORO >> 8);
-		start[1] = D6_OPT_ORO;
-		start[2] = ((ptr - start - 4) >> 8);
-		start[3] = (ptr - start - 4);
-	} else
-		ptr = start;
-
 #if ENABLE_FEATURE_UDHCPC6_RFC4704
-	ptr = mempcpy(ptr, &opt_fqdn_req, sizeof(opt_fqdn_req));
+	ptr = d6_append(ptr, (const uint8_t *)&opt_fqdn_req, sizeof(opt_fqdn_req), end);
+	if (!ptr)
+		return NULL;
 #endif
 	/* Add -x options if any */
 	curr = client_data.options;
 	while (curr) {
 		len = (curr->data[D6_OPT_LEN] << 8) | curr->data[D6_OPT_LEN + 1];
-		ptr = mempcpy(ptr, curr->data, D6_OPT_DATA + len);
+		ptr = d6_append(ptr, curr->data, D6_OPT_DATA + len, end);
+		if (!ptr)
+			return NULL;
 		curr = curr->next;
 	}
 
@@ -634,6 +649,7 @@ static NOINLINE int send_d6_info_request(void)
 {
 	struct d6_packet packet;
 	uint8_t *opt_ptr;
+	uint8_t *end = (uint8_t *)&packet + sizeof(packet);
 
 	/* Fill in: msg type, xid, ELAPSED_TIME */
 	opt_ptr = init_d6_packet(&packet, D6_MSG_INFORMATION_REQUEST);
@@ -641,7 +657,9 @@ static NOINLINE int send_d6_info_request(void)
 	/* Add options: client-id,
 	 * "param req" option according to -O, options specified with -x
 	 */
-	opt_ptr = add_d6_client_options(opt_ptr);
+	opt_ptr = add_d6_client_options(opt_ptr, end);
+	if (!opt_ptr)
+		return -1;
 
 	bb_error_msg("sending %s", "info request");
 	return d6_mcast_from_client_data_ifindex(&packet, opt_ptr);
@@ -758,6 +776,7 @@ static NOINLINE int send_d6_discover(struct in6_addr *requested_ipv6)
 {
 	struct d6_packet packet;
 	uint8_t *opt_ptr;
+	uint8_t *end = (uint8_t *)&packet + sizeof(packet);
 	unsigned len;
 
 	/* Fill in: msg type, xid, ELAPSED_TIME */
@@ -778,7 +797,9 @@ static NOINLINE int send_d6_discover(struct in6_addr *requested_ipv6)
 			iaaddr->len = 16+4+4;
 			memcpy(iaaddr->data, requested_ipv6, 16);
 		}
-		opt_ptr = mempcpy(opt_ptr, client6_data.ia_na, len);
+		opt_ptr = d6_append(opt_ptr, client6_data.ia_na, len, end);
+		if (!opt_ptr)
+			return -1;
 	}
 
 	/* IA_PD */
@@ -790,13 +811,17 @@ static NOINLINE int send_d6_discover(struct in6_addr *requested_ipv6)
 		client6_data.ia_pd->code = D6_OPT_IA_PD;
 		client6_data.ia_pd->len = len - 4;
 		generate_iaid(client6_data.ia_pd->data); /* IAID */
-		opt_ptr = mempcpy(opt_ptr, client6_data.ia_pd, len);
+		opt_ptr = d6_append(opt_ptr, client6_data.ia_pd, len, end);
+		if (!opt_ptr)
+			return -1;
 	}
 
 	/* Add options: client-id,
 	 * "param req" option according to -O, options specified with -x
 	 */
-	opt_ptr = add_d6_client_options(opt_ptr);
+	opt_ptr = add_d6_client_options(opt_ptr, end);
+	if (!opt_ptr)
+		return -1;
 
 	bb_info_msg("sending %s", "discover");
 	return d6_mcast_from_client_data_ifindex(&packet, opt_ptr);
@@ -837,23 +862,34 @@ static NOINLINE int send_d6_select(void)
 {
 	struct d6_packet packet;
 	uint8_t *opt_ptr;
+	uint8_t *end = (uint8_t *)&packet + sizeof(packet);
 
 	/* Fill in: msg type, xid, ELAPSED_TIME */
 	opt_ptr = init_d6_packet(&packet, D6_MSG_REQUEST);
 
 	/* server id */
-	opt_ptr = mempcpy(opt_ptr, client6_data.server_id, client6_data.server_id->len + 2+2);
+	opt_ptr = d6_append(opt_ptr, client6_data.server_id, client6_data.server_id->len + 2+2, end);
+	if (!opt_ptr)
+		return -1;
 	/* IA NA (contains requested IP) */
-	if (client6_data.ia_na)
-		opt_ptr = mempcpy(opt_ptr, client6_data.ia_na, client6_data.ia_na->len + 2+2);
+	if (client6_data.ia_na) {
+		opt_ptr = d6_append(opt_ptr, client6_data.ia_na, client6_data.ia_na->len + 2+2, end);
+		if (!opt_ptr)
+			return -1;
+	}
 	/* IA PD */
-	if (client6_data.ia_pd)
-		opt_ptr = mempcpy(opt_ptr, client6_data.ia_pd, client6_data.ia_pd->len + 2+2);
+	if (client6_data.ia_pd) {
+		opt_ptr = d6_append(opt_ptr, client6_data.ia_pd, client6_data.ia_pd->len + 2+2, end);
+		if (!opt_ptr)
+			return -1;
+	}
 
 	/* Add options: client-id,
 	 * "param req" option according to -O, options specified with -x
 	 */
-	opt_ptr = add_d6_client_options(opt_ptr);
+	opt_ptr = add_d6_client_options(opt_ptr, end);
+	if (!opt_ptr)
+		return -1;
 
 	bb_info_msg("sending %s", "select");
 	return d6_mcast_from_client_data_ifindex(&packet, opt_ptr);
@@ -910,23 +946,34 @@ static NOINLINE int send_d6_renew(struct in6_addr *server_ipv6, struct in6_addr 
 {
 	struct d6_packet packet;
 	uint8_t *opt_ptr;
+	uint8_t *end = (uint8_t *)&packet + sizeof(packet);
 
 	/* Fill in: msg type, xid, ELAPSED_TIME */
 	opt_ptr = init_d6_packet(&packet, D6_MSG_RENEW);
 
 	/* server id */
-	opt_ptr = mempcpy(opt_ptr, client6_data.server_id, client6_data.server_id->len + 2+2);
+	opt_ptr = d6_append(opt_ptr, client6_data.server_id, client6_data.server_id->len + 2+2, end);
+	if (!opt_ptr)
+		return -1;
 	/* IA NA (contains requested IP) */
-	if (client6_data.ia_na)
-		opt_ptr = mempcpy(opt_ptr, client6_data.ia_na, client6_data.ia_na->len + 2+2);
+	if (client6_data.ia_na) {
+		opt_ptr = d6_append(opt_ptr, client6_data.ia_na, client6_data.ia_na->len + 2+2, end);
+		if (!opt_ptr)
+			return -1;
+	}
 	/* IA PD */
-	if (client6_data.ia_pd)
-		opt_ptr = mempcpy(opt_ptr, client6_data.ia_pd, client6_data.ia_pd->len + 2+2);
+	if (client6_data.ia_pd) {
+		opt_ptr = d6_append(opt_ptr, client6_data.ia_pd, client6_data.ia_pd->len + 2+2, end);
+		if (!opt_ptr)
+			return -1;
+	}
 
 	/* Add options: client-id,
 	 * "param req" option according to -O, options specified with -x
 	 */
-	opt_ptr = add_d6_client_options(opt_ptr);
+	opt_ptr = add_d6_client_options(opt_ptr, end);
+	if (!opt_ptr)
+		return -1;
 
 	bb_info_msg("sending %s", "renew");
 	if (server_ipv6)
@@ -945,22 +992,34 @@ int send_d6_release(struct in6_addr *server_ipv6, struct in6_addr *our_cur_ipv6)
 {
 	struct d6_packet packet;
 	uint8_t *opt_ptr;
+	uint8_t *end = (uint8_t *)&packet + sizeof(packet);
 	struct option_set *ci;
 
 	/* Fill in: msg type, xid, ELAPSED_TIME */
 	opt_ptr = init_d6_packet(&packet, D6_MSG_RELEASE);
 	/* server id */
-	opt_ptr = mempcpy(opt_ptr, client6_data.server_id, client6_data.server_id->len + 2+2);
+	opt_ptr = d6_append(opt_ptr, client6_data.server_id, client6_data.server_id->len + 2+2, end);
+	if (!opt_ptr)
+		return -1;
 	/* IA NA (contains our current IP) */
-	if (client6_data.ia_na)
-		opt_ptr = mempcpy(opt_ptr, client6_data.ia_na, client6_data.ia_na->len + 2+2);
+	if (client6_data.ia_na) {
+		opt_ptr = d6_append(opt_ptr, client6_data.ia_na, client6_data.ia_na->len + 2+2, end);
+		if (!opt_ptr)
+			return -1;
+	}
 	/* IA PD */
-	if (client6_data.ia_pd)
-		opt_ptr = mempcpy(opt_ptr, client6_data.ia_pd, client6_data.ia_pd->len + 2+2);
+	if (client6_data.ia_pd) {
+		opt_ptr = d6_append(opt_ptr, client6_data.ia_pd, client6_data.ia_pd->len + 2+2, end);
+		if (!opt_ptr)
+			return -1;
+	}
 	/* Client-id */
 	ci = udhcp_find_option(client_data.options, D6_OPT_CLIENTID, /*dhcpv6:*/ 1);
-	if (ci)
-		opt_ptr = mempcpy(opt_ptr, ci->data, D6_OPT_DATA + 2+2 + 6);
+	if (ci) {
+		opt_ptr = d6_append(opt_ptr, ci->data, D6_OPT_DATA + 2+2 + 6, end);
+		if (!opt_ptr)
+			return -1;
+	}
 
 	bb_info_msg("sending %s", "release");
 	return d6_send_kernel_packet_from_client_data_ifindex(
