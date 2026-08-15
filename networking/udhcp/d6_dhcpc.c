@@ -1063,6 +1063,7 @@ static NOINLINE int d6_recv_raw_packet(struct in6_addr *peer_ipv6, struct d6_pac
 	 || packet.udp.dest != htons(CLIENT_PORT6)
 	/* || bytes > (int) sizeof(packet) - can't happen */
 	 || packet.udp.len != packet.ip6.ip6_plen
+	 || ntohs(packet.udp.len) < sizeof(packet.udp) /* else bytes underflows below */
 	) {
 		log1s("unrelated/bogus packet, ignoring");
 		return -2;
