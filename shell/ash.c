@@ -2587,6 +2587,7 @@ setvareq(char *s, int flags)
 		if (((flags & (VEXPORT|VREADONLY|VSTRFIXED|VUNSET)) | (vp->flags & VSTRFIXED)) == VUNSET) {
 			*vpp = vp->next;
 			free(vp);
+			vp = NULL;
  out_free:
 			if ((flags & (VTEXTFIXED|VSTACK|VNOSAVE)) == VNOSAVE)
 				free(s);
