@@ -1271,7 +1271,7 @@ static void dir_operation(int type, const char * dir_name, int var, unsigned lon
 
 	while ((de = readdir(dp)) != NULL) {
 
-		if (de->d_name && DOT_OR_DOTDOT(de->d_name))
+		if (DOT_OR_DOTDOT(de->d_name))
 			continue;
 		path = concat_path_file(dir_name, de->d_name);
 		if (lstat(path, &statbuf) == 0) {
