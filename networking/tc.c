@@ -182,6 +182,7 @@ static int get_tc_classid(uint32_t *h, const char *str)
 	return 0;
 }
 
+#if ENABLE_FEATURE_TC_CBQ //&& defined(TCA_CBQ_MAX)
 static void print_rate(char *buf, int len, uint32_t rate)
 {
 	double tmp = (double)rate*8;
@@ -202,6 +203,7 @@ static void print_rate(char *buf, int len, uint32_t rate)
 			snprintf(buf, len, "%.0fbit",  tmp);
 	}
 }
+#endif
 
 #if 0
 /* This is "pfifo_fast".  */
@@ -230,7 +232,7 @@ static int prio_print_opt(struct rtattr *opt)
 	return 0;
 }
 
-#if ENABLE_FEATURE_TC_CBQ
+#if ENABLE_FEATURE_TC_CBQ //&& defined(TCA_CBQ_MAX)
 #if 0
 /* Class Based Queue */
 static int cbq_parse_opt(int argc, char **argv, struct nlmsghdr *n)
@@ -381,7 +383,7 @@ static FAST_FUNC int print_qdisc(
 		if (qqq == 0) { /* pfifo_fast aka prio */
 			prio_print_opt(tb[TCA_OPTIONS]);
 		} else if (qqq == 1) { /* class based queuing */
-#if ENABLE_FEATURE_TC_CBQ
+#if ENABLE_FEATURE_TC_CBQ //&& defined(TCA_CBQ_MAX)
 			cbq_print_opt(tb[TCA_OPTIONS]);
 #endif
 		} else {
@@ -454,7 +456,7 @@ static FAST_FUNC int print_class(
 			/* nothing. */ /*prio_print_opt(tb[TCA_OPTIONS]);*/
 		} else if (qqq == 1) { /* class based queuing */
 			/* cbq_print_copt() is identical to cbq_print_opt(). */
-#if ENABLE_FEATURE_TC_CBQ
+#if ENABLE_FEATURE_TC_CBQ  //&& defined(TCA_CBQ_MAX)
 			cbq_print_opt(tb[TCA_OPTIONS]);
 #endif
 		} else {
