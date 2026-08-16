@@ -551,8 +551,9 @@ static uint8_t *init_d6_packet(struct d6_packet *packet, char type)
 }
 
 static uint8_t *safe_d6_append(uint8_t *ptr,
-		const void *src, unsigned len, uint8_t *end)
+		const void *src, unsigned len, struct d6_packet *packet_ptr)
 {
+    uint8_t *end = (uint8_t *)packet_ptr + sizeof(struct d6_packet);
 	if (len > (unsigned)(end - ptr))
 		bb_simple_error_msg_and_die("DHCPv6 packet buffer overflow");
 	return mempcpy(ptr, src, len);
@@ -583,15 +584,13 @@ static uint8_t *add_d6_client_options(uint8_t *ptr, struct d6_packet *packet_ptr
 		ptr = start;
 
 #if ENABLE_FEATURE_UDHCPC6_RFC4704
-	ptr = safe_d6_append(ptr, &opt_fqdn_req, sizeof(opt_fqdn_req),
-	    (uint8_t *)packet_ptr + sizeof(struct d6_packet));
+	ptr = safe_d6_append(ptr, &opt_fqdn_req, sizeof(opt_fqdn_req), packet_ptr);
 #endif
 	/* Add -x options if any */
 	curr = client_data.options;
 	while (curr) {
 		len = (curr->data[D6_OPT_LEN] << 8) | curr->data[D6_OPT_LEN + 1];
-	    ptr = safe_d6_append(ptr, curr->data, D6_OPT_DATA + len,
-	        (uint8_t *)packet_ptr + sizeof(struct d6_packet));
+	    ptr = safe_d6_append(ptr, curr->data, D6_OPT_DATA + len, packet_ptr);
 		curr = curr->next;
 	}
 
@@ -788,8 +787,7 @@ static NOINLINE int send_d6_discover(struct in6_addr *requested_ipv6)
 			iaaddr->len = 16+4+4;
 			memcpy(iaaddr->data, requested_ipv6, 16);
 		}
-		opt_ptr = safe_d6_append(opt_ptr, client6_data.ia_na, len,
-			(uint8_t *)&packet + sizeof(struct d6_packet));
+		opt_ptr = safe_d6_append(opt_ptr, client6_data.ia_na, len, &packet);
 	}
 
 	/* IA_PD */
@@ -801,8 +799,7 @@ static NOINLINE int send_d6_discover(struct in6_addr *requested_ipv6)
 		client6_data.ia_pd->code = D6_OPT_IA_PD;
 		client6_data.ia_pd->len = len - 4;
 		generate_iaid(client6_data.ia_pd->data); /* IAID */
-		opt_ptr = safe_d6_append(opt_ptr, client6_data.ia_pd, len,
-			(uint8_t *)&packet + sizeof(struct d6_packet));
+		opt_ptr = safe_d6_append(opt_ptr, client6_data.ia_pd, len, &packet);
 	}
 
 	/* Add options: client-id,
@@ -855,18 +852,15 @@ static NOINLINE int send_d6_select(void)
 
 	/* server id */
 	opt_ptr = safe_d6_append(opt_ptr, client6_data.server_id,
-		client6_data.server_id->len + 2+2,
-			(uint8_t *)&packet + sizeof(struct d6_packet));
+		client6_data.server_id->len + 2+2, &packet);
 	/* IA NA (contains requested IP) */
 	if (client6_data.ia_na)
 		opt_ptr = safe_d6_append(opt_ptr, client6_data.ia_na,
-			client6_data.ia_na->len + 2+2,
-				(uint8_t *)&packet + sizeof(struct d6_packet));
+			client6_data.ia_na->len + 2+2, &packet);
 	/* IA PD */
 	if (client6_data.ia_pd)
 		opt_ptr = safe_d6_append(opt_ptr, client6_data.ia_pd,
-			client6_data.ia_pd->len + 2+2,
-				(uint8_t *)&packet + sizeof(struct d6_packet));
+			client6_data.ia_pd->len + 2+2, &packet);
 
 	/* Add options: client-id,
 	 * "param req" option according to -O, options specified with -x
@@ -934,18 +928,15 @@ static NOINLINE int send_d6_renew(struct in6_addr *server_ipv6, struct in6_addr 
 
 	/* server id */
 	opt_ptr = safe_d6_append(opt_ptr, client6_data.server_id,
-		client6_data.server_id->len + 2+2,
-			(uint8_t *)&packet + sizeof(struct d6_packet));
+		client6_data.server_id->len + 2+2, &packet);
 	/* IA NA (contains requested IP) */
 	if (client6_data.ia_na)
 		opt_ptr = safe_d6_append(opt_ptr, client6_data.ia_na,
-			client6_data.ia_na->len + 2+2,
-				(uint8_t *)&packet + sizeof(struct d6_packet));
+			client6_data.ia_na->len + 2+2, &packet);
 	/* IA PD */
 	if (client6_data.ia_pd)
 		opt_ptr = safe_d6_append(opt_ptr, client6_data.ia_pd,
-			client6_data.ia_pd->len + 2+2,
-				(uint8_t *)&packet + sizeof(struct d6_packet));
+			client6_data.ia_pd->len + 2+2, &packet);
 
 	/* Add options: client-id,
 	 * "param req" option according to -O, options specified with -x
@@ -975,23 +966,19 @@ int send_d6_release(struct in6_addr *server_ipv6, struct in6_addr *our_cur_ipv6)
 	opt_ptr = init_d6_packet(&packet, D6_MSG_RELEASE);
 	/* server id */
 	opt_ptr = safe_d6_append(opt_ptr, client6_data.server_id,
-		client6_data.server_id->len + 2+2,
-			(uint8_t *)&packet + sizeof(struct d6_packet));
+		client6_data.server_id->len + 2+2, &packet);
 	/* IA NA (contains our current IP) */
 	if (client6_data.ia_na)
 		opt_ptr = safe_d6_append(opt_ptr, client6_data.ia_na,
-			client6_data.ia_na->len + 2+2,
-				(uint8_t *)&packet + sizeof(struct d6_packet));
+			client6_data.ia_na->len + 2+2, &packet);
 	/* IA PD */
 	if (client6_data.ia_pd)
 		opt_ptr = safe_d6_append(opt_ptr, client6_data.ia_pd,
-			client6_data.ia_pd->len + 2+2,
-				(uint8_t *)&packet + sizeof(struct d6_packet));
+			client6_data.ia_pd->len + 2+2, &packet);
 	/* Client-id */
 	ci = udhcp_find_option(client_data.options, D6_OPT_CLIENTID, /*dhcpv6:*/ 1);
 	if (ci)
-		opt_ptr = safe_d6_append(opt_ptr, ci->data, D6_OPT_DATA + 2+2 + 6,
-			(uint8_t *)&packet + sizeof(struct d6_packet));
+		opt_ptr = safe_d6_append(opt_ptr, ci->data, D6_OPT_DATA + 2+2 + 6, &packet);
 
 	bb_info_msg("sending %s", "release");
 	return d6_send_kernel_packet_from_client_data_ifindex(
