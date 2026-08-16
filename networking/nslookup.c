@@ -827,7 +827,7 @@ static NOINLINE int parse_reply(const unsigned char *msg, size_t len)
 			n = ns_name_uncompress(ns_msg_base(handle), ns_msg_end(handle),
 			                       cp + 6, dname, sizeof(dname));
 
-			if (n < 0) {
+			if (n < 0 || n > rdlen) {
 				//printf("Unable to uncompress domain: %s\n", strerror(errno));
 				return -1;
 			}
@@ -853,7 +853,7 @@ static NOINLINE int parse_reply(const unsigned char *msg, size_t len)
 			cp = ns_rr_rdata(rr);
 			n = ns_name_uncompress(ns_msg_base(handle), ns_msg_end(handle),
 			                       cp, dname, sizeof(dname));
-			if (n < 0) {
+			if (n < 0 || n > rdlen) {
 				//printf("Unable to uncompress domain: %s\n", strerror(errno));
 				return -1;
 			}
@@ -863,7 +863,7 @@ static NOINLINE int parse_reply(const unsigned char *msg, size_t len)
 
 			n = ns_name_uncompress(ns_msg_base(handle), ns_msg_end(handle),
 			                       cp, dname, sizeof(dname));
-			if (n < 0) {
+			if (n < 0 || n > rdlen) {
 				//printf("Unable to uncompress domain: %s\n", strerror(errno));
 				return -1;
 			}
@@ -874,6 +874,7 @@ static NOINLINE int parse_reply(const unsigned char *msg, size_t len)
 			// RAF, TODO: max lenght limit or return(-1), pros vs cons?
 			for(k = 0, ip += rdlen; cp+4 <= ip && k < _nstrn; cp += 4, k++)
 				printf("\t%s = %lu\n", prtstr[k], ns_get32(cp));
+			if(k != 5) return -1;
 			break;
 
 		default:
