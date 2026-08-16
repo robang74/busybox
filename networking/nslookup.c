@@ -837,8 +837,9 @@ static NOINLINE int parse_reply(const unsigned char *msg, size_t len)
 			break;
 
 		case ns_t_soa:
-			const unsigned char *ip;
-			static const char *prtstr[] = {
+			#define _nstrn 5
+			const unsigned char *ip = ns_rr_rdata(rr);
+			static const char *prtstr[_nstrn] = {
 				"serial", "refresh", "retry", "expire", "minimum"
 			};
 			if (rdlen < 20) {
@@ -870,7 +871,7 @@ static NOINLINE int parse_reply(const unsigned char *msg, size_t len)
 			cp += n;
 
 			// RAF, TODO: max lenght limit or return(-1), pros vs cons?
-			for(i = 0, ip += rdlen; cp < ip; cp += 4, i++)
+			for(i = 0, ip += rdlen; cp < ip && i < _nstrn; cp += 4, i++)
 				printf("\t%s = %lu\n", prtstr[i], ns_get32(cp));
 			break;
 
