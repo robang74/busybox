@@ -562,13 +562,16 @@ static uint8_t *safe_d6_append(uint8_t *ptr,
 static uint8_t *add_d6_client_options(uint8_t *ptr, struct d6_packet *packet_ptr)
 {
 	struct option_set *curr;
+	uint8_t *end = (uint8_t *)packet_ptr + sizeof(struct d6_packet);
 	uint8_t *start = ptr;
 	unsigned option;
 	uint16_t len;
 
 	ptr += 4;
+	if(ptr > end) goto out_of_bound;
 	for (option = 1; option < 256; option++) {
 		if (client_data.opt_mask[option >> 3] & (1 << (option & 7))) {
+		    if(ptr + 2 > end) goto out_of_bound;
 			ptr[0] = (option >> 8);
 			ptr[1] = option;
 			ptr += 2;
@@ -577,9 +580,9 @@ static uint8_t *add_d6_client_options(uint8_t *ptr, struct d6_packet *packet_ptr
 
 	if ((ptr - start - 4) != 0) {
 		start[0] = (D6_OPT_ORO >> 8);
-		start[1] = D6_OPT_ORO;
+		start[1] =  D6_OPT_ORO;
 		start[2] = ((ptr - start - 4) >> 8);
-		start[3] = (ptr - start - 4);
+		start[3] =  (ptr - start - 4);
 	} else
 		ptr = start;
 
@@ -595,6 +598,8 @@ static uint8_t *add_d6_client_options(uint8_t *ptr, struct d6_packet *packet_ptr
 	}
 
 	return ptr;
+out_of_bound:
+	bb_simple_error_msg_and_die("DHCPv6 packet buffer overflow");
 }
 
 static int d6_mcast_from_client_data_ifindex(struct d6_packet *packet, uint8_t *end)
