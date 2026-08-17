@@ -174,7 +174,7 @@ static char *get_key(char *str, struct sort_key *key, int flags)
 				if (key_separator) {
 					/* Skip body of key and separator */
 					while ((ch = str[end]) != '\0') {
-							end++;
+						end++;
 						if (ch == key_separator)
 							break;
 					}
@@ -193,7 +193,7 @@ static char *get_key(char *str, struct sort_key *key, int flags)
 			/* Remove last delim: "abc:def:" => "abc:def" */
 			if (j && ch && !key->range[3]) {
 				//if (str[end-1] != key_separator)
-				//  bb_error_msg(_and_die("BUG! "
+				//  bb_error_msg_and_die("BUG! "
 				//  "str[start:%d,end:%d]:'%.*s'",
 				//  start, end, (int)(end-start), &str[start]);
 				end--;
