@@ -1528,7 +1528,7 @@ static void add_cmd_block(char *cmdstr)
 int sed_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int sed_main(int argc UNUSED_PARAM, char **argv)
 {
-	unsigned opt;
+	unsigned opt, i;
 	llist_t *opt_e, *opt_f;
 	char *opt_i;
 
@@ -1568,6 +1568,37 @@ int sed_main(int argc UNUSED_PARAM, char **argv)
 			sed_longopts,
 			&opt_i, &opt_e, &opt_f,
 			&G.be_quiet); /* counter for -n */
+
+
+	/* Process -e and -f options in command line order.
+	 * getopt32long stores them in separate lists, losing
+	 * their relative order. We re-scan argv to preserve it.
+	 */
+	for (i = 1; i < optind; i++)
+	{
+		char *p = argv[i], c = *p;
+		if (c != '-' || !*++p) //'-'
+			continue;
+		if (*p == '-' && !*++p) //'--'
+			continue;
+		c = *p;
+		if (c == 'e' && opt_e) {
+			add_cmd_block(llist_pop(&opt_e));
+		}
+		else
+		if (c == 'f' && opt_f) {
+			char *line;
+			FILE *cmdfile = xfopen_stdin(llist_pop(&opt_f));
+			while ( (line = xmalloc_fgetline(cmdfile)) ) {
+				add_cmd(line);
+				free(line);
+			}
+			fclose_if_not_stdin(cmdfile);
+		}
+	}
+	llist_free(opt_e, free);
+	llist_free(opt_f, free);
+
 	//argc -= optind;
 	argv += optind;
 	if (opt & OPT_in_place) { // -i
@@ -1577,19 +1608,7 @@ int sed_main(int argc UNUSED_PARAM, char **argv)
 		G.regex_type |= REG_EXTENDED; // -r or -E
 	//if (opt & 8)
 	//	G.be_quiet++; // -n (implemented with a counter instead)
-	while (opt_e) { // -e
-		add_cmd_block(llist_pop(&opt_e));
-	}
-	while (opt_f) { // -f
-		char *line;
-		FILE *cmdfile;
-		cmdfile = xfopen_stdin(llist_pop(&opt_f));
-		while ((line = xmalloc_fgetline(cmdfile)) != NULL) {
-			add_cmd(line);
-			free(line);
-		}
-		fclose_if_not_stdin(cmdfile);
-	}
+
 	/* if we didn't get a pattern from -e or -f, use argv[0] */
 	if (!(opt & 0x30)) {
 		if (!*argv)
