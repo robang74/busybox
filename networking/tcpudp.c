@@ -420,7 +420,8 @@ int tcpudpsvd_main(int argc UNUSED_PARAM, char **argv)
 	} else {
 		/* In case recv_from_to won't be able to recover local addr.
 		 * Also sets port - recv_from_to is unable to do it. */
-		local = *lsa;
+		/* lsa is allocated for its address family, copy only that much */
+		memcpy(&local.u.sa, &lsa->u.sa, sa_len);
 		conn = recv_from_to(sock, NULL, 0, MSG_PEEK,
 				&remote.u.sa, &local.u.sa, sa_len);
 	}
