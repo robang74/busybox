@@ -1528,7 +1528,7 @@ static void add_cmd_block(char *cmdstr)
 int sed_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int sed_main(int argc UNUSED_PARAM, char **argv)
 {
-	unsigned opt, i;
+	unsigned opt;
 	llist_t *opt_e, *opt_f;
 	char *opt_i;
 
@@ -1568,36 +1568,51 @@ int sed_main(int argc UNUSED_PARAM, char **argv)
 			sed_longopts,
 			&opt_i, &opt_e, &opt_f,
 			&G.be_quiet); /* counter for -n */
-
-
-	/* Process -e and -f options in command line order.
-	 * getopt32long stores them in separate lists, losing
-	 * their relative order. We re-scan argv to preserve it.
+	/*
+	 * RAF: process -e and -f options in command line order.
+	 * The getopt32long stores them in separate lists, losing
+	 * their relative order. We determine which appeared first
+	 * by finding which argv[] element each optarg points into.
 	 */
-	for (i = 1; i < optind; i++)
-	{
-		char *p = argv[i], c = *p;
-		if (c != '-' || !*++p) //'-'
-			continue;
-		if (*p == '-' && !*++p) //'--'
-			continue;
-		c = *p;
-		if (c == 'e' && opt_e) {
-			add_cmd_block(llist_pop(&opt_e));
+	while (opt_e || opt_f) {
+		int use_e = 1;
+		if (opt_e && opt_f) {
+			int i, idx_e = optind, idx_f = optind;
+			for (i = 1; i < optind; i++) {
+				char *end = argv[i] + strlen(argv[i]);
+				if (idx_e == optind
+				&&  opt_e->data >= argv[i]
+				&&  opt_e->data <= end
+				){
+					idx_e = i;
+				}
+				if (idx_f == optind
+				&&  opt_f->data >= argv[i]
+				&&  opt_f->data <= end
+				){
+					idx_f = i;
+				}
+			}
+			if (idx_f < idx_e) {
+				use_e = 0;
+			}
 		}
 		else
-		if (c == 'f' && opt_f) {
+		if (!opt_e) {
+			use_e = 0;
+		}
+		if (use_e) {
+			add_cmd_block(llist_pop(&opt_e));
+		} else {
 			char *line;
 			FILE *cmdfile = xfopen_stdin(llist_pop(&opt_f));
-			while ( (line = xmalloc_fgetline(cmdfile)) ) {
+			while ((line = xmalloc_fgetline(cmdfile)) != NULL) {
 				add_cmd(line);
 				free(line);
 			}
 			fclose_if_not_stdin(cmdfile);
-		}
+ 		}
 	}
-	llist_free(opt_e, free);
-	llist_free(opt_f, free);
 
 	//argc -= optind;
 	argv += optind;
