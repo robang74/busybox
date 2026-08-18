@@ -1012,6 +1012,8 @@ struct hostent *xgethostbyname(const char *name) FAST_FUNC;
 // Also mount.c and inetd.c are using gethostbyname(),
 // + inet_common.c has additional IPv4-only stuff
 
+#define BB_DEFAULT_WWW_PATH "/var/www"
+const char *safe_default_running_path(void); //RAF: to adopt and yet to test
 
 struct tls_aes {
 	uint32_t key[60];
