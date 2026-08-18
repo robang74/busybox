@@ -520,20 +520,40 @@ char* FAST_FUNC xmalloc_sockaddr2dotted_noport(const struct sockaddr *sa)
 }
 
 /*
- * RAF: here because network services, deamons in particular, need a safe PWD
+ * RAF: wrote here because network services require a safe PWD to run
  *
- * Example of use:
+ * TO CAREFULLY READ BEFORE ADOPTION
  *
-if (!homedir) {
-	char cwd[PATH_MAX];
-	if (getcwd(cwd, sizeof(cwd)) && !strcmp(cwd, "/")) {
-		homedir = safe_default_running_path();
-	}
-}
- */
+ *  ****************************************************************************
 
-static ALWAYS_INLINE
-bool is_valid_dir(const char *path)
+	This new security functionality add-up a sensitive footprint increase:
+
+	   text    data     bss     dec     hex filename
+	   2659       0       0    2659     a63 libbb/xconnect.o before
+	   3119       0       0    3119     c2f libbb/xconnect.o
+							   +460
+
+	and can be accepted as much as replacing other code in various applet
+	creates security for a limited footprint increase. Priority: security.
+
+	WARNING
+
+	The adoption of this new feature introduces a SEVERE regression.
+
+	For example, a tftpd server running as root in root path "/" will
+	abort at the boot time and it won't start at any time later preventing
+	further firmware upgrades. Fortunately, the severity of the regression
+	prevents every human from falling in this case because a single test on
+	a lab unit will immediately show up the issue (in log and related DoS).
+
+	However, a totally automatised pipeline could overlook this regression,
+	avoid to explicit the root path as running directory and consequentially
+	fall into the scenario of having a bricked fleet of non-upgradable IoT
+	devices. Therefore, fully automated pipelines aren't supported by any
+	provided AS-IS piece of software (labour cost externalisation issue).
+
+ *  ************************************************************************* */
+static NOINLINE bool is_valid_dir(const char *path)
 {
 	struct stat st;
 
@@ -545,6 +565,7 @@ bool is_valid_dir(const char *path)
 		&& !access(path, R_OK | X_OK) );
 }
 
+static ALWAYS_INLINE
 const char *safe_default_running_path(void)
 {
 	if (is_valid_dir(BB_DEFAULT_WWW_PATH)) {
@@ -558,7 +579,8 @@ const char *safe_default_running_path(void)
 			return "/tmp";
 		}
 	}
-	bb_simple_message_die("Missing a safe PWD to run\n");
+//	bb_simple_message_die("Missing a safe PWD to run\n");
+	return NULL;
 }
 
 char *xcheck_for_safe_pwd(const char *path, bool requested)
@@ -581,38 +603,27 @@ char *xcheck_for_safe_pwd(const char *path, bool requested)
 		sanitized_path = xstrdup(path);
 	printable_string(sanitized_path);
 
-	// Explicitly provided path: reject if sanitization modified the original string
-	if (requested
-	&&  strcmp(path, sanitized_path)
-	){
+	// 3. Early validation branch
+	if (requested) {
+		// Explicitly provided path: reject if sanitization changed it
+		if(strcmp(path, sanitized_path))
+			goto fallback;
+	} else
+	// Implicit/Default path: reject components with leading dots
+	if (*sanitized_path == '.')
 		goto fallback;
-	} else {
-	// Implicit/Default path: reject components with leading dots or traverse tokens
-	if (strstr(sanitized_path, "/.") != NULL
-	|| strncmp(sanitized_path, ".", 1) == 0
-	){
-		goto fallback;
-	}
-	}
 
-	// 3. Resolve symlinks and canonical real path using libbb helper
+	// 4. Resolve symlinks and canonical real path using libbb helper
 	resolved_path = xmalloc_realpath(sanitized_path);
 	if (!resolved_path) goto fallback;
 
-	// 4. Validate accessibility and directory permissions
-	if (stat(resolved_path, &st) != 0
-	||  !S_ISDIR(st.st_mode)
-	||  access(resolved_path, R_OK | X_OK) != 0
-	){
+	// 5. Validate accessibility and directory permissions (redundant?)
+	if (is_valid_dir(resolved_path))
 		goto fallback;
-	}
 
-	// 5. Implicit path security gate: block root "/" if not explicitly requested
-	if (!requested
-	&&  strcmp(resolved_path, "/") == 0
-	){
+	// 6. Security gate: block root "/" if not explicitly requested
+	if (!requested && LONE_CHAR(resolved_path, '/'))
 		goto fallback;
-	}
 
 	free(sanitized_path);
 	return resolved_path;
@@ -621,9 +632,9 @@ fallback:
 	free(resolved_path);
 	free(sanitized_path);
 	if (!requested) {
-		// Fallback logic using safe_default_running_path
-		const char *safe_default = safe_default_running_path();
-		return xstrdup(safe_default);
+		resolved_path = safe_default_running_path();
+		if(resolved_path)
+			return xstrdup(resolved_path);
 	}
 	bb_simple_error_msg_and_die("Invalid safe PWD path");
 }
