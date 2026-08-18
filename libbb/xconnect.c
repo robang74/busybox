@@ -518,3 +518,46 @@ char* FAST_FUNC xmalloc_sockaddr2dotted_noport(const struct sockaddr *sa)
 {
 	return sockaddr2str(sa, NI_NUMERICHOST | NI_NUMERICSCOPE | IGNORE_PORT);
 }
+
+/*
+ * RAF: here because network services, deamons in particular, need a safe PWD
+ *
+ * Example of use:
+ *
+if (!homedir) {
+	char cwd[PATH_MAX];
+	if (getcwd(cwd, sizeof(cwd)) && !strcmp(cwd, "/")) {
+		homedir = safe_default_running_path();
+	}
+}
+ */
+
+static ALWAYS_INLINE
+bool is_valid_dir(const char *path)
+{
+	struct stat st;
+
+	if (!path || *path == '\0')
+		return false;
+
+	return ( !stat(path, &st)
+		&& S_ISDIR(st.st_mode)
+		&& !access(path, R_OK | X_OK) );
+}
+
+const char *safe_default_running_path(void)
+{
+	if (is_valid_dir(BB_DEFAULT_WWW_PATH)) {
+		return BB_DEFAULT_WWW_PATH;
+	} else {
+		const char *tmpdir = getenv("TMPDIR");
+		if (tmpdir && is_valid_dir(tmpdir)) {
+			return tmpdir;
+		} else
+		if (is_valid_dir("/tmp")) {
+			return "/tmp";
+		}
+	}
+	bb_simple_message_die("Missing a safe PWD to run\n");
+}
+
