@@ -561,3 +561,68 @@ const char *safe_default_running_path(void)
 	bb_simple_message_die("Missing a safe PWD to run\n");
 }
 
+char *xcheck_for_safe_pwd(const char *path, bool requested)
+{
+	char *sanitized_path = NULL;
+	char *resolved_path = NULL;
+	struct stat st;
+
+	// 1. Resolve candidate string: fallback to getcwd if NULL
+	if (!path) {
+		if (requested) goto fallback;
+
+		/* requested = 1; // RAF: current PWD is a request=1 in failing? */
+		path = xrealloc_getcwd_or_warn(NULL);
+		if (!path) goto fallback;
+	}
+
+	// 2. Sanitize printable characters
+	sanitized_path = xstrdup(path);
+	printable_string(sanitized_path);
+
+	if (requested) {
+		// Explicitly provided path: reject if sanitization modified the original string
+		if (!strcmp(path, sanitized_path)) goto fallback;
+	} else {
+	// Implicit/Default path: reject components with leading dots or traverse tokens
+	if (strstr(sanitized_path, "/.") != NULL
+	|| strncmp(sanitized_path, ".", 1) == 0
+	){
+		free(sanitized_path);
+		goto fallback;
+	}
+	}
+
+	// 3. Resolve symlinks and canonical real path using libbb helper
+	resolved_path = xmalloc_realpath(sanitized_path);
+	free(sanitized_path);
+	if (!resolved_path) goto fallback;
+
+	// 4. Validate accessibility and directory permissions
+	if (stat(resolved_path, &st) != 0
+	||  !S_ISDIR(st.st_mode)
+	||  access(resolved_path, R_OK | X_OK) != 0
+	){
+		free(resolved_path);
+		goto fallback;
+	}
+
+	// 5. Implicit path security gate: block root "/" if not explicitly requested
+	if (!requested
+	&&  strcmp(resolved_path, "/") == 0
+	){
+		free(resolved_path);
+		goto fallback;
+	}
+
+	return resolved_path;
+
+fallback:
+	if (requested) {
+		bb_simple_error_msg_and_die("Invalid safe PWD path");
+	}
+
+	// Fallback logic using safe_default_running_path
+	const char *safe_default = safe_default_running_path();
+	return xstrdup(safe_default);
+}
