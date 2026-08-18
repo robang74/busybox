@@ -572,30 +572,31 @@ char *xcheck_for_safe_pwd(const char *path, bool requested)
 		if (requested) goto fallback;
 
 		/* requested = 1; // RAF: current PWD is a request=1 in failing? */
-		path = xrealloc_getcwd_or_warn(NULL);
-		if (!path) goto fallback;
+		sanitized_path = xrealloc_getcwd_or_warn(NULL);
+		if (!sanitized_path) goto fallback;
 	}
 
 	// 2. Sanitize printable characters
-	sanitized_path = xstrdup(path);
+	if(!sanitized_path)
+		sanitized_path = xstrdup(path);
 	printable_string(sanitized_path);
 
-	if (requested) {
-		// Explicitly provided path: reject if sanitization modified the original string
-		if (!strcmp(path, sanitized_path)) goto fallback;
+	// Explicitly provided path: reject if sanitization modified the original string
+	if (requested
+	&&  strcmp(path, sanitized_path)
+	){
+		goto fallback;
 	} else {
 	// Implicit/Default path: reject components with leading dots or traverse tokens
 	if (strstr(sanitized_path, "/.") != NULL
 	|| strncmp(sanitized_path, ".", 1) == 0
 	){
-		free(sanitized_path);
 		goto fallback;
 	}
 	}
 
 	// 3. Resolve symlinks and canonical real path using libbb helper
 	resolved_path = xmalloc_realpath(sanitized_path);
-	free(sanitized_path);
 	if (!resolved_path) goto fallback;
 
 	// 4. Validate accessibility and directory permissions
@@ -603,7 +604,6 @@ char *xcheck_for_safe_pwd(const char *path, bool requested)
 	||  !S_ISDIR(st.st_mode)
 	||  access(resolved_path, R_OK | X_OK) != 0
 	){
-		free(resolved_path);
 		goto fallback;
 	}
 
@@ -611,18 +611,19 @@ char *xcheck_for_safe_pwd(const char *path, bool requested)
 	if (!requested
 	&&  strcmp(resolved_path, "/") == 0
 	){
-		free(resolved_path);
 		goto fallback;
 	}
 
+	free(sanitized_path);
 	return resolved_path;
 
 fallback:
-	if (requested) {
-		bb_simple_error_msg_and_die("Invalid safe PWD path");
+	free(resolved_path);
+	free(sanitized_path);
+	if (!requested) {
+		// Fallback logic using safe_default_running_path
+		const char *safe_default = safe_default_running_path();
+		return xstrdup(safe_default);
 	}
-
-	// Fallback logic using safe_default_running_path
-	const char *safe_default = safe_default_running_path();
-	return xstrdup(safe_default);
+	bb_simple_error_msg_and_die("Invalid safe PWD path");
 }
