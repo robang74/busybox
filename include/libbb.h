@@ -1014,7 +1014,7 @@ struct hostent *xgethostbyname(const char *name) FAST_FUNC;
 // + inet_common.c has additional IPv4-only stuff
 
 #define BB_DEFAULT_WWW_PATH "/var/www"
-const char *safe_default_running_path(void); //RAF: potentially static not public
+//const char *safe_default_running_path(void); //RAF: set as static unless needed as public
 char *xcheck_for_safe_pwd(const char *path, bool requested); //RAF: to adopt and yet to test
 
 struct tls_aes {
