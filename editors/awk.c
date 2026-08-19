@@ -894,7 +894,10 @@ static char nextchar(char **s)
 {
 	char c, *pps;
  again:
-	c = *(*s)++;
+	c = *(*s);
+	if (c == '\0')
+		return c; /* do not advance past the terminating NUL */
+	(*s)++;
 	pps = *s;
 	if (c == '\\')
 		c = bb_process_escape_sequence((const char**)s);
