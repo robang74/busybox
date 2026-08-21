@@ -568,18 +568,18 @@ static NOINLINE bool is_valid_dir(const char *path)
 static ALWAYS_INLINE
 const char *safe_default_running_path(void)
 {
-	if (is_valid_dir(BB_DEFAULT_WWW_PATH)) {
+	const char *tmpdir;
+
+	if (is_valid_dir(BB_DEFAULT_WWW_PATH))
 		return BB_DEFAULT_WWW_PATH;
-	} else {
-		const char *tmpdir = getenv("TMPDIR");
-		if (tmpdir && is_valid_dir(tmpdir)) {
-			return tmpdir;
-		} else
-		if (is_valid_dir("/tmp")) {
-			return "/tmp";
-		}
-	}
-//	bb_simple_message_die("Missing a safe PWD to run\n");
+
+	tmpdir = getenv("TMPDIR");
+	if (tmpdir && is_valid_dir(tmpdir))
+		return tmpdir;
+
+	if (is_valid_dir("/tmp"))
+		return "/tmp";
+
 	return NULL;
 }
 
@@ -609,7 +609,7 @@ char *xcheck_for_safe_pwd(const char *path, bool requested)
 		if(strcmp(path, sanitized_path))
 			goto fallback;
 	} else
-	// Implicit/Default path: reject components with leading dots
+	// Implicit path: reject components with leading dots
 	if (*sanitized_path == '.')
 		goto fallback;
 
@@ -618,7 +618,7 @@ char *xcheck_for_safe_pwd(const char *path, bool requested)
 	if (!resolved_path) goto fallback;
 
 	// 5. Validate accessibility and directory permissions (redundant?)
-	if (is_valid_dir(resolved_path))
+	if (!is_valid_dir(resolved_path))
 		goto fallback;
 
 	// 6. Security gate: block root "/" if not explicitly requested
