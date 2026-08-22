@@ -306,13 +306,11 @@ static void FAST_FUNC print_statfs(char *pformat, const char m,
 
 static void FAST_FUNC print_time_t(char *pformat, time_t val)
 {
-#define TYPE_SIGNED(t) (! ((t) 0 < (t) -1))
-
+#define TYPE_SIGNED(t) ((t) -1 < (t) 0)
 	if (TYPE_SIGNED(time_t)) {
 		strcat(pformat, "lld");
 		printf(pformat, (long long) val);
-	}
-	else {
+	} else {
 		strcat(pformat, "llu");
 		printf(pformat, (unsigned long long) val);
 	}
