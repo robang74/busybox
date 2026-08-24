@@ -826,4 +826,10 @@ test x"$SKIP_KNOWN_BUG_AWK_WORDMATCH" = x"" \
 	'abc\n' \
 	'' ''
 
+#optional CONFIG_DEBUG_SANITIZE
+testing 'awk detects no OOB read after backslash-newline at EOF' \
+	'set +e; awk -f awk_next_token_oob.awk 2>&1; echo $?' \
+	"awk: awk_next_token_oob.awk:1: Unexpected end of string\n1\n" \
+	"" ""
+
 exit $FAILCOUNT
