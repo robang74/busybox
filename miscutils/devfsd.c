@@ -1018,6 +1018,7 @@ static void restore(char *spath, struct stat source_stat, int rootlen)
 	lstat(dpath, &dest_stat);
 	if (S_ISLNK(source_stat.st_mode) || (source_stat.st_mode & S_ISVTX))
 		copy_inode(dpath, &dest_stat, (source_stat.st_mode & ~S_ISVTX), spath, &source_stat);
+	free(dpath);
 
 	if (S_ISDIR(source_stat.st_mode))
 		dir_operation(RESTORE, spath, rootlen, NULL);
