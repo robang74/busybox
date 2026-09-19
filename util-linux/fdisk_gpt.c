@@ -185,6 +185,7 @@ check_gpt_label(void)
 	G.gpt_part_entry_len = SWAP_LE32(G.gpt_hdr->part_entry_len);
 	if (G.gpt_n_parts > GPT_MAX_PARTS
 	 || G.gpt_part_entry_len > GPT_MAX_PART_ENTRY_LEN
+	 || G.gpt_part_entry_len < sizeof(gpt_partition)
 	 || SWAP_LE32(G.gpt_hdr->hdr_size) > sector_size
 	) {
 		puts("\nwarning: can't parse GPT disklabel");
