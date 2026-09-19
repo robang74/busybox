@@ -21,6 +21,7 @@
 #include "bb_archive.h"
 #include "rpm.h"
 
+/* This enumeration can't be changed w/o breaking rpm_getint() */
 #define RPM_CHAR_TYPE           1
 #define RPM_INT8_TYPE           2
 #define RPM_INT16_TYPE          3
@@ -200,6 +201,7 @@ static int rpm_getint(int tag, int itemindex)
 {
 	rpm_index *found;
 	char *tmpint;
+	int shift;
 
 	/* gcc throws warnings here when sizeof(void*)!=sizeof(int) ...
 	 * it's ok to ignore it because tag won't be used as a pointer */
@@ -210,26 +212,19 @@ static int rpm_getint(int tag, int itemindex)
 	if (found->offset >= G.mapsize)
 		return -1;
 
-	tmpint = (char *) G.map + found->offset;
-	if (found->type == RPM_INT32_TYPE) {
-		if ((uint64_t)found->offset + (uint64_t)(unsigned)itemindex*4 + 4 > G.mapsize)
-			return -1;
-		tmpint += itemindex*4;
+	/* RPM_INT8_TYPE=2, RPM_INT16_TYPE=3, RPM_INT32_TYPE=4 */
+	shift = found->type - 2;
+	if ((uint64_t)found->offset + ((uint64_t)(unsigned)(itemindex + 1) << shift) > G.mapsize)
+		return -1;
+
+	tmpint = (char *) G.map + found->offset + (itemindex << shift);
+
+	/* Use shift to select: 0=INT8, 1=INT16, 2=INT32 */
+	if (shift == 2)
 		return ntohl(*(int32_t*)tmpint);
-	}
-	if (found->type == RPM_INT16_TYPE) {
-		if ((uint64_t)found->offset + (uint64_t)(unsigned)itemindex*2 + 2 > G.mapsize)
-			return -1;
-		tmpint += itemindex*2;
+	if (shift)
 		return ntohs(*(int16_t*)tmpint);
-	}
-	if (found->type == RPM_INT8_TYPE) {
-		if ((uint64_t)found->offset + (uint64_t)(unsigned)itemindex + 1 > G.mapsize)
-			return -1;
-		tmpint += itemindex;
-		return *(int8_t*)tmpint;
-	}
-	return -1;
+	return *(int8_t*)tmpint;
 }
 
 static int rpm_getcount(int tag)
