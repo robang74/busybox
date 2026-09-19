@@ -162,7 +162,7 @@ static int bsearch_rpmtag(const void *key, const void *item)
 	return (*tag - tmp->tag);
 }
 
-static char *rpm_getstr(int tag, int itemindex)
+static char *rpm_getstr(int tag, unsigned itemindex)
 {
 	rpm_index *found;
 	found = bsearch(&tag, G.mytags, G.tagcount, sizeof(G.mytags[0]), bsearch_rpmtag);
@@ -175,7 +175,7 @@ static char *rpm_getstr(int tag, int itemindex)
 	 || found->type == RPM_I18NSTRING_TYPE
 	 || found->type == RPM_STRING_ARRAY_TYPE
 	) {
-		int n;
+		unsigned n;
 		char *tmpstr = (char *) G.map + found->offset;
 		char *end = (char *) G.map + G.mapsize;
 		/* Walk NUL-terminated strings, never reading past the store */
@@ -190,6 +190,7 @@ static char *rpm_getstr(int tag, int itemindex)
 	}
 	return NULL;
 }
+
 static char *rpm_getstr0(int tag)
 {
 	return rpm_getstr(tag, 0);
@@ -197,11 +198,11 @@ static char *rpm_getstr0(int tag)
 
 #if ENABLE_RPM
 
-static int rpm_getint(int tag, int itemindex)
+static int rpm_getint(int tag, unsigned itemindex)
 {
 	rpm_index *found;
 	char *tmpint;
-	int shift;
+	uint8_t shift;
 
 	/* gcc throws warnings here when sizeof(void*)!=sizeof(int) ...
 	 * it's ok to ignore it because tag won't be used as a pointer */
@@ -214,7 +215,7 @@ static int rpm_getint(int tag, int itemindex)
 
 	/* RPM_INT8_TYPE=2, RPM_INT16_TYPE=3, RPM_INT32_TYPE=4 */
 	shift = found->type - 2;
-	if ((uint64_t)found->offset + ((uint64_t)(unsigned)(itemindex + 1) << shift) > G.mapsize)
+	if ((uint64_t)found->offset + (((uint64_t)itemindex + 1) << shift) > G.mapsize)
 		return -1;
 
 	tmpint = (char *) G.map + found->offset + (itemindex << shift);
