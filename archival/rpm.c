@@ -167,15 +167,25 @@ static char *rpm_getstr(int tag, int itemindex)
 	found = bsearch(&tag, G.mytags, G.tagcount, sizeof(G.mytags[0]), bsearch_rpmtag);
 	if (!found || itemindex >= found->count)
 		return NULL;
+	/* Reject crafted index entry with out-of-bounds store offset */
+	if (found->offset >= G.mapsize)
+		return NULL;
 	if (found->type == RPM_STRING_TYPE
 	 || found->type == RPM_I18NSTRING_TYPE
 	 || found->type == RPM_STRING_ARRAY_TYPE
 	) {
 		int n;
 		char *tmpstr = (char *) G.map + found->offset;
-		for (n = 0; n < itemindex; n++)
-			tmpstr = tmpstr + strlen(tmpstr) + 1;
-		return tmpstr;
+		char *end = (char *) G.map + G.mapsize;
+		/* Walk NUL-terminated strings, never reading past the store */
+		for (n = 0; n <= itemindex; n++) {
+			char *nul = memchr(tmpstr, '\0', end - tmpstr);
+			if (!nul)
+				return NULL;
+			if (n == itemindex)
+				return tmpstr;
+			tmpstr = nul + 1;
+		}
 	}
 	return NULL;
 }
@@ -196,17 +206,26 @@ static int rpm_getint(int tag, int itemindex)
 	found = bsearch(&tag, G.mytags, G.tagcount, sizeof(G.mytags[0]), bsearch_rpmtag);
 	if (!found || itemindex >= found->count)
 		return -1;
+	/* Reject crafted index entry with out-of-bounds store offset */
+	if (found->offset >= G.mapsize)
+		return -1;
 
 	tmpint = (char *) G.map + found->offset;
 	if (found->type == RPM_INT32_TYPE) {
+		if ((uint64_t)found->offset + (uint64_t)(unsigned)itemindex*4 + 4 > G.mapsize)
+			return -1;
 		tmpint += itemindex*4;
 		return ntohl(*(int32_t*)tmpint);
 	}
 	if (found->type == RPM_INT16_TYPE) {
+		if ((uint64_t)found->offset + (uint64_t)(unsigned)itemindex*2 + 2 > G.mapsize)
+			return -1;
 		tmpint += itemindex*2;
 		return ntohs(*(int16_t*)tmpint);
 	}
 	if (found->type == RPM_INT8_TYPE) {
+		if ((uint64_t)found->offset + (uint64_t)(unsigned)itemindex + 1 > G.mapsize)
+			return -1;
 		tmpint += itemindex;
 		return *(int8_t*)tmpint;
 	}
