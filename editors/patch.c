@@ -495,6 +495,8 @@ int patch_main(int argc UNUSED_PARAM, char **argv)
 			TT.oldlen = oldlen = TT.newlen = newlen = 1;
 			TT.oldline = strtol(s, &s, 10);
 			if (*s == ',') TT.oldlen = oldlen = strtol(s+1, &s, 10);
+			if (s[0] != ' ' || s[1] != '+')
+				bb_error_msg_and_die("invalid hunk header: %s", patchline);
 			TT.newline = strtol(s+2, &s, 10);
 			if (*s == ',') TT.newlen = newlen = strtol(s+1, &s, 10);
 
