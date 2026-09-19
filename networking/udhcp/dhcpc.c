@@ -919,6 +919,7 @@ static NOINLINE int d4_recv_raw_packet(struct dhcp_packet *dhcp_pkt, int fd)
 	 || packet.ip.version != IPVERSION
 	 || packet.ip.ihl != (sizeof(packet.ip) >> 2)
 	 || packet.udp.dest != htons(CLIENT_PORT)
+	 || ntohs(packet.udp.len) < sizeof(packet.udp)
 	/* || bytes > (int) sizeof(packet) - can't happen */
 	 || ntohs(packet.udp.len) != (uint16_t)(bytes - sizeof(packet.ip))
 	) {
