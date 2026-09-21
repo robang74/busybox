@@ -534,8 +534,8 @@ static void free_package(common_node_t *node)
 
 /*
  * Gets the next package field from pkg_buf:
- * "<whitespace>Name:<whitespace>VALUE{\n|NUL}"
- * "<whitespace>Name:<whitespace>\n
+ * "<whitespace>NAME:<whitespace>VALUE{\n|NUL}"
+ * "<whitespace>NAME:<whitespace>\n
  * " VALUE{\n|NUL}"
  * separated into "NAME" and "VALUE", both strdup()ed.
  * Returns the int offset to the first character of the next field.
@@ -809,7 +809,6 @@ static void write_status_file(deb_file_t **deb_file)
 	FILE *old_status_file = xfopen_for_read("/var/lib/dpkg/status");
 	FILE *new_status_file = xfopen_for_write("/var/lib/dpkg/status.udeb");
 	char *control_buffer;
-	int field_start = 0;
 	int status_num;
 	int i;
 
@@ -819,23 +818,20 @@ static void write_status_file(deb_file_t **deb_file)
 		char *status_from_file;
 		char *tmp_string;
 		int write_flag;
-//FIXME: "int field_start = 0;" should be _here_, right?
 
 		tmp_string = strstr(control_buffer, "Package:");
 		if (tmp_string == NULL) {
 			free(control_buffer);
 			continue;
 		}
-		tmp_string += 8;
-		tmp_string += strspn(tmp_string, " \n\t");
+		tmp_string = skip_whitespace(tmp_string + 8);
 		package_name = xstrndup(tmp_string, strcspn(tmp_string, "\n"));
 
 		write_flag = FALSE;
 		status_from_file = NULL;
 		tmp_string = strstr(control_buffer, "Status:");
 		if (tmp_string != NULL) {
-			tmp_string += 7;
-			tmp_string += strspn(tmp_string, " \n\t");
+			tmp_string = skip_whitespace(tmp_string + 7);
 			status_from_file = xstrndup(tmp_string, strcspn(tmp_string, "\n"));
 		}
 
@@ -872,6 +868,8 @@ static void write_status_file(deb_file_t **deb_file)
 					}
 				}
 				else if (strcmp("not-installed", name_hashtable[state_status]) == 0) {
+					int field_start = 0;
+
 					/* Only write the Package, Status, Priority and Section lines */
 					fprintf(new_status_file, "Package: %s\n", package_name);
 					fprintf(new_status_file, "Status: %s\n", status_from_hashtable);
@@ -880,6 +878,8 @@ static void write_status_file(deb_file_t **deb_file)
 						char *field_name;
 						char *field_value;
 						field_start += read_package_field(&control_buffer[field_start], &field_name, &field_value);
+//FIXME: the questionable ": VALUE" lines (empty NAME)
+//probably should not stop parsing of the entire file?
 						if (field_name == NULL) {
 							break;
 						}
@@ -895,6 +895,8 @@ static void write_status_file(deb_file_t **deb_file)
 					fputs("\n", new_status_file);
 				}
 				else if (strcmp("config-files", name_hashtable[state_status]) == 0) {
+					int field_start = 0;
+
 					/* only change the status line */
 					while (control_buffer[field_start]) {
 						char *field_name;
