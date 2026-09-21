@@ -531,72 +531,72 @@ static void free_package(common_node_t *node)
 }
 
 /*
- * Gets the next package field from package_buffer:
+ * Gets the next package field from pkg_buf:
  * "<whitespace>Name:<whitespace>VALUE{\n|NUL}"
  * "<whitespace>Name:<whitespace>\n
  * " VALUE{\n|NUL}"
  * separated into "NAME" and "VALUE", both strdup()ed.
  * Returns the int offset to the first character of the next field.
- * The package_buffer parameter is NUL-terminated.
+ * The pkg_buf parameter is NUL-terminated.
  */
-static int read_package_field(const char *package_buffer, char **field_name, char **field_value)
+static int read_package_field(const char *pkg_buf, char **pname, char **pvalue)
 {
-	int offset_name_start;
-	int offset_name_end;
-	int offset_value_start = offset_value_start;
+	int name_start;
+	int name_end;
+	int value_start = value_start;
 	int offset;
 
-	*field_name = NULL;
-	*field_value = NULL;
+	*pname = NULL;
+	*pvalue = NULL;
 
 	offset = 0;
-	offset_name_start = 0;
-	offset_name_end = 0; /* "we did not see ':' yet" */
+	name_start = 0;
+	name_end = 0; /* "we did not see ':' yet" */
 	while (1) {
-		char ch = package_buffer[offset];
+		char ch = pkg_buf[offset];
 		switch (ch) {
-			case ':':
-				if (offset_name_end == 0) {
-					offset_name_end = offset + 1; /* points AFTER ':' - think of empty NAME case */
-					offset_value_start = offset + 1;
-				}
-				/* TODO: NAME might still have trailing spaces if ':' isn't
-				 * immediately after name */
-				break;
-			case '\n':
-				if (package_buffer[offset + 1] != ' ')
-					goto end_of_value;
-				/* fall through */
-			case '\t':
-			case ' ':
-				/* increment start points if it is just a filler */
-				if (offset_name_start == offset)
-					offset_name_start++;
-				if (offset_value_start == offset)
-					offset_value_start++;
-				break;
-			case '\0':
+		case ':':
+			if (name_end == 0) {
+				name_end = offset + 1; /* points AFTER ':' - think of empty NAME case */
+				value_start = offset + 1;
+			}
+			/* TODO: NAME might still have trailing spaces if ':' isn't
+			 * immediately after name */
+			break;
+		case '\n':
+			if (pkg_buf[offset + 1] != ' ')
+				goto end_of_value;
+			/* fall through */
+		case '\t':
+		case ' ':
+			/* increment start points if it is just a filler */
+			if (name_start == offset)
+				name_start++;
+			if (value_start == offset)
+				value_start++;
+			break;
+		case '\0':
  end_of_value:
-				/* Did we see the ':'? */
-				if (offset_name_end != 0) {
-					/* Yes. Check that NAME and VALUE exist and not empty */
-					int name_length = (offset_name_end - 1) - offset_name_start;
-					int value_length = offset - offset_value_start;
-					if ((name_length > 0) && (value_length > 0)) {
-						*field_name = xstrndup(&package_buffer[offset_name_start], name_length);
-						*field_value = xstrndup(&package_buffer[offset_value_start], value_length);
-						if (ch)
-							offset++; /* skip '\n' */
-						return offset;
-					}
+			/* Did we see the ':'? */
+			if (name_end != 0) {
+				/* Yes. Check that NAME and VALUE exist and not empty */
+				int nlen = (name_end - 1) - name_start;
+				int vlen = offset - value_start;
+				if ((nlen > 0) && (vlen > 0)) {
+					*pname = xstrndup(&pkg_buf[name_start], nlen);
+					*pvalue = xstrndup(&pkg_buf[value_start], vlen);
+					if (ch)
+						offset++; /* skip '\n' */
+					return offset;
 				}
-				if (!ch)
-					return offset; /* stop at NUL */
+			}
+			if (!ch)
+				return offset; /* stop at NUL */
 
-				/* Not valid: start fresh with next field */
-				offset_name_start = offset + 1;
-				offset_name_end = 0; /* "we did not see ':' yet" */
-				break;
+			/* Not valid: skip '\n', start fresh with next field */
+			name_start = offset + 1;
+			name_end = 0; /* "we did not see ':' yet" */
+			break;
 		}
 		offset++;
 	} /* while (1) */
