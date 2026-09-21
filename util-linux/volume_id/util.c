@@ -116,6 +116,10 @@ void volume_id_set_label_string(struct volume_id *id, const uint8_t *buf, size_t
 {
 	unsigned i;
 
+	/* Do not overflow label[VOLUME_ID_LABEL_SIZE+1] */
+	if (count > VOLUME_ID_LABEL_SIZE)
+		count = VOLUME_ID_LABEL_SIZE;
+
 	memcpy(id->label, buf, count);
 
 	/* remove trailing whitespace */
