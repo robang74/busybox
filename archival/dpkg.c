@@ -41,12 +41,11 @@
 //kbuild:lib-$(CONFIG_DPKG) += dpkg.o
 
 //usage:#define dpkg_trivial_usage
-//usage:       "[-ilCPru] [-F OPT] PACKAGE"
+//usage:       "[-iCPru] [-F OPT] PACKAGE | -l [PATTERN]"
 //usage:#define dpkg_full_usage "\n\n"
 //usage:       "Install, remove and manage Debian packages\n"
 //usage:	IF_LONG_OPTS(
 //usage:     "\n	-i,--install	Install the package"
-//usage:     "\n	-l,--list	List of installed packages"
 //usage:     "\n	--configure	Configure an unpackaged package"
 //usage:     "\n	-P,--purge	Purge all files of a package"
 //usage:     "\n	-r,--remove	Remove all but the configuration files for a package"
@@ -54,10 +53,10 @@
 //usage:     "\n	--force-depends	Ignore dependency problems"
 //usage:     "\n	--force-confnew	Overwrite existing config files when installing"
 //usage:     "\n	--force-confold	Keep old config files when installing"
+//usage:     "\n	-l,--list	List installed packages"
 //usage:	)
 //usage:	IF_NOT_LONG_OPTS(
 //usage:     "\n	-i		Install the package"
-//usage:     "\n	-l		List of installed packages"
 //usage:     "\n	-C		Configure an unpackaged package"
 //usage:     "\n	-P		Purge all files of a package"
 //usage:     "\n	-r		Remove all but the configuration files for a package"
@@ -65,6 +64,7 @@
 //usage:     "\n	-F depends	Ignore dependency problems"
 //usage:     "\n	-F confnew	Overwrite existing config files when installing"
 //usage:     "\n	-F confold	Keep old config files when installing"
+//usage:     "\n	-l		List installed packages"
 //usage:	)
 
 #include "libbb.h"
