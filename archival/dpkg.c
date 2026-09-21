@@ -166,8 +166,9 @@ typedef struct deb_file_s {
 } deb_file_t;
 
 
-static void make_hash(const char *key, unsigned *start, unsigned *decrement, const int hash_prime)
+static unsigned make_hash(const char *key, unsigned *decrement, const int hash_prime)
 {
+	unsigned start;
 	unsigned long hash_num = key[0];
 	int len = strlen(key);
 	int i;
@@ -181,8 +182,9 @@ static void make_hash(const char *key, unsigned *start, unsigned *decrement, con
 		 * no effect */
 		hash_num += (key[i] + key[i-1]) << ((key[i] * i) % 24);
 	}
-	*start = (unsigned) hash_num % hash_prime;
+	start = (unsigned) hash_num % hash_prime;
 	*decrement = (unsigned) 1 + (hash_num % (hash_prime - 1));
+	return start;
 }
 
 /* this adds the key to the hash table */
@@ -191,7 +193,7 @@ static int search_name_hashtable(const char *key)
 	unsigned probe_address;
 	unsigned probe_decrement;
 
-	make_hash(key, &probe_address, &probe_decrement, NAME_HASH_PRIME);
+	probe_address = make_hash(key, &probe_decrement, NAME_HASH_PRIME);
 	while (name_hashtable[probe_address] != NULL) {
 		if (strcmp(name_hashtable[probe_address], key) == 0) {
 			return probe_address;
@@ -213,7 +215,7 @@ static unsigned search_status_hashtable(const char *key)
 	unsigned probe_address;
 	unsigned probe_decrement;
 
-	make_hash(key, &probe_address, &probe_decrement, STATUS_HASH_PRIME);
+	probe_address = make_hash(key, &probe_decrement, STATUS_HASH_PRIME);
 	while (status_hashtable[probe_address] != NULL) {
 		if (strcmp(key, name_hashtable[package_hashtable[status_hashtable[probe_address]->package]->name]) == 0) {
 			break;
@@ -358,7 +360,7 @@ static int search_package_hashtable(const unsigned name, const unsigned version,
 	unsigned probe_address;
 	unsigned probe_decrement;
 
-	make_hash(name_hashtable[name], &probe_address, &probe_decrement, PACKAGE_HASH_PRIME);
+	probe_address = make_hash(name_hashtable[name], &probe_decrement, PACKAGE_HASH_PRIME);
 	while (package_hashtable[probe_address] != NULL) {
 		if (package_hashtable[probe_address]->name == name) {
 			if (operator == VER_ANY) {
