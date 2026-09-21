@@ -2247,7 +2247,7 @@ static int check_user_passwd(const char *path, char *user_and_passwd)
 			}
 			/* Else: passwd is from httpd.conf, it is either plaintext or encrypted */
 
-			if (passwd[0] == '$' && isdigit(passwd[1])) {
+			if (passwd[0] == '$' && (isdigit(passwd[1]) || passwd[1] == 'y')) {
 				char *encrypted;
 # if !ENABLE_PAM
  check_encrypted:
