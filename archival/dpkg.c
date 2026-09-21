@@ -612,11 +612,10 @@ static unsigned fill_package_struct(char *control_buffer)
 
 	common_node_t *new_node = xzalloc(sizeof(common_node_t));
 	int field_start = 0;
-	int buffer_length = strlen(control_buffer);
 	int num;
 
 	new_node->version = search_name_hashtable("unknown");
-	while (field_start < buffer_length) {
+	while (control_buffer[field_start]) {
 		char *field_name;
 		char *field_value;
 		unsigned field_num;
