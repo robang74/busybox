@@ -41,26 +41,26 @@
 //kbuild:lib-$(CONFIG_DPKG) += dpkg.o
 
 //usage:#define dpkg_trivial_usage
-//usage:       "[-iCPru] [-F OPT] PACKAGE | -l [PATTERN]"
+//usage:       IF_LONG_OPTS("-i|P|r|--unpack|--configure [--force-OPT]")IF_NOT_LONG_OPTS("-i|P|r|u|C [-F OPT]")" PACKAGE | -l [PATTERN]"
 //usage:#define dpkg_full_usage "\n\n"
-//usage:       "Install, remove and manage Debian packages\n"
+//usage:       "Manage Debian packages\n"
 //usage:	IF_LONG_OPTS(
-//usage:     "\n	-i,--install	Install the package"
-//usage:     "\n	--configure	Configure an unpackaged package"
-//usage:     "\n	-P,--purge	Purge all files of a package"
-//usage:     "\n	-r,--remove	Remove all but the configuration files for a package"
-//usage:     "\n	--unpack	Unpack a package, but don't configure it"
+//usage:     "\n	-i,--install	Install PACKAGE.deb"
+//usage:     "\n	-P,--purge	Purge all files of PACKAGE"
+//usage:     "\n	-r,--remove	Remove all but configuration files of PACKAGE"
+//usage:     "\n	--unpack	Unpack PACKAGE.deb relative to /, don't configure"
+//usage:     "\n	--configure	Configure unpacked PACKAGE"
 //usage:     "\n	--force-depends	Ignore dependency problems"
 //usage:     "\n	--force-confnew	Overwrite existing config files when installing"
 //usage:     "\n	--force-confold	Keep old config files when installing"
 //usage:     "\n	-l,--list	List installed packages"
 //usage:	)
 //usage:	IF_NOT_LONG_OPTS(
-//usage:     "\n	-i		Install the package"
-//usage:     "\n	-C		Configure an unpackaged package"
-//usage:     "\n	-P		Purge all files of a package"
-//usage:     "\n	-r		Remove all but the configuration files for a package"
-//usage:     "\n	-u		Unpack a package, but don't configure it"
+//usage:     "\n	-i		Install PACKAGE.deb"
+//usage:     "\n	-P		Purge all files of PACKAGE"
+//usage:     "\n	-r		Remove all but configuration files of PACKAGE"
+//usage:     "\n	-u		Unpack PACKAGE.deb relative to /, don't configure"
+//usage:     "\n	-C		Configure unpacked PACKAGE"
 //usage:     "\n	-F depends	Ignore dependency problems"
 //usage:     "\n	-F confnew	Overwrite existing config files when installing"
 //usage:     "\n	-F confold	Keep old config files when installing"
@@ -760,6 +760,7 @@ static void index_status_file(const char *filename)
 	status_node_t *status_node = NULL;
 	unsigned status_num;
 
+//FIXME: dpkg 1.22.22 recreates empty /var/lib/dpkg/status if it's missing - does not fail
 	status_file = xfopen_for_read(filename);
 	while ((control_buffer = xmalloc_fgetline_str(status_file, "\n\n")) != NULL) {
 		unsigned package_num = fill_package_struct(control_buffer);
@@ -804,6 +805,7 @@ static void write_buffer_no_status(FILE *new_status_file, const char *control_bu
 /* This could do with a cleanup */
 static void write_status_file(deb_file_t **deb_file)
 {
+//FIXME: dpkg 1.22.22 recreates empty /var/lib/dpkg/status if it's missing - does not fail
 	FILE *old_status_file = xfopen_for_read("/var/lib/dpkg/status");
 	FILE *new_status_file = xfopen_for_write("/var/lib/dpkg/status.udeb");
 	char *control_buffer;
@@ -1782,6 +1784,24 @@ int dpkg_main(int argc UNUSED_PARAM, char **argv)
 		"force-confold\0"  No_argument        "\xfd"
 		;
 #endif
+//--admindir=DIR
+//    Set the administrative directory to DIR.  This directory
+//    contains many files that give information about status of
+//    installed or uninstalled packages, etc.  Defaults to
+//    /var/lib/dpkg if DPKG_ADMINDIR has not been set.
+//--instdir=DIR
+//    Set the installation directory, which refers to the directory
+//    where packages are to be installed.  DIR is also the
+//    directory passed to chroot(2) before running package's
+//    installation scripts, which means that the scripts see DIR
+//    as a root directory.  Defaults to / if DPKG_ROOT has not
+//    been set (since dpkg 1.21.10).
+//--root=DIR
+//    Set the root directory to DIR, which sets the
+//    installation directory to DIR and the administrative
+//    directory to DIR/var/lib/dpkg if DPKG_ROOT
+//    has not been set (since dpkg 1.21.10).
+//TODO: implement --root=DIR? necessary for testing
 
 	INIT_G();
 
