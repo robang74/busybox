@@ -653,14 +653,14 @@ static ALWAYS_INLINE void free_Htaccess_IP_list(Htaccess_IP **pptr)
 #if ENABLE_FEATURE_HTTPD_ACL_IP
 /* Returns presumed mask width in bits or < 0 on error.
  * Updates strp, stores IP at provided pointer */
-static int scan_ip(const char **strp, uint32_t *ipp, unsigned char endc)
+static int scan_ip(const char **strp, uint32_t *ipp, char endc)
 {
 	const char *p = *strp;
 	int auto_mask = 8;
 	uint32_t ip = 0;
 	int j;
 
-	if (*p == '/')
+	if (*p == '/') /* Disallow "D:/24" (empty IP??) */
 		return -auto_mask;
 
 	for (j = 0; j < 4; j++) {
@@ -678,8 +678,11 @@ static int scan_ip(const char **strp, uint32_t *ipp, unsigned char endc)
 		}
 		if (*p == '.')
 			p++;
-		if (*p != '/' && *p)
+		if (*p
+		// && *p != '/' -- no need to check, for "IP/MASK" scan_ip_mask() ignores auto_mask value, incorrect +=8 does not matter in this case
+		) {
 			auto_mask += 8;
+		}
 		ip = (ip << 8) | octet;
 	}
 	if (*p) {
