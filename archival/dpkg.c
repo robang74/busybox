@@ -166,7 +166,7 @@ typedef struct deb_file_s {
 } deb_file_t;
 
 
-static unsigned make_hash(const char *key, unsigned *decrement, const int hash_prime)
+static unsigned make_hash(const char *key, unsigned *decrement, int hash_prime)
 {
 	unsigned start;
 	unsigned long hash_num = key[0];
@@ -282,7 +282,7 @@ static int version_compare_part(const char *val, const char *ref)
  * if ver1 = ver2 return 0,
  * if ver1 > ver2 return 1,
  */
-static int version_compare(const unsigned ver1, const unsigned ver2)
+static int version_compare(unsigned ver1, unsigned ver2)
 {
 	char *ch_ver1 = name_hashtable[ver1];
 	char *ch_ver2 = name_hashtable[ver2];
@@ -335,9 +335,9 @@ static int version_compare(const unsigned ver1, const unsigned ver2)
 	return result;
 }
 
-static int test_version(const unsigned version1, const unsigned version2, const unsigned operator)
+static int test_version(unsigned version1, unsigned version2, unsigned operator)
 {
-	const int version_result = version_compare(version1, version2);
+	int version_result = version_compare(version1, version2);
 	switch (operator) {
 	case VER_ANY:
 		return TRUE;
@@ -355,7 +355,7 @@ static int test_version(const unsigned version1, const unsigned version2, const 
 	return FALSE;
 }
 
-static int search_package_hashtable(const unsigned name, const unsigned version, const unsigned operator)
+static int search_package_hashtable(unsigned name, unsigned version, unsigned operator)
 {
 	unsigned probe_address;
 	unsigned probe_decrement;
@@ -678,7 +678,7 @@ static unsigned fill_package_struct(char *control_buffer)
 }
 
 /* if num = 1, it returns the want status, 2 returns flag, 3 returns status */
-static unsigned get_status(const unsigned status_node, const int num)
+static unsigned get_status(unsigned status_node, int num)
 {
 	char *status_string = name_hashtable[status_hashtable[status_node]->status];
 	char *state_sub_string;
@@ -700,9 +700,9 @@ static unsigned get_status(const unsigned status_node, const int num)
 	return state_sub_num;
 }
 
-static void set_status(const unsigned status_node_num, const char *new_value, const int position)
+static void set_status(unsigned status_node_num, const char *new_value, int position)
 {
-	const unsigned new_value_num = search_name_hashtable(new_value);
+	unsigned new_value_num = search_name_hashtable(new_value);
 	unsigned want = get_status(status_node_num, 1);
 	unsigned flag = get_status(status_node_num, 2);
 	unsigned status = get_status(status_node_num, 3);
@@ -762,7 +762,7 @@ static void index_status_file(const char *filename)
 
 	status_file = xfopen_for_read(filename);
 	while ((control_buffer = xmalloc_fgetline_str(status_file, "\n\n")) != NULL) {
-		const unsigned package_num = fill_package_struct(control_buffer);
+		unsigned package_num = fill_package_struct(control_buffer);
 		if (package_num != -1) {
 			status_node = xmalloc(sizeof(status_node_t));
 			/* fill_package_struct doesn't handle the status field */
@@ -843,7 +843,7 @@ static void write_status_file(deb_file_t **deb_file)
 			const char *status_from_hashtable = name_hashtable[status_hashtable[status_num]->status];
 			if (strcmp(status_from_file, status_from_hashtable) != 0) {
 				/* New status isn't exactly the same as old status */
-				const int state_status = get_status(status_num, 3);
+				int state_status = get_status(status_num, 3);
 				if ((strcmp("installed", name_hashtable[state_status]) == 0)
 				 || (strcmp("unpacked", name_hashtable[state_status]) == 0)
 				) {
@@ -990,14 +990,14 @@ static int check_deps(deb_file_t **deb_file, int deb_start /*, int dep_max_count
 	/* Create array of package numbers to check against
 	 * installed package for conflicts*/
 	while (deb_file[i] != NULL) {
-		const unsigned package_num = deb_file[i]->package;
+		unsigned package_num = deb_file[i]->package;
 		conflicts = xrealloc_vector(conflicts, 2, conflicts_num);
 		conflicts[conflicts_num] = package_num;
 		conflicts_num++;
 		/* add provides to conflicts list */
 		for (j = 0; j < package_hashtable[package_num]->num_of_edges; j++) {
 			if (package_hashtable[package_num]->edge[j]->type == EDGE_PROVIDES) {
-				const int conflicts_package_num = search_package_hashtable(
+				int conflicts_package_num = search_package_hashtable(
 					package_hashtable[package_num]->edge[j]->name,
 					package_hashtable[package_num]->edge[j]->version,
 					package_hashtable[package_num]->edge[j]->operator);
@@ -1032,7 +1032,7 @@ static int check_deps(deb_file_t **deb_file, int deb_start /*, int dep_max_count
 			const edge_t *package_edge = package_node->edge[j];
 
 			if (package_edge->type == EDGE_CONFLICTS) {
-				const unsigned package_num =
+				unsigned package_num =
 					search_package_hashtable(package_edge->name,
 								package_edge->version,
 								package_edge->operator);
@@ -1061,7 +1061,7 @@ static int check_deps(deb_file_t **deb_file, int deb_start /*, int dep_max_count
 	for (i = 0; i < PACKAGE_HASH_PRIME; i++) {
 		int status_num = 0;
 		int number_of_alternatives = 0;
-		const edge_t * root_of_alternatives = NULL;
+		const edge_t *root_of_alternatives = NULL;
 		const common_node_t *package_node = package_hashtable[i];
 
 		/* If the package node does not exist then this
@@ -1377,12 +1377,12 @@ static void list_packages(const char *pattern)
 	}
 }
 
-static void remove_package(const unsigned package_num, int noisy)
+static void remove_package(unsigned package_num, int noisy)
 {
 	const char *package_name = name_hashtable[package_hashtable[package_num]->name];
 	const char *package_version = name_hashtable[package_hashtable[package_num]->version];
-	const unsigned status_num = search_status_hashtable(package_name);
-	const int package_name_length = strlen(package_name);
+	unsigned status_num = search_status_hashtable(package_name);
+	int package_name_length = strlen(package_name);
 	char **remove_files;
 	char **exclude_files;
 	char list_name[package_name_length + 25];
@@ -1428,11 +1428,11 @@ static void remove_package(const unsigned package_num, int noisy)
 	set_status(status_num, "config-files", 3);
 }
 
-static void purge_package(const unsigned package_num)
+static void purge_package(unsigned package_num)
 {
 	const char *package_name = name_hashtable[package_hashtable[package_num]->name];
 	const char *package_version = name_hashtable[package_hashtable[package_num]->version];
-	const unsigned status_num = search_status_hashtable(package_name);
+	unsigned status_num = search_status_hashtable(package_name);
 	char **remove_files;
 	char **exclude_files;
 	char list_name[strlen(package_name) + 25];
@@ -1650,8 +1650,8 @@ enum {
 static void unpack_package(deb_file_t *deb_file)
 {
 	const char *package_name = name_hashtable[package_hashtable[deb_file->package]->name];
-	const unsigned status_num = search_status_hashtable(package_name);
-	const unsigned status_package_num = status_hashtable[status_num]->package;
+	unsigned status_num = search_status_hashtable(package_name);
+	unsigned status_package_num = status_hashtable[status_num]->package;
 	char *info_prefix;
 	char *list_filename;
 	archive_handle_t *archive_handle;
@@ -1741,7 +1741,7 @@ static void configure_package(deb_file_t *deb_file)
 {
 	const char *package_name = name_hashtable[package_hashtable[deb_file->package]->name];
 	const char *package_version = name_hashtable[package_hashtable[deb_file->package]->version];
-	const int status_num = search_status_hashtable(package_name);
+	int status_num = search_status_hashtable(package_name);
 
 	printf("Setting up %s (%s)...\n", package_name, package_version);
 
