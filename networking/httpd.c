@@ -38,59 +38,60 @@
  *
  * httpd.conf has the following format:
  *
- * H:/serverroot     # define the server root. It will override -h
- * A:172.20.         # Allow address from 172.20.0.0/16
- * A:10.0.0.0/25     # Allow any address from 10.0.0.0-10.0.0.127
- * A:10.0.0.0/255.255.255.128  # Same as the previous
- * A:127.0.0.1       # Allow local loopback connections
- * D:*               # Deny from other IP connections
+ * H:/serverroot        # define the server root. It will override -h
+ * I:index.html         # Show index.html when a directory is requested
+ * .au:audio/basic      # additional mime type for audio.au files
+ * *.php:/path/php      # run xxx.php through an interpreter
+ *
  * E404:/path/e404.html # /path/e404.html is the 404 (not found) error page
- * I:index.html      # Show index.html when a directory is requested
+ * Custom error pages can contain an absolute path or be relative to
+ * 'home_httpd'. Error pages are to be static files (no CGI or script).
+ * Error pages can only be defined in the main configuration file
+ * and are not taken into account in local (directories) config files.
  *
- * P:/url:[http://]hostname[:port]/new/path
- *                   # When /urlXXXXXX is requested, reverse proxy
- *                   # it to http://hostname[:port]/new/pathXXXXXX
- *
- * /cgi-bin:foo:bar  # Require user foo, pwd bar on urls starting with /cgi-bin/
- * /adm:admin:setup  # Require user admin, pwd setup on urls starting with /adm/
- * /adm:toor:PaSsWd  # or user toor, pwd PaSsWd on urls starting with /adm/
- * /adm:root:*       # or user root, pwd from /etc/passwd on urls starting with /adm/
- * /wiki:*:*         # or any user from /etc/passwd with according pwd on urls starting with /wiki/
- * .au:audio/basic   # additional mime type for audio.au files
- * *.php:/path/php   # run xxx.php through an interpreter
- *
- * A/D may be as a/d or allow/deny - only first char matters.
+ * A:172.20.            # Allow address from 172.20.0.0/16
+ * A:10.0.0.0/25        # Allow any address from 10.0.0.0-10.0.0.127
+ * A:10.0.0.0/255.255.255.128  # Same as the previous
+ * A:127.0.0.1          # Allow local loopback connections
+ * D:*                  # Deny from other IP connections
+ * A/D may be a/d or allow/deny - only first char matters.
  * Deny/Allow IP logic:
  *  - Default is to allow all (Allow all (A:*) is a no-op).
  *  - Deny rules take precedence over allow rules.
  *  - However, "Deny all" rule (D:*) is applied last.
- *
  * Example:
- *   1. Allow only specified addresses
- *     A:172.20          # Allow any address that begins with 172.20.
- *     A:10.10.          # Allow any address that begins with 10.10.
- *     A:127.0.0.1       # Allow local loopback connections
- *     D:*               # Deny from other IP connections
+ *  Allow only specified addresses
+ *  A:172.20            # allow any address that begins with 172.20.
+ *  A:10.10.            # allow any address that begins with 10.10.
+ *  A:127.0.0.1         # allow local loopback connections
+ *  D:*                 # deny from other IP connections
  *
- *   2. Only deny specified addresses
- *     D:1.2.3.        # deny from 1.2.3.0 - 1.2.3.255
- *     D:2.3.4.        # deny from 2.3.4.0 - 2.3.4.255
- *     A:*             # (optional line added for clarity)
+ *  Only deny specified addresses
+ *  D:1.2.3.            # deny from 1.2.3.0 - 1.2.3.255
+ *  D:2.3.4.            # deny from 2.3.4.0 - 2.3.4.255
+ *  A:*                 # (optional line added for clarity)
  *
- * If a sub directory contains config file, it is parsed and merged with
+ * P:/url:[http://]hostname[:port]/new/path
+ * When /urlXXXXXX is requested, reverse proxy it to http://hostname[:port]/new/pathXXXXXX
+ * This is done without checking any passwords for /urlXXXXXX.
+ * A:/D: directives work, but only those in the main configuration file.
+ *
+ * /cgi-bin:foo:bar     # Require user foo, pwd bar on urls starting with /cgi-bin/
+ * /adm:admin:setup     # Require user admin, pwd setup on urls starting with /adm/
+ * /adm:toor:PaSsWd     # or user toor, pwd PaSsWd on urls starting with /adm/
+ * /adm:toor:$1$P/eKnWXS$aI1aPGxT.dJD5SzqAKWrF0   # encrypted paaswd
+ * /adm:root:*          # or user root, pwd from /etc/passwd on urls starting with /adm/
+ * /wiki:*:*            # or any user from /etc/passwd with according pwd on urls starting with /wiki/
+ *
+ * If a subdirectory contains config file, it is parsed and merged with
  * any existing settings as if it was appended to the original configuration.
  *
  * subdir paths are relative to the containing subdir and thus cannot
  * affect the parent rules.
  *
- * Note that since the sub dir is parsed in the forked thread servicing the
- * subdir http request, any merge is discarded when the process exits.  As a
- * result, the subdir settings only have a lifetime of a single request.
- *
- * Custom error pages can contain an absolute path or be relative to
- * 'home_httpd'. Error pages are to be static files (no CGI or script). Error
- * page can only be defined in the root configuration file and are not taken
- * into account in local (directories) config files.
+ * Note that since the subdir is parsed in the forked child servicing
+ * the subdir http request, any merge is discarded when the child exits.
+ * As a result, the subdir settings only have a lifetime of a single request.
  *
  * If -c is not set, an attempt will be made to open the default
  * root configuration file.  If -c is set and the file is not found, the
