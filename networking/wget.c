@@ -333,6 +333,9 @@ static void progress_meter(int flag)
 	if (flag == PROGRESS_START)
 		bb_progress_init(&G.pmt, G.curfile);
 
+	if (flag == PROGRESS_END)
+		G.pmt.last_update_sec = 0; /* force update (and correct "notty") */
+
 	notty = bb_progress_update(&G.pmt,
 			G.beg_range,
 			G.transferred,
@@ -1010,11 +1013,11 @@ static int NOINLINE retrieve_file_data(FILE *dfp)
 			 * fread does not distinguish between EOF and error.
 			 */
 			if (errno != EAGAIN) {
+				progress_meter(PROGRESS_END);
 				if (ferror(dfp)) {
-					progress_meter(PROGRESS_END);
 					bb_simple_perror_msg(bb_msg_read_error);
-					G.content_len = 1; /* treat end as error, not EOF */
 				}
+				G.content_len = 1; /* treat end as error, not EOF */
 				goto EOF_err; /* EOF / error */
 			}
 
