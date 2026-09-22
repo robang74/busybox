@@ -95,7 +95,7 @@
 //config:	If you still think this is unacceptable, send patches.
 //config:
 //config:	If you still think this is unacceptable, do not want to send
-//config:	patches, but do want to waste bandwidth expaining how wrong
+//config:	patches, but do want to waste bandwidth explaining how wrong
 //config:	it is, you will be ignored.
 //config:
 //config:	FEATURE_WGET_OPENSSL does implement TLS verification
