@@ -534,12 +534,39 @@ static void free_package(common_node_t *node)
 
 /*
  * Gets the next package field from pkg_buf:
- * "<whitespace>NAME:<whitespace>VALUE{\n|NUL}"
- * "<whitespace>NAME:<whitespace>\n
- * " VALUE{\n|NUL}"
+ * "NAME:<spaces|tabs>VALUE{\n|NUL}"
+ * "NAME:<spaces|tabs>VALUE\n
+ * " VALUE_LINE2{\n|NUL}"
  * separated into "NAME" and "VALUE", both strdup()ed.
- * Returns the int offset to the first character of the next field.
+ * (Debian does not allow whitespace before/after NAME).
+ * Returns offset to the first character of the next field (or to NUL).
  * The pkg_buf parameter is NUL-terminated.
+ *
+ * https://manpages.debian.org/testing/dpkg-dev/deb-control.5.en.html
+ * """
+ * This file contains a number of fields. Each field begins with a tag,
+ * such as Package or Version (case insensitive), followed by a colon,
+ * and the body of the field (case sensitive unless stated otherwise).
+ * Fields are delimited only by field tags. In other words, field text
+ * may be multiple lines in length, but the installation tools will
+ * generally join lines when processing the body of the field (except
+ * in the case of the Description field, see below).
+ * ...
+ * Description: short-description (recommended)
+ *  long-description
+ * The format for the package description is a short brief summary
+ * on the first line (after the Description field). The following lines
+ * should be used as a longer, more detailed description. Each line
+ * of the long description must be preceded by a space, and blank
+ * lines in the long description must contain a single '.' following
+ * the preceding space."""
+ *
+ * Seen in libgtk-3-0t64_3.24.52: source package's control:
+ * Recommends: ibus-gtk3,
+ *             libgtk-3-bin,
+ *             librsvg2-common
+ * gets translated to this in binary package's control:
+ * Recommends: ibus-gtk3, libgtk-3-bin, librsvg2-common
  */
 static int read_package_field(const char *pkg_buf, char **pname, char **pvalue)
 {
@@ -559,34 +586,27 @@ static int read_package_field(const char *pkg_buf, char **pname, char **pvalue)
 		switch (ch) {
 		case ':':
 			if (name_end == 0) {
-				name_end = offset + 1; /* points AFTER ':' - think of empty NAME case */
-				value_start = offset + 1;
+				offset++;
+				name_end = offset; /* points AFTER ':' - think of empty NAME case */
+				while (isblank(pkg_buf[offset])) /* skip spaces/tabs (not newlines!) */
+					offset++;
+				value_start = offset;
+				continue; /* check next char */
 			}
-			/* TODO: NAME might still have trailing spaces if ':' isn't
-			 * immediately after name */
 			break;
 		case '\n':
-			if (pkg_buf[offset + 1] != ' ')
-				goto end_of_value;
-			/* fall through */
-		case '\t':
-		case ' ':
-			/* increment start points if it is just a filler */
-			if (name_start == offset)
-				name_start++;
-			if (value_start == offset)
-				value_start++;
-			break;
+			if (pkg_buf[offset + 1] == ' ')
+				break;
+			/* end of VALUE - fall through */
 		case '\0':
- end_of_value:
 			/* Did we see the ':'? */
 			if (name_end != 0) {
-				/* Yes. Check that NAME and VALUE exist and not empty */
+				/* Yes. Check that NAME is not empty */
 				int nlen = (name_end - 1) - name_start;
-				int vlen = offset - value_start;
-				if ((nlen > 0) && (vlen > 0)) {
+				if (nlen > 0) {
+//TODO: why do we disallow empty NAME? Imagine a ": VALUE\n" line
 					*pname = xstrndup(&pkg_buf[name_start], nlen);
-					*pvalue = xstrndup(&pkg_buf[value_start], vlen);
+					*pvalue = xstrndup(&pkg_buf[value_start], offset - value_start); /* could be "" */
 					if (ch)
 						offset++; /* skip '\n' */
 					return offset;
