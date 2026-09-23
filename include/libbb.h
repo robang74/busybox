@@ -2485,6 +2485,10 @@ extern const char bb_PATH_root_path[] ALIGN1; /* BB_PATH_ROOT_PATH */
  */
 #define bb_default_path      (bb_PATH_root_path + sizeof("PATH=/sbin:/usr/sbin"))
 
+/* Stored without terminating NUL */
+extern const char bb_SWAPSPACE2[sizeof("SWAPSPACE2")-1];
+
+
 extern const int const_int_0;
 //extern const int const_int_1;
 

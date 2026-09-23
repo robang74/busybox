@@ -107,9 +107,6 @@ struct BUG_sizes {
 	char bufsiz1_is_too_small[COMMON_BUFSIZE < (NWORDS * 4) ? -1 : 1];
 };
 
-/* Stored without terminating NUL */
-static const char SWAPSPACE2[sizeof("SWAPSPACE2")-1] ALIGN1 = "SWAPSPACE2";
-
 int mkswap_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int mkswap_main(int argc UNUSED_PARAM, char **argv)
 {
@@ -160,7 +157,7 @@ int mkswap_main(int argc UNUSED_PARAM, char **argv)
 	 * signature on disk (not in cache) during swapon. */
 	xwrite(fd, hdr, NWORDS * 4);
 	xlseek(fd, pagesize - 10, SEEK_SET);
-	xwrite(fd, SWAPSPACE2, 10);
+	xwrite(fd, bb_SWAPSPACE2, 10);
 	fsync(fd);
 
 	if (ENABLE_FEATURE_CLEAN_UP)
