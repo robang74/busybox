@@ -433,7 +433,6 @@ static void handle_changes_in_options(stdin_to_net_t *conn)
 			log1("C:DO SGA");
 			put_iac3_IAC_x_y(DO, TELOPT_SGA);
 			G.flags |= FLAGS_SGA_SEEN; // remember we did it
-			G.changes_seen -= CHANGED_SGA;
 		}
 		G.changes_seen &= ~(CHANGED_ECHO|CHANGED_SGA);
 
