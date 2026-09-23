@@ -1311,6 +1311,13 @@ static void download_one_url(const char *url)
 			}
 	#if ENABLE_DESKTOP
 			if(G.post_file_fd >= 0) {
+				/* Chunked transfer conflicts with a user-supplied Content-Length */
+				if (G.user_headers & HDR_CONTENT_LENGTH) {
+					bb_error_msg_and_die(
+						"Content-Length conflicts with chunked transfer"
+					);
+				}
+
 				/* More to read in the post file -> chunked transfer */
 				int chunk_bytes = G.post_data_len;
 				SENDFMT(sfp, "Transfer-Encoding: chunked\r\n\r\n%x\r\n", chunk_bytes);
@@ -1699,18 +1706,6 @@ IF_DESKTOP(	"no-parent\0"        No_argument       "\xf0")
 			xdup2(G.log_fd, STDERR_FILENO);
 		}
 	}
-
-#if ENABLE_DESKTOP && ENABLE_FEATURE_WGET_LONG_OPTIONS
-	/* Chunked transfer conflicts with a user-supplied Content-Length */
-	if (G.post_file
-	&& NOT_LONE_DASH(G.post_file)
-	&& (G.user_headers & HDR_CONTENT_LENGTH)
-	){
-		struct stat st;
-		if (!stat(G.post_file, &st) && st.st_size >= POST_CHUNK_BYTES)
-			bb_error_msg_and_die("Content-Length conflicts with chunked transfer");
-	}
-#endif
 
 	while (*argv)
 		download_one_url(*argv++);
