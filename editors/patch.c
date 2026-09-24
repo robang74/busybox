@@ -31,21 +31,21 @@
 //kbuild:lib-$(CONFIG_PATCH) += patch.o
 
 //usage:#define patch_trivial_usage
-//usage:       "[-RNE] [-p N] [-i DIFF] [ORIGFILE [PATCHFILE]]"
+//usage:	   "[-RNE] [-p N] [-i DIFF] [ORIGFILE [PATCHFILE]]"
 //usage:#define patch_full_usage "\n\n"
-//usage:       "	-p N	Strip N leading components from file names"
-//usage:     "\n	-i DIFF	Read DIFF instead of stdin"
-//usage:     "\n	-R	Reverse patch"
-//usage:     "\n	-N	Ignore already applied patches"
-//usage:     "\n	-E	Remove output files if they become empty"
+//usage:	   "	-p N	Strip N leading components from file names"
+//usage:	 "\n	-i DIFF	Read DIFF instead of stdin"
+//usage:	 "\n	-R	Reverse patch"
+//usage:	 "\n	-N	Ignore already applied patches"
+//usage:	 "\n	-E	Remove output files if they become empty"
 //usage:	IF_LONG_OPTS(
-//usage:     "\n	--dry-run	Don't actually change files"
+//usage:	 "\n	--dry-run	Don't actually change files"
 //usage:	)
 /* -u "interpret as unified diff" is supported but not documented: this info is not useful for --help */
 //usage:
 //usage:#define patch_example_usage
-//usage:       "$ patch -p1 < example.diff\n"
-//usage:       "$ patch -p0 -i example.diff"
+//usage:	   "$ patch -p1 < example.diff\n"
+//usage:	   "$ patch -p0 -i example.diff"
 
 #include "libbb.h"
 
@@ -117,9 +117,9 @@ struct globals {
 #define FLAG_STR "Rup:i:NEfg"
 /* FLAG_REVERSE must be == 1! Code uses this fact. */
 #define FLAG_REVERSE  (1 << 0)
-#define FLAG_u        (1 << 1)
+#define FLAG_u		(1 << 1)
 #define FLAG_PATHLEN  (1 << 2)
-#define FLAG_INPUT    (1 << 3)
+#define FLAG_INPUT	(1 << 3)
 #define FLAG_IGNORE   (1 << 4)
 #define FLAG_RMEMPTY  (1 << 5)
 #define FLAG_f_unused (1 << 6)
@@ -148,7 +148,7 @@ static void do_line(void *data)
 	free(dlist);
 }
 
-static void finish_oldfile(void)
+static void finish_oldfile(char no_newline)
 {
 	if (TT.tempname) {
 		// Copy the rest of the data and replace the original with the copy.
@@ -158,14 +158,33 @@ static void finish_oldfile(void)
 			bb_copyfd_eof(TT.filein, TT.fileout);
 			xclose(TT.filein);
 		}
+		if(no_newline){
+			// RAF
+			// All these checks are likely useless in this specific case because:
+			// patch operates on a file in output, lseek can fails only if size=0
+			// thus read would not change no_newline and truncate will not happen.
+			// While xlseek would die but it shouldn't here, just skip & continue.
+			off_t size = lseek(TT.fileout, -1, SEEK_CUR);
+			// Once it is determined +/- verse, checking should be superflous
+			//read(TT.fileout, &no_newline, 1);
+			//if(no_newline == '\n')
+			no_newline = ftruncate(TT.fileout, size);
+			no_newline &= 0; // to skip the warning
+			// Since the busybox create a temproary file from the original, then
+			// adding a file-ending newline is necessary, and it happens always
+			// at the end of the file wherever the "no new line" happens because
+			// removing a \n in any other position collates two lines of text.
+		}
 		xclose(TT.fileout);
 
 		if (!ENABLE_LONG_OPTS || TT.tempname[0]) { /* not --dry-run? */
 			temp = xstrdup(TT.tempname);
 			temp[strlen(temp) - 6] = '\0';
-			rename(TT.tempname, temp);
-			free(temp);
-			free(TT.tempname);
+			xrename(TT.tempname, temp);
+			if(ENABLE_FEATURE_CLEAN_UP) {
+			    free(temp);
+			    free(TT.tempname);
+			}
 		}
 
 		TT.tempname = NULL;
@@ -362,23 +381,23 @@ int patch_main(int argc UNUSED_PARAM, char **argv)
 	int opts;
 	int reverse, state = 0;
 	char *oldname = NULL, *newname = NULL;
-	char *opt_p, *opt_i;
+	char *opt_p, *opt_i, no_newline = FALSE;
 	long oldlen = oldlen; /* for compiler */
 	long newlen = newlen; /* for compiler */
 
 #if ENABLE_LONG_OPTS
 	static const char patch_longopts[] ALIGN1 =
-		"reverse\0"               No_argument       "R"
-		"unified\0"               No_argument       "u"
-		"strip\0"                 Required_argument "p"
-		"input\0"                 Required_argument "i"
-		"forward\0"               No_argument       "N"
+		"reverse\0"			   No_argument	   "R"
+		"unified\0"			   No_argument	   "u"
+		"strip\0"				 Required_argument "p"
+		"input\0"				 Required_argument "i"
+		"forward\0"			   No_argument	   "N"
 # if ENABLE_DESKTOP
-		"remove-empty-files\0"    No_argument       "E" /*ignored*/
-		/* "debug"                Required_argument "x" */
+		"remove-empty-files\0"	No_argument	   "E" /*ignored*/
+		/* "debug"				Required_argument "x" */
 # endif
 		/* "Assume user knows what [s]he is doing, do not ask any questions": */
-		"force\0"                 No_argument       "f" /*ignored*/
+		"force\0"				 No_argument	   "f" /*ignored*/
 # if ENABLE_DESKTOP
 		/* "Controls actions when a file is under RCS or SCCS control,
 		 * and does not exist or is read-only and matches the default version,
@@ -386,12 +405,12 @@ int patch_main(int argc UNUSED_PARAM, char **argv)
 		 * IOW: rather obscure option.
 		 * But Gentoo's portage does use -g0
 		 */
-		"get\0"                   Required_argument "g" /*ignored*/
+		"get\0"				   Required_argument "g" /*ignored*/
 # endif
-		"dry-run\0"               No_argument       "\xfd"
+		"dry-run\0"			   No_argument	   "\xfd"
 # if ENABLE_DESKTOP
-		"backup-if-mismatch\0"    No_argument       "\xfe" /*ignored*/
-		"no-backup-if-mismatch\0" No_argument       "\xff" /*ignored*/
+		"backup-if-mismatch\0"	No_argument	   "\xfe" /*ignored*/
+		"no-backup-if-mismatch\0" No_argument	   "\xff" /*ignored*/
 # endif
 		;
 #endif
@@ -429,6 +448,12 @@ int patch_main(int argc UNUSED_PARAM, char **argv)
 		if (!*patchline) {
 			free(patchline);
 			patchline = xstrdup(" ");
+		} else
+		if (*patchline == '\\') {
+			// '\ No newline at end of file' detected
+			no_newline = (state-reverse == 1);
+			free(patchline);
+			continue;
 		}
 
 		// Are we assembling a hunk?
@@ -444,12 +469,12 @@ int patch_main(int argc UNUSED_PARAM, char **argv)
 				else state = 3;
 
 				// If we've consumed all expected hunk lines, apply the hunk.
-
-				if (!oldlen && !newlen) state = apply_one_hunk();
-				continue;
+				if (!oldlen && !newlen)
+					state = apply_one_hunk();
+			} else {
+				fail_hunk();
+				state = 0;
 			}
-			fail_hunk();
-			state = 0;
 			continue;
 		}
 
@@ -463,10 +488,11 @@ int patch_main(int argc UNUSED_PARAM, char **argv)
 				state = 1;
 			}
 
-			finish_oldfile();
+			finish_oldfile(no_newline);
 
 			if (!argv[0]) {
-				free(*name);
+				if(ENABLE_FEATURE_CLEAN_UP)
+					free(*name);
 				// Trim date from end of filename (if any).  We don't care.
 				for (s = patchline+4; *s && *s!='\t'; s++)
 					if (*s == '\\' && s[1]) s++;
@@ -605,7 +631,7 @@ int patch_main(int argc UNUSED_PARAM, char **argv)
 		free(patchline);
 	}
 
-	finish_oldfile();
+	finish_oldfile(no_newline);
 
 	if (ENABLE_FEATURE_CLEAN_UP) {
 		free(oldname);

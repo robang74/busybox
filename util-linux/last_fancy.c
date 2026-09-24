@@ -51,14 +51,18 @@ static void show_entry(struct utmpx *ut, int state, time_t dur_secs)
 	char logout_time[8];
 	const char *logout_str;
 	const char *duration_str;
-	time_t tmp;
 
-	/* manpages say ut_tv.tv_sec *is* time_t,
-	 * but some systems have it wrong */
-	tmp = ut->ut_tv.tv_sec;
-	safe_strncpy(login_time, ctime(&tmp), 17);
-	tmp = dur_secs;
-	snprintf(logout_time, 8, "- %s", ctime(&tmp) + 11);
+	{ // RAF: explicit variable scope limitation
+		char tbuf[CTIME_BUF_MAXLEN];
+		time_t tmp;
+
+		/* manpages say ut_tv.tv_sec *is* time_t,
+		 * but some systems have it wrong */
+		tmp = ut->ut_tv.tv_sec;
+		safe_strncpy(login_time, ctime_r(&tmp,tbuf), 17);
+		tmp = dur_secs;
+		snprintf(logout_time, 8, "- %s", ctime_r(&tmp,tbuf) + 11);
+	}
 
 	dur_secs = MAX(dur_secs - (time_t)ut->ut_tv.tv_sec, (time_t)0);
 	/* unsigned int is easier to divide than time_t (which may be signed long) */
@@ -160,6 +164,7 @@ int last_main(int argc UNUSED_PARAM, char **argv)
 {
 	struct utmpx ut;
 	const char *filename = _PATH_WTMP;
+	char tbuf[CTIME_BUF_MAXLEN];
 	llist_t *zlist;
 	off_t pos;
 	time_t start_time;
@@ -292,7 +297,7 @@ int last_main(int argc UNUSED_PARAM, char **argv)
 		llist_free(zlist, free);
 	}
 
-	printf("\nwtmp begins %s", ctime(&start_time));
+	printf("\nwtmp begins %s", ctime_r(&start_time,tbuf));
 
 	if (ENABLE_FEATURE_CLEAN_UP)
 		close(file);

@@ -127,10 +127,10 @@ int cal_main(int argc UNUSED_PARAM, char **argv)
 	argv += optind;
 
 	if (!argv[0]) {
-		struct tm *ptm;
+		struct tm *ptm, tres;
 
 		time(&now);
-		ptm = localtime(&now);
+		ptm = localtime_r(&now,&tres);
 		year = ptm->tm_year + 1900;
 		if (!(flags & OPT_YEAR)) { /* no -y */
 			month = ptm->tm_mon + 1;

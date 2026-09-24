@@ -39,8 +39,14 @@ DPKG_FILES:= \
 	get_header_tar_bz2.o \
 	get_header_tar_lzma.o \
 	get_header_tar_xz.o \
+	get_header_tar_zstd.o
 
 INSERT
+
+ifdef CONFIG_FEATURE_GUNZIP_O2
+CFLAGS_decompress_gunzip.o += -O2
+CFLAGS_REMOVE_decompress_gunzip.o = -Os -O0 -O1
+endif
 
 lib-$(CONFIG_DPKG)                      += $(DPKG_FILES)
 lib-$(CONFIG_DPKG_DEB)                  += $(DPKG_FILES)
@@ -89,6 +95,7 @@ lib-$(CONFIG_FEATURE_SEAMLESS_GZ)       += open_transformer.o decompress_gunzip.
 lib-$(CONFIG_FEATURE_SEAMLESS_BZ2)      += open_transformer.o decompress_bunzip2.o
 lib-$(CONFIG_FEATURE_SEAMLESS_LZMA)     += open_transformer.o decompress_unlzma.o
 lib-$(CONFIG_FEATURE_SEAMLESS_XZ)       += open_transformer.o decompress_unxz.o
+lib-$(CONFIG_FEATURE_SEAMLESS_ZSTD)     += open_transformer.o decompress_unzstd.o
 lib-$(CONFIG_FEATURE_COMPRESS_USAGE)    += open_transformer.o decompress_bunzip2.o
 lib-$(CONFIG_FEATURE_COMPRESS_BBCONFIG) += open_transformer.o decompress_bunzip2.o
 lib-$(CONFIG_FEATURE_SH_EMBEDDED_SCRIPTS) += open_transformer.o decompress_bunzip2.o

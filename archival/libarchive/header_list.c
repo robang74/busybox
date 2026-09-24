@@ -7,6 +7,6 @@
 
 void FAST_FUNC header_list(const file_header_t *file_header)
 {
-//TODO: cpio -vp DIR should output "DIR/NAME", not just "NAME" */
-	puts(printable_string(file_header->name));
+	//TODO: cpio -vp DIR should output "DIR/NAME", not just "NAME" */
+	fprintf(file_header->verbose_fp, "%s\n", printable_string(file_header->name));
 }

@@ -584,6 +584,15 @@ handle_port(void)
 	G.port_addr = xdotted2sockaddr(raw, port);
 #else
 	G.port_addr = get_peer_lsa(STDIN_FILENO);
+	if (!G.port_addr) {
+		/* This is confusing:
+		 * bb_error_msg_and_die("stdin is not a socket");
+		 * Better: */
+		bb_show_usage();
+		/* Help text says that ftpd must be used as inetd service,
+		 * which is by far the most usual cause of get_peer_lsa
+		 * failure */
+	}
 	set_nport(&G.port_addr->u.sa, htons(port));
 #endif
 	WRITE_OK(FTP_PORTOK);

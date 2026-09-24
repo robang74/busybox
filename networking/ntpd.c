@@ -583,8 +583,10 @@ d_to_lfp(l_fixedpt_t *lfp, double d)
 {
 	uint32_t intl;
 	uint32_t frac;
-	intl = (uint32_t)(time_t)d;
-	frac = (uint32_t)((d - (time_t)d) * 0xffffffff);
+	if (d >= (double)(1ULL << 32))
+		d -= (double)(1ULL << 32);
+	intl = (uint32_t)d;
+	frac = (uint32_t)((d - intl) * 0xffffffff);
 	lfp->int_partl = htonl(intl);
 	lfp->fractionl = htonl(frac);
 }
@@ -2086,6 +2088,8 @@ recv_and_process_client_pkt(void /*int fd*/)
 	l_fixedpt_t      query_xmttime;
 
 	to = get_sock_lsa(G_listen_fd);
+	if (!to)
+		bb_simple_perror_msg_and_die("get_sock_lsa");
 	from = xzalloc(to->len);
 
 	size = recv_from_to(G_listen_fd, &msg, sizeof(msg), MSG_DONTWAIT, from, &to->u.sa, to->len);

@@ -31,7 +31,7 @@
 static int print_matchpathcon(char *path, int noprint)
 {
 	char *buf;
-	int rc = matchpathcon(path, 0, &buf);
+	int rc = bb_match_path_context(path, 0, &buf);
 	if (rc < 0) {
 		bb_perror_msg("matchpathcon(%s) failed", path);
 		return 1;

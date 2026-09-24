@@ -785,7 +785,7 @@ S_STAT_END(time_stat)
 static void FAST_FUNC collect_tv(time_stat *s, struct timeval *tv, int local)
 {
 	char buf[sizeof("12:34:56.123456")];
-	struct tm* tm;
+	struct tm *tm, tres;
 	unsigned us = tv->tv_usec + s->scale/2;
 	time_t t = tv->tv_sec;
 
@@ -794,9 +794,9 @@ static void FAST_FUNC collect_tv(time_stat *s, struct timeval *tv, int local)
 		us -= 1000000;
 	}
 	if (local)
-		tm = localtime(&t);
+		tm = localtime_r(&t,&tres);
 	else
-		tm = gmtime(&t);
+		tm = gmtime_r(&t,&tres);
 
 	sprintf(buf, "%02u:%02u:%02u", tm->tm_hour, tm->tm_min, tm->tm_sec);
 	if (s->prec)

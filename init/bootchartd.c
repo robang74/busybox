@@ -16,6 +16,11 @@
 //config:	bootchartd is started interactively by running bootchartd start
 //config:	and stopped using bootchartd stop.
 //config:
+//config:config BOOTCHARTD_TIMEOUT
+//config:	int "Time to do logging (in seconds)"
+//config:	default 60
+//config:	depends on BOOTCHARTD
+//config:
 //config:config FEATURE_BOOTCHARTD_BLOATED_HEADER
 //config:	bool "Compatible, bloated header"
 //config:	default y
@@ -223,7 +228,7 @@ static void do_logging(unsigned sample_period_us, int process_accounting)
 	//FILE *proc_netdev = xfopen_for_write("proc_netdev.log");
 	FILE *proc_ps = xfopen_for_write("proc_ps.log");
 	int look_for_login_process = (getppid() == 1);
-	unsigned count = 60*1000*1000 / sample_period_us; /* ~1 minute */
+	unsigned count = (unsigned)CONFIG_BOOTCHARTD_TIMEOUT*1000*1000 / sample_period_us;
 
 	if (process_accounting) {
 		close(xopen("kernel_pacct", O_WRONLY | O_CREAT | O_TRUNC));

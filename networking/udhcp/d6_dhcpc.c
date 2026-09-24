@@ -215,6 +215,21 @@ static char** new_env(void)
 	return &client6_data.env_ptr[client6_data.env_idx++];
 }
 
+/* A malicious DHCPv6 server fully controls these option strings. Bytes that
+ * cannot legitimately appear in a URL/FQDN/TZ token (whitespace + control
+ * chars) let it inject extra argv, shell words or file lines through the
+ * config-script environment. Refuse such values. (The IPv4 client sanitizes
+ * host options via good_hostname(); the IPv6 client never did.) */
+static int d6_optval_is_safe(const char *p, unsigned len)
+{
+	while (len--) {
+		unsigned char c = (unsigned char)*p++;
+		if (c <= ' ' || c == 0x7f)
+			return 0;
+	}
+	return 1;
+}
+
 static char *string_option_to_env(const uint8_t *option,
 		const uint8_t *option_end)
 {
@@ -239,6 +254,10 @@ static char *string_option_to_env(const uint8_t *option,
 	val_len = (option[2] << 8) | option[3];
 	if (val_len + &option[D6_OPT_DATA] > option_end) {
 		bb_simple_error_msg("option data exceeds option length");
+		return NULL;
+	}
+	if (!d6_optval_is_safe((char*)option + 4, val_len)) {
+		bb_error_msg("ignoring unsafe value for option %s", name);
 		return NULL;
 	}
 	return xasprintf("%s=%.*s", name, val_len, (char*)option + 4);
@@ -410,7 +429,8 @@ static void option_to_env(const uint8_t *option, const uint8_t *option_end)
 			 * broken server here if any of the reserved bits are set.
 			 */
 			if (option[4] & 0xf8) {
-				*new_env() = xasprintf("fqdn=%.*s", (int)option[3], (char*)option + 4);
+				if (d6_optval_is_safe((char*)option + 4, option[3]))
+					*new_env() = xasprintf("fqdn=%.*s", (int)option[3], (char*)option + 4);
 				break;
 			}
 			dlist = dname_dec(option + 5, (/*(option[2] << 8) |*/ option[3]) - 1, "fqdn=");
@@ -423,10 +443,12 @@ static void option_to_env(const uint8_t *option, const uint8_t *option_end)
 #if ENABLE_FEATURE_UDHCPC6_RFC4833
 		/* RFC 4833 Timezones */
 		case D6_OPT_TZ_POSIX:
-			*new_env() = xasprintf("tz=%.*s", (int)option[3], (char*)option + 4);
+			if (d6_optval_is_safe((char*)option + 4, option[3]))
+				*new_env() = xasprintf("tz=%.*s", (int)option[3], (char*)option + 4);
 			break;
 		case D6_OPT_TZ_NAME:
-			*new_env() = xasprintf("tz_name=%.*s", (int)option[3], (char*)option + 4);
+			if (d6_optval_is_safe((char*)option + 4, option[3]))
+				*new_env() = xasprintf("tz_name=%.*s", (int)option[3], (char*)option + 4);
 			break;
 #endif
 		case D6_OPT_BOOT_URL:
@@ -528,16 +550,28 @@ static uint8_t *init_d6_packet(struct d6_packet *packet, char type)
 	return ptr;
 }
 
-static uint8_t *add_d6_client_options(uint8_t *ptr)
+static uint8_t *safe_d6_append(uint8_t *ptr,
+		const void *src, unsigned len, struct d6_packet *packet_ptr)
+{
+    uint8_t *end = (uint8_t *)packet_ptr + sizeof(struct d6_packet);
+	if (len > (unsigned)(end - ptr))
+		bb_simple_error_msg_and_die("DHCPv6 packet buffer overflow");
+	return mempcpy(ptr, src, len);
+}
+
+static uint8_t *add_d6_client_options(uint8_t *ptr, struct d6_packet *packet_ptr)
 {
 	struct option_set *curr;
+	uint8_t *end = (uint8_t *)packet_ptr + sizeof(struct d6_packet);
 	uint8_t *start = ptr;
 	unsigned option;
 	uint16_t len;
 
 	ptr += 4;
+	if(ptr > end) goto out_of_bound;
 	for (option = 1; option < 256; option++) {
 		if (client_data.opt_mask[option >> 3] & (1 << (option & 7))) {
+		    if(ptr + 2 > end) goto out_of_bound;
 			ptr[0] = (option >> 8);
 			ptr[1] = option;
 			ptr += 2;
@@ -546,24 +580,26 @@ static uint8_t *add_d6_client_options(uint8_t *ptr)
 
 	if ((ptr - start - 4) != 0) {
 		start[0] = (D6_OPT_ORO >> 8);
-		start[1] = D6_OPT_ORO;
+		start[1] =  D6_OPT_ORO;
 		start[2] = ((ptr - start - 4) >> 8);
-		start[3] = (ptr - start - 4);
+		start[3] =  (ptr - start - 4);
 	} else
 		ptr = start;
 
 #if ENABLE_FEATURE_UDHCPC6_RFC4704
-	ptr = mempcpy(ptr, &opt_fqdn_req, sizeof(opt_fqdn_req));
+	ptr = safe_d6_append(ptr, &opt_fqdn_req, sizeof(opt_fqdn_req), packet_ptr);
 #endif
 	/* Add -x options if any */
 	curr = client_data.options;
 	while (curr) {
 		len = (curr->data[D6_OPT_LEN] << 8) | curr->data[D6_OPT_LEN + 1];
-		ptr = mempcpy(ptr, curr->data, D6_OPT_DATA + len);
+	    ptr = safe_d6_append(ptr, curr->data, D6_OPT_DATA + len, packet_ptr);
 		curr = curr->next;
 	}
 
 	return ptr;
+out_of_bound:
+	bb_simple_error_msg_and_die("DHCPv6 packet buffer overflow");
 }
 
 static int d6_mcast_from_client_data_ifindex(struct d6_packet *packet, uint8_t *end)
@@ -619,7 +655,7 @@ static NOINLINE int send_d6_info_request(void)
 	/* Add options: client-id,
 	 * "param req" option according to -O, options specified with -x
 	 */
-	opt_ptr = add_d6_client_options(opt_ptr);
+	opt_ptr = add_d6_client_options(opt_ptr, &packet);
 
 	bb_error_msg("sending %s", "info request");
 	return d6_mcast_from_client_data_ifindex(&packet, opt_ptr);
@@ -756,7 +792,7 @@ static NOINLINE int send_d6_discover(struct in6_addr *requested_ipv6)
 			iaaddr->len = 16+4+4;
 			memcpy(iaaddr->data, requested_ipv6, 16);
 		}
-		opt_ptr = mempcpy(opt_ptr, client6_data.ia_na, len);
+		opt_ptr = safe_d6_append(opt_ptr, client6_data.ia_na, len, &packet);
 	}
 
 	/* IA_PD */
@@ -768,13 +804,13 @@ static NOINLINE int send_d6_discover(struct in6_addr *requested_ipv6)
 		client6_data.ia_pd->code = D6_OPT_IA_PD;
 		client6_data.ia_pd->len = len - 4;
 		generate_iaid(client6_data.ia_pd->data); /* IAID */
-		opt_ptr = mempcpy(opt_ptr, client6_data.ia_pd, len);
+		opt_ptr = safe_d6_append(opt_ptr, client6_data.ia_pd, len, &packet);
 	}
 
 	/* Add options: client-id,
 	 * "param req" option according to -O, options specified with -x
 	 */
-	opt_ptr = add_d6_client_options(opt_ptr);
+	opt_ptr = add_d6_client_options(opt_ptr, &packet);
 
 	bb_info_msg("sending %s", "discover");
 	return d6_mcast_from_client_data_ifindex(&packet, opt_ptr);
@@ -820,18 +856,21 @@ static NOINLINE int send_d6_select(void)
 	opt_ptr = init_d6_packet(&packet, D6_MSG_REQUEST);
 
 	/* server id */
-	opt_ptr = mempcpy(opt_ptr, client6_data.server_id, client6_data.server_id->len + 2+2);
+	opt_ptr = safe_d6_append(opt_ptr, client6_data.server_id,
+		client6_data.server_id->len + 2+2, &packet);
 	/* IA NA (contains requested IP) */
 	if (client6_data.ia_na)
-		opt_ptr = mempcpy(opt_ptr, client6_data.ia_na, client6_data.ia_na->len + 2+2);
+		opt_ptr = safe_d6_append(opt_ptr, client6_data.ia_na,
+			client6_data.ia_na->len + 2+2, &packet);
 	/* IA PD */
 	if (client6_data.ia_pd)
-		opt_ptr = mempcpy(opt_ptr, client6_data.ia_pd, client6_data.ia_pd->len + 2+2);
+		opt_ptr = safe_d6_append(opt_ptr, client6_data.ia_pd,
+			client6_data.ia_pd->len + 2+2, &packet);
 
 	/* Add options: client-id,
 	 * "param req" option according to -O, options specified with -x
 	 */
-	opt_ptr = add_d6_client_options(opt_ptr);
+	opt_ptr = add_d6_client_options(opt_ptr, &packet);
 
 	bb_info_msg("sending %s", "select");
 	return d6_mcast_from_client_data_ifindex(&packet, opt_ptr);
@@ -893,18 +932,21 @@ static NOINLINE int send_d6_renew(struct in6_addr *server_ipv6, struct in6_addr 
 	opt_ptr = init_d6_packet(&packet, D6_MSG_RENEW);
 
 	/* server id */
-	opt_ptr = mempcpy(opt_ptr, client6_data.server_id, client6_data.server_id->len + 2+2);
+	opt_ptr = safe_d6_append(opt_ptr, client6_data.server_id,
+		client6_data.server_id->len + 2+2, &packet);
 	/* IA NA (contains requested IP) */
 	if (client6_data.ia_na)
-		opt_ptr = mempcpy(opt_ptr, client6_data.ia_na, client6_data.ia_na->len + 2+2);
+		opt_ptr = safe_d6_append(opt_ptr, client6_data.ia_na,
+			client6_data.ia_na->len + 2+2, &packet);
 	/* IA PD */
 	if (client6_data.ia_pd)
-		opt_ptr = mempcpy(opt_ptr, client6_data.ia_pd, client6_data.ia_pd->len + 2+2);
+		opt_ptr = safe_d6_append(opt_ptr, client6_data.ia_pd,
+			client6_data.ia_pd->len + 2+2, &packet);
 
 	/* Add options: client-id,
 	 * "param req" option according to -O, options specified with -x
 	 */
-	opt_ptr = add_d6_client_options(opt_ptr);
+	opt_ptr = add_d6_client_options(opt_ptr, &packet);
 
 	bb_info_msg("sending %s", "renew");
 	if (server_ipv6)
@@ -928,17 +970,20 @@ int send_d6_release(struct in6_addr *server_ipv6, struct in6_addr *our_cur_ipv6)
 	/* Fill in: msg type, xid, ELAPSED_TIME */
 	opt_ptr = init_d6_packet(&packet, D6_MSG_RELEASE);
 	/* server id */
-	opt_ptr = mempcpy(opt_ptr, client6_data.server_id, client6_data.server_id->len + 2+2);
+	opt_ptr = safe_d6_append(opt_ptr, client6_data.server_id,
+		client6_data.server_id->len + 2+2, &packet);
 	/* IA NA (contains our current IP) */
 	if (client6_data.ia_na)
-		opt_ptr = mempcpy(opt_ptr, client6_data.ia_na, client6_data.ia_na->len + 2+2);
+		opt_ptr = safe_d6_append(opt_ptr, client6_data.ia_na,
+			client6_data.ia_na->len + 2+2, &packet);
 	/* IA PD */
 	if (client6_data.ia_pd)
-		opt_ptr = mempcpy(opt_ptr, client6_data.ia_pd, client6_data.ia_pd->len + 2+2);
+		opt_ptr = safe_d6_append(opt_ptr, client6_data.ia_pd,
+			client6_data.ia_pd->len + 2+2, &packet);
 	/* Client-id */
 	ci = udhcp_find_option(client_data.options, D6_OPT_CLIENTID, /*dhcpv6:*/ 1);
 	if (ci)
-		opt_ptr = mempcpy(opt_ptr, ci->data, D6_OPT_DATA + 2+2 + 6);
+		opt_ptr = safe_d6_append(opt_ptr, ci->data, D6_OPT_DATA + 2+2 + 6, &packet);
 
 	bb_info_msg("sending %s", "release");
 	return d6_send_kernel_packet_from_client_data_ifindex(
@@ -982,6 +1027,7 @@ static NOINLINE int d6_recv_raw_packet(struct in6_addr *peer_ipv6, struct d6_pac
 	 || packet.udp.dest != htons(CLIENT_PORT6)
 	/* || bytes > (int) sizeof(packet) - can't happen */
 	 || packet.udp.len != packet.ip6.ip6_plen
+	 || ntohs(packet.udp.len) < sizeof(packet.udp) /* else bytes underflows below */
 	) {
 		log1s("unrelated/bogus packet, ignoring");
 		return -2;
@@ -1622,7 +1668,7 @@ int udhcpc6_main(int argc UNUSED_PARAM, char **argv)
 				len = d6_recv_raw_packet(&srv6_buf, &packet, client_data.sockfd);
 			if (len == -1) {
 				/* Error is severe, reopen socket */
-				bb_error_msg("read error: "STRERROR_FMT", reopening socket" STRERROR_ERRNO);
+				bb_simple_perror_msg("read error: reopening socket");
 				sleep(discover_timeout); /* 3 seconds by default */
 				change_listen_mode(client_data.listen_mode); /* just close and reopen */
 			}
@@ -1808,6 +1854,23 @@ int udhcpc6_main(int argc UNUSED_PARAM, char **argv)
 						continue;
 					}
 					if (client6_data.ia_na->len < (4 + 4 + 4) + (2 + 2 + 16 + 4 + 4)) {
+						/*
+						 * RAF: invalid packets are usually dropped by the firewall but
+						 * a NoAddrsAvail is valid, pass through, arrive here, log and
+						 * it could cause a DOS or a QoS degradation when flooded. Thus
+						 * free() + NULL to prevent memory leakage and crash, then jump.
+						 *
+						 * This is the code of a client, not a server, however in many
+						 * systems the DHCP clients run in a relatively tight loop due
+						 * to the fact that is triggered by a script or crond rather
+						 * than put in background (-b), especially at boot time, even
+						 * if the loop at boot time runs "until got an IP or timeout".
+						 */
+						if (option_mask32 & OPT_d) {
+							free(client6_data.ia_na);
+							client6_data.ia_na = NULL;
+							goto OPT_d_eval;
+						}
 						bb_info_msg("%s option is too short:%d bytes",
 							"IA_NA", client6_data.ia_na->len);
 						continue;
@@ -1837,6 +1900,7 @@ int udhcpc6_main(int argc UNUSED_PARAM, char **argv)
 					address_timeout = lease_seconds;
 				}
 				if (option_mask32 & OPT_d) {
+OPT_d_eval:
 					struct d6_option *iaprefix;
 
 					free(client6_data.ia_pd);

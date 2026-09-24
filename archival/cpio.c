@@ -543,8 +543,11 @@ int cpio_main(int argc UNUSED_PARAM, char **argv)
 	}
 	if (opt & OPT_EXTRACT) {
 		archive_handle->action_data = data_extract_all;
-		if (opt & OPT_2STDOUT)
+		if (opt & OPT_2STDOUT) {
 			archive_handle->action_data = data_extract_to_stdout;
+			/* If data goes to stdout, verbose goes to stderr */
+			archive_handle->file_header->verbose_fp = stderr;
+		}
 	}
 	if (opt & OPT_UNCONDITIONAL) {
 		archive_handle->ah_flags |= ARCHIVE_UNLINK_OLD;

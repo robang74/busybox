@@ -11,10 +11,8 @@
 #include <stdio.h>
 
 #include "autoconf.h"
-
+#include "platform.h"
 #define SKIP_applet_main
-#define ALIGN1 /* nothing, just to placate applet_tables.h */
-#define ALIGN2 /* nothing, just to placate applet_tables.h */
 #include "applet_tables.h"
 
 /* Since we can't use platform.h, have to do this again by hand: */

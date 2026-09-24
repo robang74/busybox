@@ -183,7 +183,7 @@ struct globals {
 	char check_file_blk[BLOCK_SIZE];
 
 	/* File-name data */
-	char current_name[MAX_DEPTH * MINIX_NAME_MAX];
+	char current_name[MAX_DEPTH * (MINIX_NAME_MAX + 1) + 1];
 };
 #define G (*ptr_to_globals)
 #if ENABLE_FEATURE_MINIX2

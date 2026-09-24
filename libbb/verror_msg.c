@@ -73,7 +73,7 @@ void FAST_FUNC bb_verror_msg(const char *s, va_list p, const char* strerr)
 		msg[applet_len - 2] = ':';
 		msg[applet_len - 1] = ' ';
 		if (strerr) {
-			if (s[0]) { /* not perror_nomsg? */
+			if (used > applet_len) { /* not perror_nomsg? */
 				msg[used++] = ':';
 				msg[used++] = ' ';
 			}

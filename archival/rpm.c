@@ -21,6 +21,7 @@
 #include "bb_archive.h"
 #include "rpm.h"
 
+/* This enumeration can't be changed w/o breaking rpm_getint() */
 #define RPM_CHAR_TYPE           1
 #define RPM_INT8_TYPE           2
 #define RPM_INT16_TYPE          3
@@ -161,24 +162,35 @@ static int bsearch_rpmtag(const void *key, const void *item)
 	return (*tag - tmp->tag);
 }
 
-static char *rpm_getstr(int tag, int itemindex)
+static char *rpm_getstr(int tag, unsigned itemindex)
 {
 	rpm_index *found;
 	found = bsearch(&tag, G.mytags, G.tagcount, sizeof(G.mytags[0]), bsearch_rpmtag);
 	if (!found || itemindex >= found->count)
 		return NULL;
+	/* Reject crafted index entry with out-of-bounds store offset */
+	if (found->offset >= G.mapsize)
+		return NULL;
 	if (found->type == RPM_STRING_TYPE
 	 || found->type == RPM_I18NSTRING_TYPE
 	 || found->type == RPM_STRING_ARRAY_TYPE
 	) {
-		int n;
+		unsigned n;
 		char *tmpstr = (char *) G.map + found->offset;
-		for (n = 0; n < itemindex; n++)
-			tmpstr = tmpstr + strlen(tmpstr) + 1;
-		return tmpstr;
+		char *end = (char *) G.map + G.mapsize;
+		/* Walk NUL-terminated strings, never reading past the store */
+		for (n = 0; n <= itemindex; n++) {
+			char *nul = memchr(tmpstr, '\0', end - tmpstr);
+			if (!nul)
+				return NULL;
+			if (n == itemindex)
+				return tmpstr;
+			tmpstr = nul + 1;
+		}
 	}
 	return NULL;
 }
+
 static char *rpm_getstr0(int tag)
 {
 	return rpm_getstr(tag, 0);
@@ -186,31 +198,34 @@ static char *rpm_getstr0(int tag)
 
 #if ENABLE_RPM
 
-static int rpm_getint(int tag, int itemindex)
+static int rpm_getint(int tag, unsigned itemindex)
 {
 	rpm_index *found;
 	char *tmpint;
+	uint8_t shift;
 
 	/* gcc throws warnings here when sizeof(void*)!=sizeof(int) ...
 	 * it's ok to ignore it because tag won't be used as a pointer */
 	found = bsearch(&tag, G.mytags, G.tagcount, sizeof(G.mytags[0]), bsearch_rpmtag);
 	if (!found || itemindex >= found->count)
 		return -1;
+	/* Reject crafted index entry with out-of-bounds store offset */
+	if (found->offset >= G.mapsize)
+		return -1;
 
-	tmpint = (char *) G.map + found->offset;
-	if (found->type == RPM_INT32_TYPE) {
-		tmpint += itemindex*4;
+	/* RPM_INT8_TYPE=2, RPM_INT16_TYPE=3, RPM_INT32_TYPE=4 */
+	shift = found->type - 2;
+	if ((uint64_t)found->offset + (((uint64_t)itemindex + 1) << shift) > G.mapsize)
+		return -1;
+
+	tmpint = (char *) G.map + found->offset + (itemindex << shift);
+
+	/* Use shift to select: 0=INT8, 1=INT16, 2=INT32 */
+	if (shift == 2)
 		return ntohl(*(int32_t*)tmpint);
-	}
-	if (found->type == RPM_INT16_TYPE) {
-		tmpint += itemindex*2;
+	if (shift)
 		return ntohs(*(int16_t*)tmpint);
-	}
-	if (found->type == RPM_INT8_TYPE) {
-		tmpint += itemindex;
-		return *(int8_t*)tmpint;
-	}
-	return -1;
+	return *(int8_t*)tmpint;
 }
 
 static int rpm_getcount(int tag)
@@ -533,9 +548,9 @@ int rpm2cpio_main(int argc UNUSED_PARAM, char **argv)
 	//	/* We need to know whether child (gzip/bzip/etc) exits abnormally */
 	//	signal(SIGCHLD, check_errors_in_children);
 
-	str = NULL;
+	str = rpm_getstr0(TAG_PAYLOADCOMPRESSOR);
 	if (ENABLE_FEATURE_SEAMLESS_LZMA
-	 && (str = rpm_getstr0(TAG_PAYLOADCOMPRESSOR)) != NULL
+	 && str != NULL
 	 && strcmp(str, "lzma") == 0
 	) {
 		// lzma compression can't be detected

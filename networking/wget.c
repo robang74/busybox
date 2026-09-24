@@ -20,6 +20,17 @@
 //config:	default y
 //config:	depends on WGET && LONG_OPTS
 //config:
+//config:config FEATURE_WGET_POST_BUFFER_SIZE
+//config:	int "Max memory buffer size for POST data (in KB)"
+//config:	range 4 65536
+//config:	default 2048
+//config:	depends on WGET && FEATURE_WGET_LONG_OPTIONS
+//config:	help
+//config:	Set the maximum amount of RAM (in Kilobytes) that wget can
+//config:	allocate to buffer POST data from a file or pipe before
+//config:	enforcing quota limits to prevent OOM by malloc().
+//config:	NOTE: max allowed quota is the amount-1 bytes.
+//config:
 //config:config FEATURE_WGET_STATUSBAR
 //config:	bool "Enable progress bar (+2k)"
 //config:	default y
@@ -208,36 +219,41 @@ static const char P_FTPS[] ALIGN1 = "ftps";
 #if ENABLE_FEATURE_WGET_LONG_OPTIONS
 /* User-specified headers prevent using our corresponding built-in headers.  */
 enum {
-	HDR_HOST          = (1<<0),
-	HDR_USER_AGENT    = (1<<1),
-	HDR_RANGE         = (1<<2),
-	HDR_CONTENT_TYPE  = (1<<3),
-	HDR_AUTH          = (1<<4) * ENABLE_FEATURE_WGET_AUTHENTICATION,
-	HDR_PROXY_AUTH    = (1<<5) * ENABLE_FEATURE_WGET_AUTHENTICATION,
+	HDR_HOST           = (1<<0),
+	HDR_USER_AGENT     = (1<<1),
+	HDR_RANGE          = (1<<2),
+	HDR_CONTENT_TYPE   = (1<<3),
+	HDR_CONTENT_LENGTH = (1<<4),
+	HDR_AUTH           = (1<<5) * ENABLE_FEATURE_WGET_AUTHENTICATION,
+	HDR_PROXY_AUTH     = (1<<6) * ENABLE_FEATURE_WGET_AUTHENTICATION,
 };
 static const char wget_user_headers[] ALIGN1 =
 	"Host:\0"
 	"User-Agent:\0"
 	"Range:\0"
 	"Content-Type:\0"
+	"Content-Length:\0"
 # if ENABLE_FEATURE_WGET_AUTHENTICATION
 	"Authorization:\0"
 	"Proxy-Authorization:\0"
 # endif
 	;
-# define USR_HEADER_HOST         (G.user_headers & HDR_HOST)
-# define USR_HEADER_USER_AGENT   (G.user_headers & HDR_USER_AGENT)
-# define USR_HEADER_RANGE        (G.user_headers & HDR_RANGE)
-# define USR_HEADER_CONTENT_TYPE (G.user_headers & HDR_CONTENT_TYPE)
-# define USR_HEADER_AUTH         (G.user_headers & HDR_AUTH)
-# define USR_HEADER_PROXY_AUTH   (G.user_headers & HDR_PROXY_AUTH)
+# define POST_CHUNK_BYTES (CONFIG_FEATURE_WGET_POST_BUFFER_SIZE << 10)
+# define USR_HEADER_HOST           (G.user_headers & HDR_HOST)
+# define USR_HEADER_USER_AGENT     (G.user_headers & HDR_USER_AGENT)
+# define USR_HEADER_RANGE          (G.user_headers & HDR_RANGE)
+# define USR_HEADER_CONTENT_LENGTH (G.user_headers & HDR_CONTENT_LENGTH)
+# define USR_HEADER_CONTENT_TYPE   (G.user_headers & HDR_CONTENT_TYPE)
+# define USR_HEADER_AUTH           (G.user_headers & HDR_AUTH)
+# define USR_HEADER_PROXY_AUTH     (G.user_headers & HDR_PROXY_AUTH)
 #else /* No long options, no user-headers :( */
-# define USR_HEADER_HOST         0
-# define USR_HEADER_USER_AGENT   0
-# define USR_HEADER_RANGE        0
-# define USR_HEADER_CONTENT_TYPE 0
-# define USR_HEADER_AUTH         0
-# define USR_HEADER_PROXY_AUTH   0
+# define USR_HEADER_HOST           0
+# define USR_HEADER_USER_AGENT     0
+# define USR_HEADER_RANGE          0
+# define USR_HEADER_CONTENT_LENGTH 0
+# define USR_HEADER_CONTENT_TYPE   0
+# define USR_HEADER_AUTH           0
+# define USR_HEADER_PROXY_AUTH     0
 #endif
 
 /* Globals */
@@ -253,7 +269,9 @@ struct globals {
 #if ENABLE_FEATURE_WGET_LONG_OPTIONS
 	char *post_data;
 	char *post_file;
+	int post_file_fd;
 	char *extra_headers;
+	size_t post_data_len;
 	unsigned char user_headers; /* Headers mentioned by the user */
 #endif
 	char *fname_out;        /* where to direct output (-O) */
@@ -313,6 +331,16 @@ enum {
 	PROGRESS_END   = 0,
 	PROGRESS_BUMP  = 1,
 };
+
+#if ENABLE_FEATURE_WGET_HTTPS
+enum {
+	PROXY_NONE         = 0,
+	PROXY_NEED_CONNECT = 1,
+	PROXY_CONNECT      = 2,
+	PROXY_TLS          = 3,
+};
+#endif
+
 #if ENABLE_FEATURE_WGET_STATUSBAR
 static void progress_meter(int flag)
 {
@@ -622,6 +650,9 @@ static void parse_url(const char *src_url, struct host_info *h)
 	 */
 }
 
+#define percent_encode_target(path) \
+	url_sanitizer_to_dest(xmalloc(strlen(path) * 3 + 1), path);
+
 static char *get_sanitized_hdr(FILE *fp)
 {
 	char *s, *hdrval;
@@ -675,7 +706,7 @@ static void reset_beg_range_to_zero(void)
 }
 
 #if ENABLE_FEATURE_WGET_OPENSSL
-static int spawn_https_helper_openssl(const char *host, unsigned port)
+static int spawn_https_helper_openssl(const char *host, unsigned port, bool use_proxy, const char *proxy_host)
 {
 	char *allocated = NULL;
 	char *servername;
@@ -696,7 +727,7 @@ static int spawn_https_helper_openssl(const char *host, unsigned port)
 	pid = xvfork();
 	if (pid == 0) {
 		/* Child */
-		char *argv[13];
+		char *argv[17];
 		char **argp;
 
 		close(sp[0]);
@@ -713,14 +744,23 @@ static int spawn_https_helper_openssl(const char *host, unsigned port)
 		argv[0] = (char*)"openssl";
 		argv[1] = (char*)"s_client";
 		argv[2] = (char*)"-quiet";
-		argv[3] = (char*)"-connect";
-		argv[4] = (char*)host;
+		if (use_proxy) {
+			argv[3] = (char*)"-proxy";
+			argv[4] = (char*)proxy_host;
+			argv[5] = (char*)"-connect";
+			argv[6] = (char*)host;
+			argp = &argv[7];
+		} else {
+			argv[3] = (char*)"-connect";
+			argv[4] = (char*)host;
+			argp = &argv[5];
+		}
 		/*
 		 * Per RFC 6066 Section 3, the only permitted values in the
 		 * TLS server_name (SNI) field are FQDNs (DNS hostnames).
 		 * IPv4 and IPv6 addresses, port numbers are not allowed.
 		 */
-		argp = &argv[5];
+
 		if (!is_ip_address(servername)) {
 			*argp++ = (char*)"-servername"; //[5]
 			*argp++ = (char*)servername;    //[6]
@@ -1097,6 +1137,9 @@ static void NOINLINE retrieve_file_data(FILE *dfp)
 static void download_one_url(const char *url)
 {
 	bool use_proxy;                 /* Use proxies if env vars are set  */
+	#if ENABLE_FEATURE_WGET_HTTPS
+	int proxy_state = PROXY_NONE;
+	#endif
 	int redir_limit;
 	len_and_sockaddr *lsa;
 	FILE *sfp;                      /* socket to web/ftp server         */
@@ -1190,16 +1233,19 @@ static void download_one_url(const char *url)
 		/* Open socket to http(s) server */
 #if ENABLE_FEATURE_WGET_OPENSSL
 		/* openssl (and maybe internal TLS) support is configured */
-		if (server.protocol == P_HTTPS) {
+		if (target.protocol == P_HTTPS) {
 			/* openssl-based helper
 			 * Inconvenient API since we can't give it an open fd
 			 */
-			int fd = spawn_https_helper_openssl(server.host, server.port);
+			int fd = spawn_https_helper_openssl(target.host, target.port, use_proxy, server.host);
 # if ENABLE_FEATURE_WGET_HTTPS
 			if (fd < 0) { /* no openssl? try internal */
 				sfp = open_socket(lsa);
-				spawn_ssl_client(server.host, fileno(sfp), /*flags*/ 0);
-				goto socket_opened;
+				if (use_proxy) {
+					proxy_state = PROXY_NEED_CONNECT;
+					goto socket_opened;
+				} else
+					spawn_ssl_client(target.host, fileno(sfp), /*flags*/ 0);
 			}
 # else
 			/* We don't check for exec("openssl") failure in this case */
@@ -1210,25 +1256,62 @@ static void download_one_url(const char *url)
 			goto socket_opened;
 		}
 		sfp = open_socket(lsa);
- socket_opened:
+
 #elif ENABLE_FEATURE_WGET_HTTPS
 		/* Only internal TLS support is configured */
 		sfp = open_socket(lsa);
-		if (server.protocol == P_HTTPS)
-			spawn_ssl_client(server.host, fileno(sfp), /*flags*/ 0);
+		if (target.protocol == P_HTTPS) {
+			if (use_proxy)
+				proxy_state = PROXY_NEED_CONNECT;
+			else
+				spawn_ssl_client(target.host, fileno(sfp), /*flags*/ 0);
+
+		}
 #else
 		/* ssl (https) support is not configured */
 		sfp = open_socket(lsa);
 #endif
-		/* Send HTTP request */
-		if (use_proxy) {
-			SENDFMT(sfp, "GET %s://%s/%s HTTP/1.1\r\n",
-				target.protocol, target.host,
-				target.path);
-		} else {
-			SENDFMT(sfp, "%s /%s HTTP/1.1\r\n",
-				(option_mask32 & WGET_OPT_POST) ? "POST" : "GET",
-				target.path);
+socket_opened:
+		/* Send HTTP request. The request-target path is percent-encoded so a
+		 * crafted URL cannot split the request line or inject headers
+		 * (CVE-2025-60876): "/foo bar" is sent as "/foo%20bar". The host is sent
+		 * verbatim in the proxy request-target and the Host: header, and in proxy
+		 * mode is not resolved locally, so reject control chars and space there
+		 * (a hostname can never legitimately contain them). */
+		{
+			const unsigned char *hp = (const unsigned char *)target.host;
+			char *req_target;
+			while (*hp) {
+				if (*hp <= ' ' || *hp == 0x7f)
+					bb_simple_error_msg_and_die("bad character in URL host");
+				hp++;
+			}
+			req_target = percent_encode_target(target.path);
+			if (use_proxy) {
+#if ENABLE_FEATURE_WGET_HTTPS
+				if (target.protocol == P_HTTPS) {
+					if(proxy_state == PROXY_NEED_CONNECT) {
+						SENDFMT(sfp, "CONNECT %s:%d HTTP/1.1\r\n",
+							target.host, target.port);
+						proxy_state = PROXY_CONNECT;
+					}
+					else goto plain_request;
+				}
+				else
+#endif
+				SENDFMT(sfp, "%s %s://%s/%s HTTP/1.1\r\n",
+					(option_mask32 & WGET_OPT_POST) ? "POST" : "GET",
+					target.protocol, target.host,
+					req_target);
+
+			} else {
+plain_request:
+				SENDFMT(sfp, "%s /%s HTTP/1.1\r\n",
+					(option_mask32 & WGET_OPT_POST) ? "POST" : "GET",
+					req_target);
+			}
+			if (ENABLE_FEATURE_CLEAN_UP)
+				free(req_target);
 		}
 		if (!USR_HEADER_HOST)
 			SENDFMT(sfp, "Host: %s\r\n", target.host);
@@ -1261,9 +1344,27 @@ static void download_one_url(const char *url)
 		}
 
 		if (option_mask32 & WGET_OPT_POST_FILE) {
-			int fd = xopen_stdin(G.post_file);
-			G.post_data = xmalloc_read(fd, NULL);
-			close(fd);
+			G.post_file_fd = xopen_stdin(G.post_file);
+			G.post_data_len = POST_CHUNK_BYTES; // RAM: size N mem pages, hopefully
+			G.post_data = xmalloc_read(G.post_file_fd, &G.post_data_len);
+	#if ENABLE_DESKTOP
+			if(G.post_data_len < POST_CHUNK_BYTES) {
+				/* The whole file fit into one chunk -> transfer like --post-data */
+				close(G.post_file_fd);
+				G.post_file_fd = -1;
+			}
+	#else
+			if(G.post_data_len >= POST_CHUNK_BYTES) // RAF: quota is POST_CHUNK_BYTES-1
+				bb_simple_error_msg_and_die("wget POST exceeded quota");
+			close(G.post_file_fd);
+	#endif
+		}
+		else
+		if(G.post_data) { // RAF: populated by the getopt32() argument parser
+			G.post_data_len = strlen(G.post_data);
+	#if ENABLE_DESKTOP
+			G.post_file_fd = -1;
+	#endif
 		}
 
 		if (G.post_data) {
@@ -1273,12 +1374,45 @@ static void download_one_url(const char *url)
 					"Content-Type: application/x-www-form-urlencoded\r\n"
 				);
 			}
-			SENDFMT(sfp,
-				"Content-Length: %u\r\n"
-				"\r\n"
-				"%s",
-				(int) strlen(G.post_data), G.post_data
-			);
+	#if ENABLE_DESKTOP
+			if(G.post_file_fd >= 0) {
+				/* Chunked transfer conflicts with a user-supplied Content-Length */
+				if (G.user_headers & HDR_CONTENT_LENGTH) {
+					bb_error_msg_and_die(
+						"Content-Length conflicts with chunked transfer"
+					);
+				}
+
+				/* More to read in the post file -> chunked transfer */
+				int chunk_bytes = G.post_data_len;
+				SENDFMT(sfp, "Transfer-Encoding: chunked\r\n\r\n%x\r\n", chunk_bytes);
+
+				do {
+					fwrite(G.post_data, 1, chunk_bytes, sfp);
+					chunk_bytes = full_read(G.post_file_fd, G.post_data, POST_CHUNK_BYTES);
+
+					if(chunk_bytes < 0) {
+						/* There's no really good way to signal to the server what the problem is,
+						 * so just stop sending data. The server should recognize the request as
+						 * malformed and discard it. */
+						bb_simple_perror_msg_and_die("Error reading post-file");
+					}
+
+					SENDFMT(sfp, "\r\n%x\r\n", chunk_bytes);
+				} while(chunk_bytes > 0);
+
+				fwrite("\r\n", 1, 2, sfp);
+				close(G.post_file_fd);
+			}
+			else
+	#endif
+			{
+				if (!USR_HEADER_CONTENT_LENGTH) {
+					SENDFMT(sfp, "Content-Length: %u\r\n", (int)G.post_data_len);
+				}
+				SENDFMT(sfp, "\r\n");
+				fwrite(G.post_data, 1, G.post_data_len, sfp);
+			}
 		} else
 #endif
 		{
@@ -1297,6 +1431,10 @@ static void download_one_url(const char *url)
 			 * even after child closes its copy of the fd.
 			 * This helps:
 			 */
+			#if ENABLE_FEATURE_WGET_HTTPS
+				if (proxy_state != PROXY_CONNECT)
+				/* Do not shutdown in the middle of CONNECT, still need to send HTTPS request */
+			#endif
 			shutdown(fileno(sfp), SHUT_WR);
 		}
 #endif
@@ -1358,6 +1496,18 @@ is always terminated by the first empty line after the header fields."
 However, in real world it was observed that some web servers
 (e.g. Boa/0.94.14rc21) simply use code 204 when file size is zero.
 */
+			#if ENABLE_FEATURE_WGET_HTTPS
+			if (use_proxy && proxy_state == PROXY_CONNECT && target.protocol == P_HTTPS) {
+				/* CONNECT worked. Now we have a tunnel to the server.
+				 * Need to start an SSL session and send HTTPS request.
+				 */
+				while (get_sanitized_hdr(sfp) != NULL)
+					/* eat all remaining headers */;
+				spawn_ssl_client(target.host, fileno(sfp), /*flags*/ 0);
+				proxy_state = PROXY_TLS;
+				goto socket_opened;
+			}
+			#endif
 			if (G.beg_range != 0) {
 				/* "Range:..." was not honored by the server.
 				 * Restart download from the beginning.
@@ -1546,7 +1696,8 @@ IF_DESKTOP(	"no-parent\0"        No_argument       "\xf0")
 	G.user_agent = "Wget"; /* "User-Agent" header field */
 
 	GETOPT32(argv, "^"
-		"cqSO:o:P:Y:U:T:+"
+		"cqSO:o:P:Y:U:"
+		IF_FEATURE_WGET_TIMEOUT("T:+")
 		/*ignored:*/ "t:"
 		/*ignored:*/ "n::"
 		/* wget has exactly four -n<letter> opts, all of which we can ignore:
@@ -1566,7 +1717,7 @@ IF_DESKTOP(	"no-parent\0"        No_argument       "\xf0")
 		LONGOPTS
 		, &G.fname_out, &G.fname_log, &G.dir_prefix,
 		&G.proxy_flag, &G.user_agent,
-		IF_FEATURE_WGET_TIMEOUT(&G.timeout_seconds) IF_NOT_FEATURE_WGET_TIMEOUT(NULL),
+		IF_FEATURE_WGET_TIMEOUT(&G.timeout_seconds,)
 		NULL, /* -t RETRIES */
 		NULL  /* -n[ARG] */
 		IF_FEATURE_WGET_LONG_OPTIONS(, &headers_llist)

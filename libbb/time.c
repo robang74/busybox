@@ -276,13 +276,14 @@ time_t FAST_FUNC validate_tm_time(const char *date_str, struct tm *ptm)
 
 static char* strftime_fmt(char *buf, unsigned len, time_t *tp, const char *fmt)
 {
+	struct tm tres;
 	time_t t;
 	if (!tp) {
 		tp = &t;
 		time(tp);
 	}
 	/* Returns pointer to NUL */
-	return buf + strftime(buf, len, fmt, localtime(tp));
+	return buf + strftime(buf, len, fmt, localtime_r(tp,&tres));
 }
 
 char* FAST_FUNC strftime_HHMMSS(char *buf, unsigned len, time_t *tp)

@@ -126,6 +126,7 @@ int who_main(int argc UNUSED_PARAM, char **argv)
 		) {
 			if (!do_users) {
 				char str6[6];
+				char tbuf[CTIME_BUF_MAXLEN];
 				char name[sizeof("/dev/") + sizeof(ut->ut_line) + 1];
 				struct stat st;
 				time_t seconds;
@@ -153,7 +154,7 @@ int who_main(int argc UNUSED_PARAM, char **argv)
 // TODO: with LANG=en_US.UTF-8, who from coreutils 8.25 shows
 // TIME col as "2017-04-06 18:47" (the default format is "Apr  6 18:47").
 // The former format looks saner to me. Switch to it unconditionally?
-						ctime(&seconds) + 4,
+						ctime_r(&seconds,tbuf) + 4,
 						(int)sizeof(ut->ut_host), ut->ut_host
 				);
 			} else {

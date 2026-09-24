@@ -1,7 +1,7 @@
 VERSION = 1
 PATCHLEVEL = 38
 SUBLEVEL = 0
-EXTRAVERSION =
+EXTRAVERSION = .ucs
 NAME = Unnamed
 
 # *DOCUMENTATION*
@@ -261,7 +261,7 @@ endif
 # If the user is running make -s (silent mode), suppress echoing of
 # commands
 
-ifneq ($(findstring s,$(MAKEFLAGS)),)
+ifneq ($(findstring s,$(filter-out --%,$(MAKEFLAGS))),)
   quiet=silent_
 endif
 

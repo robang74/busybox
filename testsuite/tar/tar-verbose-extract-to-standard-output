@@ -1,0 +1,41 @@
+# FEATURE: CONFIG_FEATURE_TAR_CREATE
+
+#####################################################
+# create test tar
+#####################################################
+echo "data 1" > file1.txt
+echo "data 2" > file2.txt
+echo "data 3" > file3.txt
+busybox tar cf test.tar file1.txt file2.txt file3.txt
+
+
+#####################################################
+# tar vO: verbose goes to to stderr instead
+#####################################################
+busybox tar xvOf test.tar 2> stderr.txt > /dev/null
+
+cat > expected.txt << 'EOF'
+file1.txt
+file2.txt
+file3.txt
+EOF
+
+cmp expected.txt stderr.txt
+
+
+#####################################################
+# is stdout/stderr properly synchronized?
+#####################################################
+busybox tar xvOf test.tar > output.txt 2>&1
+
+cat > expected.txt << 'EOF'
+file1.txt
+data 1
+file2.txt
+data 2
+file3.txt
+data 3
+EOF
+
+cmp expected.txt output.txt
+

@@ -1,0 +1,781 @@
+From 59a549f63c6141c32e0610ab5604db92bda43b92 Mon Sep 17 00:00:00 2001
+From: "Roberto A. Foglietta" <roberto.foglietta@gmail.com>
+Date: Sat, 25 Apr 2026 09:09:10 +0200
+Subject: [PATCH] Replacing time functions for thread & reentrant safety,
+ patchset v1
+
+The listed changes following a static code inspection by one of
+the most used automatic analyser and reported as critical flaws
+but usually BusyBox is compiled static and leverages the fork()
+magic which on modern architectures do a copy in memory of the
+whole process by copy-on-write (CoW) optimisation.
+
+The functions ctime(), gmtime() and localtime() which uses a static
+buffer thus are not re-entrant / thread-safe, and in BusyBox their use
+correctly addresses their limitation in the most common scenario above
+depicted. However, fork() has its own use cases limitations as well.
+
+The fork() isn't available on no-MMU architectures which usually rely
+on vfork() while dynamic cpu/mem allocation in cloud infrastructure is
+the opposite architecture spectrum edge in which fork() magic (CoW)
+starts to face drawbacks. Plus libc-pthreaded despite being not common
+are other cases in which reentrant / thread safety is required.
+
+This patch replaces all those function with their _r() counterparts,
+and move BusyBox development/ maintenance towards new frontiers, but
+it brings also a penalty in terms of footprint increase:
+
+       text    data     bss     dec     hex filename
+    1155501   18124    2056 1175681  11f081 busybox
+    1155856   18124    2056 1176036  11f1e4 busybox
+    Total 19 fixes             +355
+
+Actually, it is 307 ppm on an almost-all-yes dynamic compiled BusyBox
+but on a static linked ELF this figure can be cut in half or marginalised
+by including a subset of commands. Below a static musl-compiled elf64
+using more common commands subset:
+
+       text    data     bss     dec     hex filename
+     578882     855    6248  585985   8f101 bbox/busybox.elf
+     578953     855    6248  586056   8f148 bbox/busybox.elf
+    Total:                      +71
+
+Moreover, LTO linking as well as milder optimisation than -Os like -O1
+can have a 25-33% impact on the size but where CPU process caching is
+a relevant factor that can speed up a process run in the way size-only
+reduction cannot achieve.
+
+Climbing a mountain starts with a first step towards it.
+
+-------------------------------------------------------------------------------
+
+Patches aggregated, alerts list and files patched:
+
+include/libbb.h: #define CTIME_BUF_MAXLEN 26
+
+Alerts: #96-93,91,88-83,81-77
+util-linux/ipcs.c: use of potentially dangerous function (fix 1)
+
+Alerts: #97
+util-linux/rdate.c: use of potentially dangerous function (fix 2)
+
+Alerts: #100-98
+util-linux/rtcwake.c: use of potentially dangerous function (fix 3)
+
+Alerts: #92,90-89
+util-linux/last_fancy.c: use of potentially dangerous function (fix 4)
+
+Alerts: #82
+util-linux/last.c: use of potentially dangerous function (fix 5)
+
+Alerts: #76-75
+util-linux/hwclock.c: use of potentially dangerous function (fix 6)
+
+Alerts: #74
+util-linux/cal.c: use of potentially dangerous function (fix 7)
+
+Alerts: #73
+sysklogd/syslogd.c: use of potentially dangerous function (fix 8)
+
+Alerts: #72-70
+scripts/kconfig/confdata.c: use of potentially dangerous function (fix 9)
+
+Alerts: #69
+procps/uptime.c: use of potentially dangerous function (fix 10)
+
+Alerts: #68-67
+procps/nmeter.c: use of potentially dangerous function (fix 11)
+
+Alerts: #63
+miscutils/crond.c: use of potentially dangerous function (fix 12)
+
+Alerts: #62
+libbb/time.c: use of potentially dangerous function (fix 13)
+
+Alerts: #66
+networking/udhcp/dumpleases.c: use of potentially dangerous function (fix 14)
+
+Alerts: #65-64
+networking/httpd_indexcgi.c: use of potentially dangerous function (fix 15)
+
+Alerts: #60
+editors/awk.c: use of potentially dangerous function (fix 16)
+
+Alerts: #59
+coreutils/who.c: use of potentially dangerous function (fix 17)
+
+Alerts: #58
+coreutils/stat.c: use of potentially dangerous function (fix 18)
+
+Alerts: #57
+archival/ar.c: use of potentially dangerous function (fix 19)
+
+-------------------------------------------------------------------------------
+
+Signed-off-by: Roberto A. Foglietta <roberto.foglietta@gmail.com>
+---
+ archival/ar.c                 |  3 ++-
+ coreutils/stat.c              |  3 ++-
+ coreutils/who.c               |  3 ++-
+ editors/awk.c                 |  3 ++-
+ include/libbb.h               |  4 ++++
+ libbb/time.c                  |  3 ++-
+ miscutils/crond.c             |  4 ++--
+ networking/httpd_indexcgi.c   |  6 ++---
+ networking/udhcp/dumpleases.c |  3 ++-
+ procps/nmeter.c               |  6 ++---
+ procps/uptime.c               |  3 ++-
+ scripts/kconfig/confdata.c    |  8 ++++---
+ scripts/kconfig/lkc.h         |  3 +++
+ sysklogd/syslogd.c            |  5 ++--
+ util-linux/cal.c              |  4 ++--
+ util-linux/hwclock.c          |  9 ++++---
+ util-linux/ipcs.c             | 44 ++++++++++++++++++++---------------
+ util-linux/last.c             |  3 ++-
+ util-linux/last_fancy.c       |  8 ++++---
+ util-linux/rdate.c            |  3 ++-
+ util-linux/rtcwake.c          | 13 +++++++----
+ 21 files changed, 87 insertions(+), 54 deletions(-)
+
+diff --git a/archival/ar.c b/archival/ar.c
+index 320cbae72..e3f5f76ba 100644
+--- a/archival/ar.c
++++ b/archival/ar.c
+@@ -196,11 +196,12 @@ static int write_ar_archive(archive_handle_t *handle)
+ 
+ static void FAST_FUNC header_verbose_list_ar(const file_header_t *file_header)
+ {
++	char tbuf[CTIME_BUF_MAXLEN];
+ 	char mode[12];
+ 	char *mtime;
+ 
+ 	bb_mode_string(mode, file_header->mode);
+-	mtime = ctime(&file_header->mtime);
++	mtime = ctime_r(&file_header->mtime,tbuf);
+ 	mtime[16] = ' ';
+ 	memmove(&mtime[17], &mtime[20], 4);
+ 	mtime[21] = '\0';
+diff --git a/coreutils/stat.c b/coreutils/stat.c
+index 2c2909e7e..cf882ae3f 100644
+--- a/coreutils/stat.c
++++ b/coreutils/stat.c
+@@ -152,13 +152,14 @@ static const char *file_type(const struct stat *st)
+ static const char *human_time(struct timespec *ts)
+ {
+ 	char fmt[sizeof("%Y-%m-%d %H:%M:%S.123456789 %z") + /*paranoia*/ 8];
++	struct tm tres;
+ 
+ 	/* coreutils 6.3 compat */
+ #define buf bb_common_bufsiz1
+ 	setup_common_bufsiz();
+ 
+ 	sprintf(stpcpy(fmt, "%Y-%m-%d %H:%M:%S"), ".%09u %%z", (unsigned)ts->tv_nsec);
+-	strftime(buf, COMMON_BUFSIZE, fmt, localtime(&ts->tv_sec));
++	strftime(buf, COMMON_BUFSIZE, fmt, localtime_r(&ts->tv_sec,&tres));
+ 	return buf;
+ #undef buf
+ }
+diff --git a/coreutils/who.c b/coreutils/who.c
+index 6f96f7243..c06044c52 100644
+--- a/coreutils/who.c
++++ b/coreutils/who.c
+@@ -114,6 +114,7 @@ int who_main(int argc UNUSED_PARAM, char **argv)
+ 	struct utmpx *ut;
+ 	unsigned opt;
+ 	const char *fmt = "%s";
++	char tbuf[CTIME_BUF_MAXLEN];
+ 
+ 	opt = getopt32(argv, do_who ? "^" "aH" "\0" "=0": "^" "" "\0" "=0");
+ 	if ((opt & 2) || do_w) /* -H or we are w */
+@@ -153,7 +154,7 @@ int who_main(int argc UNUSED_PARAM, char **argv)
+ // TODO: with LANG=en_US.UTF-8, who from coreutils 8.25 shows
+ // TIME col as "2017-04-06 18:47" (the default format is "Apr  6 18:47").
+ // The former format looks saner to me. Switch to it unconditionally?
+-						ctime(&seconds) + 4,
++						ctime_r(&seconds,tbuf) + 4,
+ 						(int)sizeof(ut->ut_host), ut->ut_host
+ 				);
+ 			} else {
+diff --git a/editors/awk.c b/editors/awk.c
+index dd8f4ac42..aa84c37c1 100644
+--- a/editors/awk.c
++++ b/editors/awk.c
+@@ -2721,6 +2721,7 @@ static NOINLINE var *exec_builtin(node *op, var *res)
+ 	node *an[4];
+ 	var *av[4];
+ 	const char *as[4];
++	struct tm tres;
+ 	node *spl;
+ 	uint32_t isr, info;
+ 	int nargs;
+@@ -2866,7 +2867,7 @@ static NOINLINE var *exec_builtin(node *op, var *res)
+ 			time(&tt);
+ 		i = strftime(g_buf, MAXVARFMT,
+ 			((nargs > 0) ? as[0] : "%a %b %d %H:%M:%S %Z %Y"),
+-			localtime(&tt));
++			localtime_r(&tt,&tres));
+ 		setvar_sn(res, g_buf, i);
+ 		break;
+ 
+diff --git a/include/libbb.h b/include/libbb.h
+index a54f17d49..67855dfee 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -192,6 +192,10 @@ int klogctl(int type, char *b, int len);
+ # define BUFSIZ 4096
+ #endif
+ 
++#ifndef CTIME_BUF_MAXLEN
++#define CTIME_BUF_MAXLEN 26
++#endif
++
+ #if __GNUC_PREREQ(5,0)
+ /* Since musl is apparently unable to get it right and would use
+  * a function call to a single-instruction function of "bswap %eax",
+diff --git a/libbb/time.c b/libbb/time.c
+index f09ef5d52..b55e091b0 100644
+--- a/libbb/time.c
++++ b/libbb/time.c
+@@ -276,13 +276,14 @@ time_t FAST_FUNC validate_tm_time(const char *date_str, struct tm *ptm)
+ 
+ static char* strftime_fmt(char *buf, unsigned len, time_t *tp, const char *fmt)
+ {
++	struct tm tres;
+ 	time_t t;
+ 	if (!tp) {
+ 		tp = &t;
+ 		time(tp);
+ 	}
+ 	/* Returns pointer to NUL */
+-	return buf + strftime(buf, len, fmt, localtime(tp));
++	return buf + strftime(buf, len, fmt, localtime_r(tp,&tres));
+ }
+ 
+ char* FAST_FUNC strftime_HHMMSS(char *buf, unsigned len, time_t *tp)
+diff --git a/miscutils/crond.c b/miscutils/crond.c
+index 6a384fdfb..0d9e805b2 100644
+--- a/miscutils/crond.c
++++ b/miscutils/crond.c
+@@ -893,14 +893,14 @@ static void flag_starting_jobs(time_t t1, time_t t2)
+ 	/* Find jobs > t1 and <= t2 */
+ 
+ 	for (t = t1 - t1 % 60; t <= t2; t += 60) {
+-		struct tm *ptm;
++		struct tm *ptm, tres;
+ 		CronFile *file;
+ 		CronLine *line;
+ 
+ 		if (t <= t1)
+ 			continue;
+ 
+-		ptm = localtime(&t);
++		ptm = localtime_r(&t,&tres);
+ 		for (file = G.cron_files; file; file = file->cf_next) {
+ 			log5("file %s:", file->cf_username);
+ 			if (file->cf_deleted)
+diff --git a/networking/httpd_indexcgi.c b/networking/httpd_indexcgi.c
+index aeed8ccb1..48bc63cf8 100644
+--- a/networking/httpd_indexcgi.c
++++ b/networking/httpd_indexcgi.c
+@@ -348,7 +348,7 @@ int main(int argc, char **argv)
+ 	count_files = 0;
+ 	size_total = 0;
+ 	while (--dir_list_count >= 0) {
+-		struct tm *ptm;
++		struct tm *ptm, tres;
+ 		time_t tt;
+ 
+ 		cdir = *dir_list++;
+@@ -375,10 +375,10 @@ int main(int argc, char **argv)
+ 			dst = fmt_ull(dst, cdir->D_SIZE);
+ 		dst = fmt_str(dst, "<td class=dt>");
+ 		if (sizeof(cdir->D_MTIME) == sizeof(tt))
+-			ptm = gmtime((time_t*)&cdir->D_MTIME);
++			ptm = gmtime_r((time_t*)&cdir->D_MTIME,&tres);
+ 		else {
+ 			tt = cdir->D_MTIME;
+-			ptm = gmtime(&tt);
++			ptm = gmtime_r(&tt,&tres);
+ 		}
+ 		dst = fmt_04u(dst, 1900 + ptm->tm_year); *dst++ = '-';
+ 		dst = fmt_02u(dst, ptm->tm_mon + 1); *dst++ = '-';
+diff --git a/networking/udhcp/dumpleases.c b/networking/udhcp/dumpleases.c
+index 19606c58e..9ff593c45 100644
+--- a/networking/udhcp/dumpleases.c
++++ b/networking/udhcp/dumpleases.c
+@@ -112,7 +112,8 @@ int dumpleases_main(int argc UNUSED_PARAM, char **argv)
+ 			printf("%02u:%02u:%02u\n", h, m, (unsigned)expires);
+ 		} else { /* -a */
+ 			time_t t = expires_abs;
+-			fputs_stdout(ctime(&t));
++			char tbuf[CTIME_BUF_MAXLEN];
++			fputs_stdout(ctime_r(&t,tbuf));
+ 		}
+ 	}
+ 	/* close(fd); */
+diff --git a/procps/nmeter.c b/procps/nmeter.c
+index fd8907aac..265d72c4b 100644
+--- a/procps/nmeter.c
++++ b/procps/nmeter.c
+@@ -785,7 +785,7 @@ S_STAT_END(time_stat)
+ static void FAST_FUNC collect_tv(time_stat *s, struct timeval *tv, int local)
+ {
+ 	char buf[sizeof("12:34:56.123456")];
+-	struct tm* tm;
++	struct tm *tm, tres;
+ 	unsigned us = tv->tv_usec + s->scale/2;
+ 	time_t t = tv->tv_sec;
+ 
+@@ -794,9 +794,9 @@ static void FAST_FUNC collect_tv(time_stat *s, struct timeval *tv, int local)
+ 		us -= 1000000;
+ 	}
+ 	if (local)
+-		tm = localtime(&t);
++		tm = localtime_r(&t,&tres);
+ 	else
+-		tm = gmtime(&t);
++		tm = gmtime_r(&t,&tres);
+ 
+ 	sprintf(buf, "%02u:%02u:%02u", tm->tm_hour, tm->tm_min, tm->tm_sec);
+ 	if (s->prec)
+diff --git a/procps/uptime.c b/procps/uptime.c
+index aec7bd7d1..679016660 100644
+--- a/procps/uptime.c
++++ b/procps/uptime.c
+@@ -59,6 +59,7 @@ int uptime_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ 	struct sysinfo info;
+ 	struct tm *current_time;
+ 	time_t current_secs;
++	struct tm tres;
+ 
+ 	opts = getopt32(argv, "s");
+ 
+@@ -68,7 +69,7 @@ int uptime_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ 	if (opts) // -s
+ 		current_secs -= info.uptime;
+ 
+-	current_time = localtime(&current_secs);
++	current_time = localtime_r(&current_secs,&tres);
+ 
+ 	if (opts) { // -s
+ 		printf("%04u-%02u-%02u %02u:%02u:%02u\n",
+diff --git a/scripts/kconfig/confdata.c b/scripts/kconfig/confdata.c
+index d13a7d66b..766629760 100644
+--- a/scripts/kconfig/confdata.c
++++ b/scripts/kconfig/confdata.c
+@@ -337,6 +337,7 @@ int conf_write(const char *name)
+ 	char dirname[128];
+ 	char tmpname[256];
+ 	char newname[256];
++	char tbuf[CTIME_BUF_MAXLEN];
+ 	int type, l;
+ 	const char *str;
+ 	time_t now;
+@@ -344,6 +345,7 @@ int conf_write(const char *name)
+ 	char *env;
+ 	char *source_date_epoch;
+ 	struct tm *build_time;
++	struct tm tres;
+ 
+ 	dirname[0] = 0;
+ 	if (name && name[0]) {
+@@ -384,10 +386,10 @@ int conf_write(const char *name)
+ 	source_date_epoch = getenv("SOURCE_DATE_EPOCH");
+ 	if (source_date_epoch && *source_date_epoch) {
+ 		now = strtoull(source_date_epoch, NULL, 10);
+-		build_time = gmtime(&now);
++		build_time = gmtime_r(&now,&tres);
+ 	} else {
+ 		time(&now);
+-		build_time = localtime(&now);
++		build_time = localtime_r(&now,&tres);
+ 	}
+ 
+ 	env = getenv("KCONFIG_NOTIMESTAMP");
+@@ -401,7 +403,7 @@ int conf_write(const char *name)
+ 		       "#\n"),
+ 		     sym_get_string_value(sym),
+ 		     use_timestamp ? "# " : "",
+-		     use_timestamp ? ctime(&now) : "");
++		     use_timestamp ? ctime_r(&now,tbuf) : "");
+ 	if (out_h) {
+ 		char buf[sizeof("#define AUTOCONF_TIMESTAMP "
+ 				"\"YYYY-MM-DD HH:MM:SS some_timezone\"\n")];
+diff --git a/scripts/kconfig/lkc.h b/scripts/kconfig/lkc.h
+index 527f60c99..099d97d06 100644
+--- a/scripts/kconfig/lkc.h
++++ b/scripts/kconfig/lkc.h
+@@ -37,6 +37,9 @@ extern "C" {
+ #define _(text) gettext(text)
+ #define N_(text) (text)
+ 
++#ifndef CTIME_BUF_MAXLEN
++#define CTIME_BUF_MAXLEN 26
++#endif
+ 
+ #define TF_COMMAND	0x0001
+ #define TF_PARAM	0x0002
+diff --git a/sysklogd/syslogd.c b/sysklogd/syslogd.c
+index 2cbb22b6d..6f6fc7784 100644
+--- a/sysklogd/syslogd.c
++++ b/sysklogd/syslogd.c
+@@ -824,6 +824,7 @@ static void parse_fac_prio_20(int pri, char *res20)
+ static void timestamp_and_log(int pri, char *msg, int len)
+ {
+ 	char *timestamp = NULL;
++	char tbuf[CTIME_BUF_MAXLEN];
+ 	time_t now;
+ 
+ 	/* Jan 18 00:11:22 msg... */
+@@ -844,7 +845,7 @@ static void timestamp_and_log(int pri, char *msg, int len)
+ 		struct timeval tv;
+ 		xgettimeofday(&tv);
+ 		now = tv.tv_sec;
+-		timestamp = ctime(&now) + 4; /* skip day of week */
++		timestamp = ctime_r(&now,tbuf) + 4; /* skip day of week */
+ 		/* overwrite year by milliseconds, zero terminate */
+ 		sprintf(timestamp + 15, ".%03u", (unsigned)tv.tv_usec / 1000u);
+ 	} else {
+@@ -853,7 +854,7 @@ static void timestamp_and_log(int pri, char *msg, int len)
+ #else
+ 	if (!timestamp) {
+ 		time(&now);
+-		timestamp = ctime(&now) + 4; /* skip day of week */
++		timestamp = ctime_r(&now,tbuf) + 4; /* skip day of week */
+ 	}
+ 	timestamp[15] = '\0';
+ #endif
+diff --git a/util-linux/cal.c b/util-linux/cal.c
+index 0577c3899..323c019e3 100644
+--- a/util-linux/cal.c
++++ b/util-linux/cal.c
+@@ -105,7 +105,7 @@ enum {
+ int cal_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int cal_main(int argc UNUSED_PARAM, char **argv)
+ {
+-	struct tm zero_tm;
++	struct tm zero_tm, tres;
+ 	time_t now;
+ 	unsigned month, year, flags, i, weekstart;
+ 	char *month_names[12];
+@@ -130,7 +130,7 @@ int cal_main(int argc UNUSED_PARAM, char **argv)
+ 		struct tm *ptm;
+ 
+ 		time(&now);
+-		ptm = localtime(&now);
++		ptm = localtime_r(&now,&tres);
+ 		year = ptm->tm_year + 1900;
+ 		if (!(flags & OPT_YEAR)) { /* no -y */
+ 			month = ptm->tm_mon + 1;
+diff --git a/util-linux/hwclock.c b/util-linux/hwclock.c
+index c3fd0eb57..2c493de36 100644
+--- a/util-linux/hwclock.c
++++ b/util-linux/hwclock.c
+@@ -98,15 +98,17 @@ static void show_clock(const char **pp_rtcname, int utc)
+ #if SHOW_HWCLOCK_DIFF
+ 	struct timeval sys_tv;
+ #endif
++	char tbuf[CTIME_BUF_MAXLEN];
+ 	time_t t = read_rtc(pp_rtcname, &sys_tv, utc);
+ 
+ #if ENABLE_LOCALE_SUPPORT
+ 	/* Standard hwclock uses locale-specific output format */
+ 	char cp[64];
+-	struct tm *ptm = localtime(&t);
++	struct tm tres;
++	struct tm *ptm = localtime_r(&t,&tres);
+ 	strftime(cp, sizeof(cp), "%c", ptm);
+ #else
+-	char *cp = ctime(&t);
++	char *cp = ctime_r(&t,tbuf);
+ 	chomp(cp);
+ #endif
+ 
+@@ -168,6 +170,7 @@ static void set_kernel_tz(const struct timezone *tz)
+ static void set_kernel_timezone_and_clock(int utc, const struct timeval *hctosys)
+ {
+ 	time_t cur;
++	struct tm tres;
+ 	struct tm *broken;
+ 	struct timezone tz = { 0 };
+ 
+@@ -180,7 +183,7 @@ static void set_kernel_timezone_and_clock(int utc, const struct timeval *hctosys
+ //...but it does NOT include DST shift (IOW: it's WRONG, usually by one hour,
+ //if DST is in effect!) Thus this ridiculous dance:
+ 	cur = time(NULL);
+-	broken = localtime(&cur);
++	broken = localtime_r(&cur,&tres);
+ 	tz.tz_minuteswest = -broken->tm_gmtoff / 60;
+ 	/*tz.tz_dsttime = 0; already is */
+ 	set_kernel_tz(&tz); /* MIGHT warp_clock() if 1st call since boot */
+diff --git a/util-linux/ipcs.c b/util-linux/ipcs.c
+index f0e5c5a7f..6a7500ec3 100644
+--- a/util-linux/ipcs.c
++++ b/util-linux/ipcs.c
+@@ -205,17 +205,18 @@ static NOINLINE void do_shm(int format)
+ 		pw = getpwuid(ipcp->uid);
+ 		switch (format) {
+ 		case TIME:
++			char tbuf[CTIME_BUF_MAXLEN];
+ 			if (pw)
+ 				printf("%-10d %-10.10s", shmid, pw->pw_name);
+ 			else
+ 				printf("%-10d %-10d", shmid, ipcp->uid);
+-			/* ctime uses static buffer: use separate calls */
++			/* ctime_r uses the same buffer: do separate calls */
+ 			printf(" %-20.16s", shmseg.shm_atime
+-					? ctime(&shmseg.shm_atime) + 4 : "Not set");
++					? ctime_r(&shmseg.shm_atime,tbuf) + 4 : "Not set");
+ 			printf(" %-20.16s", shmseg.shm_dtime
+-					? ctime(&shmseg.shm_dtime) + 4 : "Not set");
++					? ctime_r(&shmseg.shm_dtime,tbuf) + 4 : "Not set");
+ 			printf(" %-20.16s\n", shmseg.shm_ctime
+-					? ctime(&shmseg.shm_ctime) + 4 : "Not set");
++					? ctime_r(&shmseg.shm_ctime,tbuf) + 4 : "Not set");
+ 			break;
+ 		case PID:
+ 			if (pw)
+@@ -321,15 +322,16 @@ static NOINLINE void do_sem(int format)
+ 		pw = getpwuid(ipcp->uid);
+ 		switch (format) {
+ 		case TIME:
++			char tbuf[CTIME_BUF_MAXLEN];
+ 			if (pw)
+ 				printf("%-8d %-10.10s", semid, pw->pw_name);
+ 			else
+ 				printf("%-8d %-10d", semid, ipcp->uid);
+-			/* ctime uses static buffer: use separate calls */
++			/* ctime_r uses the same buffer: do separate calls */
+ 			printf("  %-26.24s", semary.sem_otime
+-					? ctime(&semary.sem_otime) : "Not set");
++					? ctime_r(&semary.sem_otime,tbuf) : "Not set");
+ 			printf(" %-26.24s\n", semary.sem_ctime
+-					? ctime(&semary.sem_ctime) : "Not set");
++					? ctime_r(&semary.sem_ctime,tbuf) : "Not set");
+ 			break;
+ 		case PID:
+ 			break;
+@@ -422,16 +424,17 @@ static NOINLINE void do_msg(int format)
+ 		pw = getpwuid(ipcp->uid);
+ 		switch (format) {
+ 		case TIME:
++			char tbuf[CTIME_BUF_MAXLEN];
+ 			if (pw)
+ 				printf("%-8d %-10.10s", msqid, pw->pw_name);
+ 			else
+ 				printf("%-8d %-10d", msqid, ipcp->uid);
+ 			printf(" %-20.16s", msgque.msg_stime
+-					? ctime(&msgque.msg_stime) + 4 : "Not set");
++					? ctime_r(&msgque.msg_stime,tbuf) + 4 : "Not set");
+ 			printf(" %-20.16s", msgque.msg_rtime
+-					? ctime(&msgque.msg_rtime) + 4 : "Not set");
++					? ctime_r(&msgque.msg_rtime,tbuf) + 4 : "Not set");
+ 			printf(" %-20.16s\n", msgque.msg_ctime
+-					? ctime(&msgque.msg_ctime) + 4 : "Not set");
++					? ctime_r(&msgque.msg_ctime,tbuf) + 4 : "Not set");
+ 			break;
+ 		case PID:
+ 			if (pw)
+@@ -464,6 +467,7 @@ static void print_shm(int shmid)
+ {
+ 	struct shmid_ds shmds;
+ 	struct ipc_perm *ipcp = &shmds.shm_perm;
++	char tbuf[CTIME_BUF_MAXLEN];
+ 
+ 	if (shmctl(shmid, IPC_STAT, &shmds) == -1) {
+ 		bb_simple_perror_msg("shmctl");
+@@ -480,16 +484,18 @@ static void print_shm(int shmid)
+ 			(long) shmds.shm_segsz, shmds.shm_lpid, shmds.shm_cpid,
+ 			(long) shmds.shm_nattch);
+ 	printf("att_time=%-26.24s\n",
+-			shmds.shm_atime ? ctime(&shmds.shm_atime) : "Not set");
++			shmds.shm_atime ? ctime_r(&shmds.shm_atime,tbuf) : "Not set");
+ 	printf("det_time=%-26.24s\n",
+-			shmds.shm_dtime ? ctime(&shmds.shm_dtime) : "Not set");
+-	printf("change_time=%-26.24s\n\n", ctime(&shmds.shm_ctime));
++			shmds.shm_dtime ? ctime_r(&shmds.shm_dtime,tbuf) : "Not set");
++	printf("change_time=%-26.24s\n\n",
++			ctime_r(&shmds.shm_ctime,tbuf));
+ }
+ 
+ static void print_msg(int msqid)
+ {
+ 	struct msqid_ds buf;
+ 	struct ipc_perm *ipcp = &buf.msg_perm;
++	char tbuf[CTIME_BUF_MAXLEN];
+ 
+ 	if (msgctl(msqid, IPC_STAT, &buf) == -1) {
+ 		bb_simple_perror_msg("msgctl");
+@@ -510,17 +516,18 @@ static void print_msg(int msqid)
+ 			(long) buf.msg_qnum, buf.msg_lspid, buf.msg_lrpid);
+ 
+ 	printf("send_time=%-26.24s\n",
+-			buf.msg_stime ? ctime(&buf.msg_stime) : "Not set");
++			buf.msg_stime ? ctime_r(&buf.msg_stime,tbuf) : "Not set");
+ 	printf("rcv_time=%-26.24s\n",
+-			buf.msg_rtime ? ctime(&buf.msg_rtime) : "Not set");
++			buf.msg_rtime ? ctime_r(&buf.msg_rtime,tbuf) : "Not set");
+ 	printf("change_time=%-26.24s\n\n",
+-			buf.msg_ctime ? ctime(&buf.msg_ctime) : "Not set");
++			buf.msg_ctime ? ctime_r(&buf.msg_ctime,tbuf) : "Not set");
+ }
+ 
+ static void print_sem(int semid)
+ {
+ 	struct semid_ds semds;
+ 	struct ipc_perm *ipcp = &semds.sem_perm;
++	char tbuf[CTIME_BUF_MAXLEN];
+ 	union semun arg;
+ 	unsigned int i;
+ 
+@@ -539,10 +546,9 @@ static void print_sem(int semid)
+ 			ipcp->uid, ipcp->gid, ipcp->cuid, ipcp->cgid,
+ 			ipcp->mode, ipcp->mode & 0777,
+ 			(long) semds.sem_nsems,
+-			semds.sem_otime ? ctime(&semds.sem_otime) : "Not set");
++			semds.sem_otime ? ctime_r(&semds.sem_otime,tbuf) : "Not set");
+ 	printf("ctime = %-26.24s\n"
+-			"%-10s %-10s %-10s %-10s %-10s\n",
+-			ctime(&semds.sem_ctime),
++			"%-10s %-10s %-10s %-10s %-10s\n", ctime_r(&semds.sem_ctime,tbuf),
+ 			"semnum", "value", "ncount", "zcount", "pid");
+ 
+ 	arg.val = 0;
+diff --git a/util-linux/last.c b/util-linux/last.c
+index aafd01bb9..b8112610a 100644
+--- a/util-linux/last.c
++++ b/util-linux/last.c
+@@ -73,6 +73,7 @@ int last_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ 	int n, file = STDIN_FILENO;
+ 	time_t t_tmp;
+ 	off_t pos;
++	char tbuf[CTIME_BUF_MAXLEN];
+ 	static const char _ut_usr[] ALIGN1 =
+ 			"runlevel\0" "reboot\0" "shutdown\0";
+ 	static const char _ut_lin[] ALIGN1 =
+@@ -154,7 +155,7 @@ int last_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ 		 * but some systems have it wrong */
+ 		t_tmp = (time_t)ut.ut_tv.tv_sec;
+ 		printf("%-10s %-14s %-18s %-12.12s\n",
+-			ut.ut_user, ut.ut_line, ut.ut_host, ctime(&t_tmp) + 4);
++			ut.ut_user, ut.ut_line, ut.ut_host, ctime_r(&t_tmp,tbuf,tbuf) + 4);
+  next:
+ 		pos -= sizeof(ut);
+ 		if (pos < 0)
+diff --git a/util-linux/last_fancy.c b/util-linux/last_fancy.c
+index 648236229..a2e20744d 100644
+--- a/util-linux/last_fancy.c
++++ b/util-linux/last_fancy.c
+@@ -47,6 +47,7 @@ static void show_entry(struct utmpx *ut, int state, time_t dur_secs)
+ {
+ 	unsigned days, hours, mins;
+ 	char duration[sizeof("(%u+02:02)") + sizeof(int)*3];
++	char tbuf[CTIME_BUF_MAXLEN];
+ 	char login_time[17];
+ 	char logout_time[8];
+ 	const char *logout_str;
+@@ -56,9 +57,9 @@ static void show_entry(struct utmpx *ut, int state, time_t dur_secs)
+ 	/* manpages say ut_tv.tv_sec *is* time_t,
+ 	 * but some systems have it wrong */
+ 	tmp = ut->ut_tv.tv_sec;
+-	safe_strncpy(login_time, ctime(&tmp), 17);
++	safe_strncpy(login_time, ctime_r(&tmp,tbuf), 17);
+ 	tmp = dur_secs;
+-	snprintf(logout_time, 8, "- %s", ctime(&tmp) + 11);
++	snprintf(logout_time, 8, "- %s", ctime_r(&tmp,tbuf) + 11);
+ 
+ 	dur_secs = MAX(dur_secs - (time_t)ut->ut_tv.tv_sec, (time_t)0);
+ 	/* unsigned int is easier to divide than time_t (which may be signed long) */
+@@ -160,6 +161,7 @@ int last_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	struct utmpx ut;
+ 	const char *filename = _PATH_WTMP;
++	char tbuf[CTIME_BUF_MAXLEN];
+ 	llist_t *zlist;
+ 	off_t pos;
+ 	time_t start_time;
+@@ -292,7 +294,7 @@ int last_main(int argc UNUSED_PARAM, char **argv)
+ 		llist_free(zlist, free);
+ 	}
+ 
+-	printf("\nwtmp begins %s", ctime(&start_time));
++	printf("\nwtmp begins %s", ctime_r(&start_time,tbuf));
+ 
+ 	if (ENABLE_FEATURE_CLEAN_UP)
+ 		close(file);
+diff --git a/util-linux/rdate.c b/util-linux/rdate.c
+index fd45081d8..4d7c0b2c5 100644
+--- a/util-linux/rdate.c
++++ b/util-linux/rdate.c
+@@ -78,6 +78,7 @@ static time_t askremotedate(const char *host)
+ int rdate_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int rdate_main(int argc UNUSED_PARAM, char **argv)
+ {
++	char tbuf[CTIME_BUF_MAXLEN];
+ 	time_t remote_time;
+ 	unsigned flags;
+ 
+@@ -104,7 +105,7 @@ int rdate_main(int argc UNUSED_PARAM, char **argv)
+ 	}
+ 
+ 	if (flags != 1) /* not lone -s */
+-		printf("%s", ctime(&remote_time));
++		printf("%s", ctime_r(&remote_time,tbuf));
+ 
+ 	return EXIT_SUCCESS;
+ }
+diff --git a/util-linux/rtcwake.c b/util-linux/rtcwake.c
+index a8dfab064..6a4c1f46f 100644
+--- a/util-linux/rtcwake.c
++++ b/util-linux/rtcwake.c
+@@ -70,6 +70,7 @@ static NOINLINE bool may_wakeup(const char *rtcname)
+ static NOINLINE void setup_alarm(int fd, time_t *wakeup, time_t rtc_time)
+ {
+ 	struct tm *ptm;
++	struct tm tres;
+ 	struct linux_rtc_wkalrm wake;
+ 
+ 	/* The wakeup time is in POSIX time (more or less UTC).
+@@ -82,7 +83,7 @@ static NOINLINE void setup_alarm(int fd, time_t *wakeup, time_t rtc_time)
+ 	 * Else mode is local so the time given to the RTC
+ 	 * will instead use the local time zone.
+ 	 */
+-	ptm = localtime(wakeup);
++	ptm = localtime_r(wakeup,&tres);
+ 
+ 	wake.time.tm_sec = ptm->tm_sec;
+ 	wake.time.tm_min = ptm->tm_min;
+@@ -129,6 +130,7 @@ int rtcwake_main(int argc UNUSED_PARAM, char **argv)
+ 	time_t sys_time;
+ 	time_t alarm_time = alarm_time;
+ 	unsigned seconds = seconds; /* for compiler */
++	char tbuf[CTIME_BUF_MAXLEN];
+ 	int utc = -1;
+ 	int fd;
+ 
+@@ -195,17 +197,18 @@ int rtcwake_main(int argc UNUSED_PARAM, char **argv)
+ 			 * Compat message text.
+ 			 * I'd say "RTC time is already ahead of ..." instead.
+ 			 */
+-			bb_error_msg_and_die("time doesn't go backward to %s", ctime(&alarm_time));
++			bb_error_msg_and_die("time doesn't go backward to %s",
++				ctime_r(&alarm_time,tbuf));
+ 	} else
+ 		alarm_time = rtc_time + seconds + 1;
+ 
+ 	setup_alarm(fd, &alarm_time, rtc_time);
+ 	sync();
+ #if 0 /*debug*/
+-	printf("sys_time: %s", ctime(&sys_time));
+-	printf("rtc_time: %s", ctime(&rtc_time));
++	printf("sys_time: %s", ctime_r(&sys_time,tbuf));
++	printf("rtc_time: %s", ctime_r(&rtc_time,tbuf));
+ #endif
+-	printf("wakeup from \"%s\" at %s", suspend, ctime(&alarm_time));
++	printf("wakeup from \"%s\" at %s", suspend, ctime_r(&alarm_time,tbuf));
+ 	fflush_all();
+ 	usleep(10 * 1000);
+ 
+-- 
+2.34.1
+

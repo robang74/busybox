@@ -112,7 +112,8 @@ int dumpleases_main(int argc UNUSED_PARAM, char **argv)
 			printf("%02u:%02u:%02u\n", h, m, (unsigned)expires);
 		} else { /* -a */
 			time_t t = expires_abs;
-			fputs_stdout(ctime(&t));
+			char tbuf[CTIME_BUF_MAXLEN];
+			fputs_stdout(ctime_r(&t,tbuf));
 		}
 	}
 	/* close(fd); */

@@ -919,6 +919,7 @@ static NOINLINE int d4_recv_raw_packet(struct dhcp_packet *dhcp_pkt, int fd)
 	 || packet.ip.version != IPVERSION
 	 || packet.ip.ihl != (sizeof(packet.ip) >> 2)
 	 || packet.udp.dest != htons(CLIENT_PORT)
+	 || ntohs(packet.udp.len) < sizeof(packet.udp)
 	/* || bytes > (int) sizeof(packet) - can't happen */
 	 || ntohs(packet.udp.len) != (uint16_t)(bytes - sizeof(packet.ip))
 	) {
@@ -1617,7 +1618,7 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
 				len = d4_recv_raw_packet(&packet, client_data.sockfd);
 			if (len == -1) {
 				/* Error is severe, reopen socket */
-				bb_error_msg("read error: "STRERROR_FMT", reopening socket" STRERROR_ERRNO);
+				bb_simple_perror_msg("read error: reopening socket");
 				sleep(discover_timeout); /* 3 seconds by default */
 				change_listen_mode(client_data.listen_mode); /* just close and reopen */
 			}

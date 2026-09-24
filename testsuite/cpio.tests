@@ -166,9 +166,9 @@ mkdir -p cpio.testdir/extract
 # The output of "../dont_write" name by cpio -v can be either "../dont_write" or "dont_write" depending on FEATURE_TAR_LONG_OPTIONS.
 # sed 's:^../dont_write:dont_write:' is used to fix the output to be the same in either case.
 testing "cpio extract file outside of destination" "\
-(cd cpio.testdir/prepare/inner && echo -e '../dont_write\nto_extract' | cpio -o -H newc) | (cd cpio.testdir/extract && cpio -vi 2>&1) | sed 's:^../dont_write:dont_write:'
+(cd cpio.testdir/prepare/inner && $ECHO -e '../dont_write\nto_extract' | cpio -o -H newc) | (cd cpio.testdir/extract && cpio -vi 2>&1) | sed 's:^../dont_write:dont_write:'
 echo \$?
-test -f cpio.testdir/dont_write || echo cpio.testdir/dont_write does not exist" \
+test -f cpio.testdir/dont_write || $ECHO cpio.testdir/dont_write does not exist" \
 "\
 cpio: removing leading '../' from member names
 dont_write

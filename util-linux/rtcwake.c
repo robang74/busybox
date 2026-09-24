@@ -70,6 +70,7 @@ static NOINLINE bool may_wakeup(const char *rtcname)
 static NOINLINE void setup_alarm(int fd, time_t *wakeup, time_t rtc_time)
 {
 	struct tm *ptm;
+	struct tm tres;
 	struct linux_rtc_wkalrm wake;
 
 	/* The wakeup time is in POSIX time (more or less UTC).
@@ -82,7 +83,7 @@ static NOINLINE void setup_alarm(int fd, time_t *wakeup, time_t rtc_time)
 	 * Else mode is local so the time given to the RTC
 	 * will instead use the local time zone.
 	 */
-	ptm = localtime(wakeup);
+	ptm = localtime_r(wakeup,&tres);
 
 	wake.time.tm_sec = ptm->tm_sec;
 	wake.time.tm_min = ptm->tm_min;
@@ -120,8 +121,9 @@ int rtcwake_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int rtcwake_main(int argc UNUSED_PARAM, char **argv)
 {
 	unsigned opt;
-	const char *rtcname = NULL;
+	char tbuf[CTIME_BUF_MAXLEN];
 	const char *suspend = "standby";
+	const char *rtcname = NULL;
 	const char *opt_seconds;
 	const char *opt_time;
 
@@ -195,17 +197,18 @@ int rtcwake_main(int argc UNUSED_PARAM, char **argv)
 			 * Compat message text.
 			 * I'd say "RTC time is already ahead of ..." instead.
 			 */
-			bb_error_msg_and_die("time doesn't go backward to %s", ctime(&alarm_time));
+			bb_error_msg_and_die("time doesn't go backward to %s",
+				ctime_r(&alarm_time,tbuf));
 	} else
 		alarm_time = rtc_time + seconds + 1;
 
 	setup_alarm(fd, &alarm_time, rtc_time);
 	sync();
 #if 0 /*debug*/
-	printf("sys_time: %s", ctime(&sys_time));
-	printf("rtc_time: %s", ctime(&rtc_time));
+	printf("sys_time: %s", ctime_r(&sys_time,tbuf));
+	printf("rtc_time: %s", ctime_r(&rtc_time,tbuf));
 #endif
-	printf("wakeup from \"%s\" at %s", suspend, ctime(&alarm_time));
+	printf("wakeup from \"%s\" at %s", suspend, ctime_r(&alarm_time,tbuf));
 	fflush_all();
 	usleep(10 * 1000);
 

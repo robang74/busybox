@@ -18,14 +18,14 @@
 //config:	help
 //config:	sleep is used to pause for a specified number of seconds.
 //config:	It comes in 2 versions:
-//config:	- small: takes one integer parameter
+//config:	- small: takes one integer parameter or inf as infinite
 //config:	- fancy:
 //config:		* takes multiple integer arguments with suffixes:
 //config:			sleep 1d 2h 3m 15s
 //config:		* allows fractional numbers:
 //config:			sleep 2.3s 4.5h sleeps for 16202.3 seconds
-//config:	fancy is more compatible with coreutils sleep, but it adds around
-//config:	1k of code.
+//config:	The BB fancy sleep is more compatible with coreutils sleep,
+//config:	but it adds around 1Kb of code.
 //config:
 //config:config FEATURE_FANCY_SLEEP
 //config:	bool "Enable multiple arguments and s/m/h/d suffixes"
@@ -49,8 +49,8 @@
 //usage:#define sleep_full_usage "\n\n"
 //usage:	IF_NOT_FEATURE_FANCY_SLEEP("Pause for N seconds")
 //usage:	IF_FEATURE_FANCY_SLEEP(
-//usage:       "Pause for a time equal to the total of the args given, where each arg can\n"
-//usage:       "have an optional suffix of (s)econds, (m)inutes, (h)ours, or (d)ays")
+//usage:       "Pause for a time equal to the total of the args given or (inf)inite, where each"
+//usage:       " arg can have an optional suffix of (s)econds, (m)inutes, (h)ours, or (d)ays")
 //usage:
 //usage:#define sleep_example_usage
 //usage:       "$ sleep 2\n"

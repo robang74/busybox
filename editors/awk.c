@@ -894,7 +894,10 @@ static char nextchar(char **s)
 {
 	char c, *pps;
  again:
-	c = *(*s)++;
+	c = *(*s);
+	if (c == '\0')
+		return c; /* do not advance past the terminating NUL */
+	(*s)++;
 	pps = *s;
 	if (c == '\\')
 		c = bb_process_escape_sequence((const char**)s);
@@ -959,24 +962,147 @@ static double my_strtod_or_hexoct(char **pp)
 # define my_strtod_or_hexoct(p) my_strtod(p)
 #endif
 
+#define fmt_num_types_i "diouxXp"
+#define fmt_num_types_f "eEfFgGaA"
+#define fmt_num_types_d "0123456789"
+#define fmt_num_types_l "hjltz.-+*#"
+/*
+ * WARNING -- BACK COMPATIBILITY CORNER CASES BROKEN -- WARNING
+ *
+ * RAF: %Lf isn't acceptable because on 128 arch it creates a reading
+ * beyond the 64 bit double limit and the same happens accepting %lld,
+ * while big endian 128 bit is a super-computer arena, thus ignored.
+ * Finally, the best choice is to unsopport all 128 bit arch and keep
+ * the code minimal for 32 and 64 bit architectures.
+ */
+#if __SIZEOF_LONG__ > 8
+#warning "This architecture is at risk becase %ll and %L read beyond var"
+#endif
+
+#if 0 // RAF: set '0' to check the alternative codebase
+#define _ENABLE_DESKTOP 0 // ENABLE_DESKTOP
+#else
+#define _ENABLE_DESKTOP 1 // is always more convient here
+#endif
+
 /* -------- working with variables (set/get/copy/etc) -------- */
 
 static const char *fmt_num(const char *format, double n)
+// RAF: the intrinsic limitation by "double" as "n" type parameter
+// remains for integers which are going to lose precision outside
+// the (-2^53, 2^53) range supported by IEEE 754.
 {
+/*
+ * 	WARNING -- BACK COMPATIBILITY CORNER CASES BROKEN -- WARNING
+ */
+#if 0 // RAF: '1' breaks with printing a string with a single integer
+	  // properly formated identifier. While '0' breaks back-compatibility
+	  // with previous use of a wrong/void format with an integer number.
 	if (n == (long long)n) {
 		snprintf(g_buf, MAXVARFMT, "%lld", (long long)n);
-	} else {
-		const char *s = format;
-		char c;
-
-		do { c = *s; } while (c && *++s);
-		if (strchr("diouxX", c)) {
-			snprintf(g_buf, MAXVARFMT, format, (int)n);
-		} else if (strchr("eEfFgGaA", c)) {
-			snprintf(g_buf, MAXVARFMT, format, n);
-		} else {
-			syntax_error(EMSG_INV_FMT);
+	} else
+#endif
+	{
+		const char *s = format, *p = NULL;
+		unsigned char c;
+/*
+ * RAF: as per minimalist approach only the last specifier is considered
+ * therefore printf() performs on garbage I/O principle without crashes
+ * and walking trough multiple parameters without related values in mem.
+ *
+ * UPDATE: unfortunately this approach introduces a regression "val: %d".
+ * The p.2 is going to fix regression using the same loop but rejecting
+ * multiple specifiers and using the `format` parameter from users.
+ */
+	   while ((c = *s++)) {
+			if (c != '%') continue;
+			if (*s == '%') { s++; continue; }  // skip literal %%
+			if (p) { p = NULL; break; }  // 2nd specifier: reject
+			p = s;
+			if (*p == ' ') p++;        // allow one space after %
 		}
+		// RAF: when !p here, it means not only one %-field found
+		debug_printf_eval("c: '%c', p: '%s', s: '%s'\n",
+			c?:'0', s?:"(null)", p?:"(null)");
+		do {
+			if (!p || !(c = *p++)) {
+				syntax_error(EMSG_INV_FMT); // invalid, only here
+				break; // just to inform cc that it is a end-case
+			}
+#if _ENABLE_DESKTOP
+			// RAF: isdigit() is already size optimised in BusyBox
+			// but here s/char c/undigned &/ is enough to check(c)
+			if (c-'0' < 10 || strchr(fmt_num_types_l, c))
+			// RAF: skip format chars among those allowed
+				continue;
+#else
+			// RAF: a trailing space is the end of invalid %-field,
+			// while '%n' is the troblesome unsupported specifier.
+			if (c == ' ' || c == 'n')
+				p = 0; //syntax_error(EMSG_INV_FMT);
+#endif
+			if (strchr(fmt_num_types_i, c)) {
+				/*
+				 * RAF: almost lke round(n) but smaller elf however
+				 * correcting users using %d and giving a float do
+				 * not fit into minimalistic garbage I/O principle
+				 *
+				_IF_FEATURE_AWK_LIBM(n += (n>0) ? +0.5 : -0.5);
+				 *
+				 * RAF: the big endian 64 bit is troublesome in
+				 * dealing with "%d" when the cast is (long) while
+				 * %hd isn't because short are autopromoted (int)
+				 *
+#if BYTE_ORDER == BIG_ENDIAN && ULONG_MAX > 0xFFFFFFFFU
+				 */
+#if __BYTE_ORDER == __BIG_ENDIAN && __SIZEOF_LONG__ == 8
+#pragma message "fmt_num() is using int or long for %ld"
+				if(*(p-2) != 'l' || c == 'p')
+				snprintf(g_buf, MAXVARFMT, format, (int)n);
+				else
+				snprintf(g_buf, MAXVARFMT, format, (long)n);
+#else
+#pragma message "fmt_num() is using long long for %ld"
+				snprintf(g_buf, MAXVARFMT, format, (long long)n);
+#endif
+				break;
+			}
+			else
+			if (strchr(fmt_num_types_f, c)) {
+#if 0 // RAF: %llf isn't a valid format, printf will take care of it
+				if(*(p-2) == 'l' && *(p-3) == 'l')
+					goto llf_format_handle;
+#endif
+				// RAF: some implementations might recognise %llf as %Lf
+				// in that cases padding the printf would not help much
+				// because 128bit are on the stack not in the registry.
+				snprintf(g_buf, MAXVARFMT, format, n);
+				break;
+			}
+#if _ENABLE_DESKTOP
+/*
+ * Info by Dietmar Schindler, according to:
+ * - pubs.opengroup.org/onlinepubs/9799919799/utilities/awk.html
+ * - pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap05.html
+ * quoting this:
+ *   If any character sequence in the format string begins with a '%'
+ *   character, but does not form a valid conversion specification,
+ *   the behavior is unspecified
+ *
+ * RAF:
+ * For helping users debug their awk scripts, print the format
+ * given adding a short prefix "E?:" which to grep these cases
+ * A noble cause helping users to debug their awk scripts but
+ * in practice the "E?" flag is rare compared the GIGO volume.
+ */
+			#if 0 // RAF: using strncpy saves 3b, just "E?:", in footprint
+			snprintf(g_buf, MAXVARFMT, "E?:%s", format);
+			#else
+			strncpy(g_buf, format, MAXVARFMT);
+			#endif
+			break;
+#endif
+		} while(1);
 	}
 	return g_buf;
 }
@@ -1069,7 +1195,7 @@ static const char *getvar_s(var *v)
 		/* Get CONVFMT, unless we already recursed on it:
 		 * someone might try to cause stack overflow by setting
 		 * CONVFMT=9 (a numeric, not string, value)
-		 */
+		 */  
 		if (v != intvar[CONVFMT])
 			convfmt = getvar_s(intvar[CONVFMT]);
 		/* Convert the value */
@@ -1089,7 +1215,8 @@ static double getvar_i(var *v)
 		if (s && *s) {
 			debug_printf_eval("getvar_i: '%s'->", s);
 			v->number = my_strtod(&s);
-			/* ^^^ hex/oct NOT allowed here! */
+			/* ^^^ hex/oct NOT allowed in _input_ (POSIX) */
+			/* awk only allows hex/oct consts in _program_ */
 			debug_printf_eval("%f (s:'%s')\n", v->number, s);
 			if (v->type & VF_USER) {
 //TODO: skip_spaces() also skips backslash+newline, is it intended here?
@@ -1107,14 +1234,22 @@ static double getvar_i(var *v)
 	return v->number;
 }
 
+
+/*
+ * RAF: among bitwise and hexadecimal operations, the complements are those fail
+ *      and the reason is pretty clear: the complements are arch dependant ops
+ *      as much as the variable that stores the input/argument value. To settle
+ *      down this matter a fixed size "register" should be chosen and 32 bit
+ *      might not seem the best choice vs 64 bit but it the most universal one
+ */
 /* Used for operands of bitwise ops */
-static unsigned long getvar_i_int(var *v)
+static uint32_t getvar_i_int(var *v)
 {
 	double d = getvar_i(v);
 
 	/* Casting doubles to longs is undefined for values outside
 	 * of target type range. Try to widen it as much as possible */
-	if (d >= 0)
+	if (d >= 0.0)
 		return (unsigned long)d;
 	/* Why? Think about d == -4294967295.0 (assuming 32bit longs) */
 	return - (long) (unsigned long) (-d);
@@ -2443,7 +2578,20 @@ static char *awk_printf(node *n, size_t *len)
 		char sv;
 		var *arg;
 		size_t slen;
-
+		char *fmt_str = NULL;
+#if ENABLE_DESKTOP
+#define fmt_buf_size 64
+		int w;
+		char fmt_buf[fmt_buf_size];
+		char *p, *out = fmt_buf;
+		bool has_star = 0, has_prec = 0;
+#if 0 //RAF: debug only
+		char sze = fmt_buf_size-2;
+#define chksze(n) { if((sze-=(n)) <= 0) syntax_error("%* format too long"); }
+#else
+#define chksze(n)
+#endif
+#endif
 		/* Find end of the next format spec, or end of line */
 		s = f;
 		while (1) {
@@ -2454,30 +2602,83 @@ static char *awk_printf(node *n, size_t *len)
 			if (c == '%')
 				break;
 		}
+#if ENABLE_DESKTOP
+		p = f - 1;
+		*out++ = '%'; //RAF: sze--, but already computed in fmt_buf_size-2
+#endif
 		/* we are past % in "....%..." */
 		c = *f;
-		if (!c) /* "....%" */
-			goto nul;
+		if (!c) { /* "....%" */
+nul:
+			slen = f - s;
+			goto tail;
+	    }
 		if (c == '%') { /* "....%%...." */
 			slen = f - s;
 			s = xstrndup(s, slen);
 			f++;
 			goto append; /* print "....%" part verbatim */
 		}
-		while (1) {
-			if (isalpha(c))
-				break;
-			if (c == '*') /* gawk supports %*d and %*.*f, we don't... */
-				syntax_error("%*x formats are not supported");
+
+#if ENABLE_DESKTOP
+		/* flags */
+		while (c && strchr("+- 0#", c)) {
+			*out++ = c;
 			c = *++f;
-			if (!c) { /* "....%...." and no letter found after % */
-				/* Example: awk 'BEGIN { printf "^^^%^^^\n"; }' */
- nul:
-				slen = f - s;
-				goto tail; /* print remaining string, exit loop */
+			chksze(1);
+		}
+
+star_again:
+		if (c == '*') {
+			char wrn;
+			has_star = 1;
+			w = (int)getvar_i(evaluate(nextarg(&n), TMPVAR));
+			if(has_prec && w < 0) w = 0;
+			wrn = sprintf(out, "%d", w);
+			out += wrn;
+			chksze(wrn);
+			c = *++f;
+			if (c >= '0' && c <= '9') /* invalidate "^^^%5.*8f^^^" */
+//invalid:
+				syntax_error("invalid format specifier");
+		} else {
+			while (c >= '0' && c <= '9') {
+				*out++ = c;
+				c = *++f;
+				chksze(1);
 			}
 		}
-		/* we are at A in "....%...A..." */
+
+		/* precision */
+		if (c == '.') {
+			*out++ = '.';
+			c = *++f;
+			chksze(1);
+			has_prec=1;
+			goto star_again;
+		}
+
+/*
+ * RAF,TODO: it is not just about 'fmt_num_types_l' but we need to consider
+ *          moving  %* in fmt_num() altogether, for the most of generality
+ *          single place of code running, maintenance and footprint size
+ */
+		/* long integer */
+		if (strchr(fmt_num_types_l, c)) {
+			*out++ = c;
+			c = *++f;
+			chksze(1);
+		}
+#if 0
+//RAF: alternative branch of compilation (+16b) with different output on edge cases
+		else
+		if (!isalpha(c))
+			goto invalid;
+#endif
+#else
+		if (c == '*')
+			syntax_error("%* requires ENABLE_DESKTOP");
+#endif
 
 		arg = evaluate(nextarg(&n), TMPVAR);
 
@@ -2486,37 +2687,43 @@ static char *awk_printf(node *n, size_t *len)
 		 */
 		sv = *++f;
 		*f = '\0';
+#if ENABLE_DESKTOP
+		*out++ = c;
+		chksze(1);
+		*out = '\0'; //RAF: sze--, but already computed in fmt_buf_size-2
+		if (has_star) {
+			size_t prefix_len = p - s;
+			size_t fmt_buf_len = out - fmt_buf + 1; //RAF: faster than strnlen()
+			fmt_str = xmalloc(prefix_len + fmt_buf_len);
+			memcpy(fmt_str, s, prefix_len);
+			//RAF: since we already calculated fmt_buf_len for xmalloc() then
+			//     using that value costs 4 bytes but memcpy() is faster than
+			//     strcpy() because it has not to find the trailing \0 again.
+			memcpy(fmt_str + prefix_len, fmt_buf, fmt_buf_len);
+		} else
+#endif //RAF,TODO: it would be nice to use 's' instead of 'fmt_str' here below
+		fmt_str = s;
 		if (c == 'c') {
 			char cc = is_numeric(arg) ? getvar_i(arg) : *getvar_s(arg);
-			char *r = xasprintf(s, cc ? cc : '^' /* else strlen will be wrong */);
+			char *r = xasprintf(fmt_str, cc ? cc : '^' /* else strlen will be wrong */);
 			slen = strlen(r);
 			if (cc == '\0') /* if cc is NUL, re-format the string with it */
-				sprintf(r, s, cc);
+				sprintf(r, fmt_str, cc);
 			s = r;
 		} else {
 			if (c == 's') {
-				s = xasprintf(s, getvar_s(arg));
+				s = xasprintf(fmt_str, getvar_s(arg));
 			} else {
-				double d = getvar_i(arg);
-				if (strchr("diouxX", c)) {
-//TODO: make it wider here (%x -> %llx etc)?
-//Can even print the value into a temp string with %.0f,
-//then replace diouxX with s and print that string.
-//This will correctly print even very large numbers,
-//but some replacements are not equivalent:
-//%09d -> %09s: breaks zero-padding;
-//%+d -> %+s: won't prepend +; etc
-					s = xasprintf(s, (int)d);
-				} else if (strchr("eEfFgGaA", c)) {
-					s = xasprintf(s, d);
-				} else {
-					/* gawk 5.1.1 printf("%W") prints "%W", does not error out */
-					s = xstrndup(s, f - s);
-				}
+				//RAF: re-use the novel fmt_num() here
+				s = xstrdup(fmt_num(fmt_str, getvar_i(arg)));
 			}
 			slen = strlen(s);
 		}
 		*f = sv;
+#if ENABLE_DESKTOP
+		if (has_star)
+			free(fmt_str);
+#endif
  append:
 		if (i == 0) {
 			b = s;
@@ -2553,6 +2760,7 @@ static char *awk_printf(node *n, size_t *len)
 static int awk_sub(node *rn, const char *repl, int nm, var *src, var *dest /*,int subexp*/)
 {
 	char *resbuf;
+	char *repl_copy;
 	const char *sp;
 	int match_no, residx, replen, resbufsize;
 	int regexec_flags;
@@ -2570,7 +2778,9 @@ static int awk_sub(node *rn, const char *repl, int nm, var *src, var *dest /*,in
 	resbuf = NULL;
 	residx = 0;
 	match_no = 0;
+	repl_copy = xstrdup(repl);
 	regex = as_regex(rn, &sreg);
+	repl = repl_copy;
 	sp = getvar_s(src ? src : intvar[F0]);
 #if defined(REG_STARTEND)
 	src_string = sp;
@@ -2660,10 +2870,11 @@ static int awk_sub(node *rn, const char *repl, int nm, var *src, var *dest /*,in
 	setvar_p(dest ? dest : intvar[F0], resbuf);
 	if (regex == &sreg)
 		regfree(regex);
+	free(repl_copy); // RAF: mandatory because awk repetitive/recursive nature
 	return match_no;
 }
 
-static NOINLINE int do_mktime(const char *ds)
+static NOINLINE time_t do_mktime(const char *ds)
 {
 	struct tm then;
 	int count;
@@ -2717,15 +2928,12 @@ static NOINLINE var *exec_builtin(node *op, var *res)
 {
 #define tspl (G.exec_builtin__tspl)
 
-	var *tmpvars;
-	node *an[4];
-	var *av[4];
+	var *tmpvars, *av[4];
+	node *spl, *an[4];
 	const char *as[4];
-	node *spl;
 	uint32_t isr, info;
-	int nargs;
+	int nargs, i, l, ll, n;
 	time_t tt;
-	int i, l, ll, n;
 
 	tmpvars = nvalloc(4);
 #define TMPVAR0 (tmpvars)
@@ -2864,10 +3072,13 @@ static NOINLINE var *exec_builtin(node *op, var *res)
 			tt = getvar_i(av[1]);
 		else
 			time(&tt);
-		i = strftime(g_buf, MAXVARFMT,
-			((nargs > 0) ? as[0] : "%a %b %d %H:%M:%S %Z %Y"),
-			localtime(&tt));
-		setvar_sn(res, g_buf, i);
+		{ // RAF: scope limitation of tres + code if/else clarity
+			struct tm tres;
+			i = strftime(g_buf, MAXVARFMT,
+				((nargs > 0) ? as[0] : "%a %b %d %H:%M:%S %Z %Y"),
+				localtime_r(&tt,&tres));
+			setvar_sn(res, g_buf, i);
+		}
 		break;
 
 	case B_mt:
@@ -3149,8 +3360,9 @@ static var *evaluate(node *op, var *res)
 					for (;;) {
 						var *v = evaluate(nextarg(&op1), TMPVAR0);
 						if (v->type & VF_NUMBER) {
-							fputs(fmt_num(getvar_s(intvar[OFMT]), getvar_i(v)),
-								F);
+							fputs(fmt_num("%lu", getvar_i_int(v)), F);
+							//fputs(fmt_num(getvar_s(intvar[OFMT]), getvar_i(v)),
+							//	F);
 						} else {
 							fputs(getvar_s(v), F);
 						}

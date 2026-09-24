@@ -205,17 +205,18 @@ static NOINLINE void do_shm(int format)
 		pw = getpwuid(ipcp->uid);
 		switch (format) {
 		case TIME:
+			char tbuf[CTIME_BUF_MAXLEN];
 			if (pw)
 				printf("%-10d %-10.10s", shmid, pw->pw_name);
 			else
 				printf("%-10d %-10d", shmid, ipcp->uid);
-			/* ctime uses static buffer: use separate calls */
+			/* ctime_r uses the same buffer: do separate calls */
 			printf(" %-20.16s", shmseg.shm_atime
-					? ctime(&shmseg.shm_atime) + 4 : "Not set");
+					? ctime_r(&shmseg.shm_atime,tbuf) + 4 : "Not set");
 			printf(" %-20.16s", shmseg.shm_dtime
-					? ctime(&shmseg.shm_dtime) + 4 : "Not set");
+					? ctime_r(&shmseg.shm_dtime,tbuf) + 4 : "Not set");
 			printf(" %-20.16s\n", shmseg.shm_ctime
-					? ctime(&shmseg.shm_ctime) + 4 : "Not set");
+					? ctime_r(&shmseg.shm_ctime,tbuf) + 4 : "Not set");
 			break;
 		case PID:
 			if (pw)
@@ -321,15 +322,16 @@ static NOINLINE void do_sem(int format)
 		pw = getpwuid(ipcp->uid);
 		switch (format) {
 		case TIME:
+			char tbuf[CTIME_BUF_MAXLEN];
 			if (pw)
 				printf("%-8d %-10.10s", semid, pw->pw_name);
 			else
 				printf("%-8d %-10d", semid, ipcp->uid);
-			/* ctime uses static buffer: use separate calls */
+			/* ctime_r uses the same buffer: do separate calls */
 			printf("  %-26.24s", semary.sem_otime
-					? ctime(&semary.sem_otime) : "Not set");
+					? ctime_r(&semary.sem_otime,tbuf) : "Not set");
 			printf(" %-26.24s\n", semary.sem_ctime
-					? ctime(&semary.sem_ctime) : "Not set");
+					? ctime_r(&semary.sem_ctime,tbuf) : "Not set");
 			break;
 		case PID:
 			break;
@@ -422,16 +424,17 @@ static NOINLINE void do_msg(int format)
 		pw = getpwuid(ipcp->uid);
 		switch (format) {
 		case TIME:
+			char tbuf[CTIME_BUF_MAXLEN];
 			if (pw)
 				printf("%-8d %-10.10s", msqid, pw->pw_name);
 			else
 				printf("%-8d %-10d", msqid, ipcp->uid);
 			printf(" %-20.16s", msgque.msg_stime
-					? ctime(&msgque.msg_stime) + 4 : "Not set");
+					? ctime_r(&msgque.msg_stime,tbuf) + 4 : "Not set");
 			printf(" %-20.16s", msgque.msg_rtime
-					? ctime(&msgque.msg_rtime) + 4 : "Not set");
+					? ctime_r(&msgque.msg_rtime,tbuf) + 4 : "Not set");
 			printf(" %-20.16s\n", msgque.msg_ctime
-					? ctime(&msgque.msg_ctime) + 4 : "Not set");
+					? ctime_r(&msgque.msg_ctime,tbuf) + 4 : "Not set");
 			break;
 		case PID:
 			if (pw)
@@ -464,6 +467,7 @@ static void print_shm(int shmid)
 {
 	struct shmid_ds shmds;
 	struct ipc_perm *ipcp = &shmds.shm_perm;
+	char tbuf[CTIME_BUF_MAXLEN];
 
 	if (shmctl(shmid, IPC_STAT, &shmds) == -1) {
 		bb_simple_perror_msg("shmctl");
@@ -480,16 +484,18 @@ static void print_shm(int shmid)
 			(long) shmds.shm_segsz, shmds.shm_lpid, shmds.shm_cpid,
 			(long) shmds.shm_nattch);
 	printf("att_time=%-26.24s\n",
-			shmds.shm_atime ? ctime(&shmds.shm_atime) : "Not set");
+			shmds.shm_atime ? ctime_r(&shmds.shm_atime,tbuf) : "Not set");
 	printf("det_time=%-26.24s\n",
-			shmds.shm_dtime ? ctime(&shmds.shm_dtime) : "Not set");
-	printf("change_time=%-26.24s\n\n", ctime(&shmds.shm_ctime));
+			shmds.shm_dtime ? ctime_r(&shmds.shm_dtime,tbuf) : "Not set");
+	printf("change_time=%-26.24s\n\n",
+			ctime_r(&shmds.shm_ctime,tbuf));
 }
 
 static void print_msg(int msqid)
 {
 	struct msqid_ds buf;
 	struct ipc_perm *ipcp = &buf.msg_perm;
+	char tbuf[CTIME_BUF_MAXLEN];
 
 	if (msgctl(msqid, IPC_STAT, &buf) == -1) {
 		bb_simple_perror_msg("msgctl");
@@ -510,17 +516,18 @@ static void print_msg(int msqid)
 			(long) buf.msg_qnum, buf.msg_lspid, buf.msg_lrpid);
 
 	printf("send_time=%-26.24s\n",
-			buf.msg_stime ? ctime(&buf.msg_stime) : "Not set");
+			buf.msg_stime ? ctime_r(&buf.msg_stime,tbuf) : "Not set");
 	printf("rcv_time=%-26.24s\n",
-			buf.msg_rtime ? ctime(&buf.msg_rtime) : "Not set");
+			buf.msg_rtime ? ctime_r(&buf.msg_rtime,tbuf) : "Not set");
 	printf("change_time=%-26.24s\n\n",
-			buf.msg_ctime ? ctime(&buf.msg_ctime) : "Not set");
+			buf.msg_ctime ? ctime_r(&buf.msg_ctime,tbuf) : "Not set");
 }
 
 static void print_sem(int semid)
 {
 	struct semid_ds semds;
 	struct ipc_perm *ipcp = &semds.sem_perm;
+	char tbuf[CTIME_BUF_MAXLEN];
 	union semun arg;
 	unsigned int i;
 
@@ -539,10 +546,9 @@ static void print_sem(int semid)
 			ipcp->uid, ipcp->gid, ipcp->cuid, ipcp->cgid,
 			ipcp->mode, ipcp->mode & 0777,
 			(long) semds.sem_nsems,
-			semds.sem_otime ? ctime(&semds.sem_otime) : "Not set");
+			semds.sem_otime ? ctime_r(&semds.sem_otime,tbuf) : "Not set");
 	printf("ctime = %-26.24s\n"
-			"%-10s %-10s %-10s %-10s %-10s\n",
-			ctime(&semds.sem_ctime),
+			"%-10s %-10s %-10s %-10s %-10s\n", ctime_r(&semds.sem_ctime,tbuf),
 			"semnum", "value", "ncount", "zcount", "pid");
 
 	arg.val = 0;

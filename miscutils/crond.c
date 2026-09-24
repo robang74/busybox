@@ -414,9 +414,8 @@ static void delete_cronfile(const char *userName)
 
 static void load_crontab(const char *fileName)
 {
-	struct parser_t *parser;
+	struct parser_t *parser = NULL;
 	struct stat sbuf;
-	int maxLines;
 	char *tokens[6];
 #if ENABLE_FEATURE_CROND_CALL_SENDMAIL
 	char *mailTo = NULL;
@@ -426,18 +425,16 @@ static void load_crontab(const char *fileName)
 
 	delete_cronfile(fileName);
 
-	if (!getpwnam(fileName)) {
-		log7("ignoring file '%s' (no such user)", fileName);
-		return;
+	if (!getpwnam(fileName)
+	 || !(parser = config_open(fileName))
+	 ||  fstat(fileno(parser->fp), &sbuf)
+	 ||  sbuf.st_uid != DAEMON_UID
+	) {
+		log7("ignoring file '%s' (invalid)", fileName);
 	}
-
-	parser = config_open(fileName);
-	if (!parser)
-		return;
-
-	maxLines = (strcmp(fileName, "root") == 0) ? 65535 : MAXLINES;
-
-	if (fstat(fileno(parser->fp), &sbuf) == 0 && sbuf.st_uid == DAEMON_UID) {
+	else
+	{
+		int maxLines = (strcmp(fileName, "root") == 0) ? 65535 : MAXLINES;
 		CronFile *file = xzalloc(sizeof(CronFile));
 		CronLine **pline;
 		int n;
@@ -893,14 +890,14 @@ static void flag_starting_jobs(time_t t1, time_t t2)
 	/* Find jobs > t1 and <= t2 */
 
 	for (t = t1 - t1 % 60; t <= t2; t += 60) {
-		struct tm *ptm;
+		struct tm *ptm, tres;
 		CronFile *file;
 		CronLine *line;
 
 		if (t <= t1)
 			continue;
 
-		ptm = localtime(&t);
+		ptm = localtime_r(&t,&tres);
 		for (file = G.cron_files; file; file = file->cf_next) {
 			log5("file %s:", file->cf_username);
 			if (file->cf_deleted)

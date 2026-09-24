@@ -1374,7 +1374,7 @@ static int test_net_to_pty_data_integrity(void)
 				break; /* error (parent closed master) - expected */
 			}
 			/* If happens, probably kernel bug! */
-			if (retry != 0) bb_error_msg_and_die("READ DATA AFTER EOF/ERROR RETRY!!!");
+			if (retry != 0) bb_simple_error_msg_and_die("READ DATA AFTER EOF/ERROR RETRY!!!");
 #if SAVE_NET2PTY_ACTUAL
 			xwrite(out_fd, read_buf, n);
 #endif
@@ -1412,9 +1412,9 @@ static int test_net_to_pty_data_integrity(void)
 		/* This should be done inside ioloop. Check where possible: */
 		//free_connection(conn);
 		if (close(sock_pair[0]) == 0) /* should be EBADF */
-			bb_error_msg_and_die("BUG: net read side wasn't closed");
+			bb_simple_error_msg_and_die("BUG: net read side wasn't closed");
 		if (close(ptyfd) == 0)
-			bb_error_msg_and_die("BUG: pty write side wasn't closed");
+			bb_simple_error_msg_and_die("BUG: pty write side wasn't closed");
 
 		free_ioloop_state(io);
 	}
@@ -1617,9 +1617,9 @@ static int test_pty_to_net_data_integrity(void)
 		/* This should be done inside ioloop. Check where possible: */
 		//free_connection(conn);
 		if (close(sock_pair[1]) == 0) /* should be EBADF */
-			bb_error_msg_and_die("BUG: net write side wasn't closed");
+			bb_simple_error_msg_and_die("BUG: net write side wasn't closed");
 		if (close(ptyfd) == 0)
-			bb_error_msg_and_die("BUG: pty read side wasn't closed");
+			bb_simple_error_msg_and_die("BUG: pty read side wasn't closed");
 
 		free_ioloop_state(io);
 	}

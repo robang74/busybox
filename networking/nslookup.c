@@ -808,6 +808,8 @@ static NOINLINE int parse_reply(const unsigned char *msg, size_t len)
 				return -1;
 			}
 			n = *(unsigned char *)ns_rr_rdata(rr);
+			// RAF, TODO: max lenght limit or return(-1), pros vs cons?
+			if(n > rdlen - 1) n = rdlen - 1;
 			if (n > 0) {
 				memset(dname, 0, sizeof(dname));
 				memcpy(dname, ns_rr_rdata(rr) + 1, n);
@@ -825,7 +827,7 @@ static NOINLINE int parse_reply(const unsigned char *msg, size_t len)
 			n = ns_name_uncompress(ns_msg_base(handle), ns_msg_end(handle),
 			                       cp + 6, dname, sizeof(dname));
 
-			if (n < 0) {
+			if (n < 0 || n > rdlen) {
 				//printf("Unable to uncompress domain: %s\n", strerror(errno));
 				return -1;
 			}
@@ -835,6 +837,12 @@ static NOINLINE int parse_reply(const unsigned char *msg, size_t len)
 			break;
 
 		case ns_t_soa:
+			int k;
+			#define _nstrn 5
+			const unsigned char *ip = ns_rr_rdata(rr);
+			static const char *prtstr[_nstrn] = {
+				"serial", "refresh", "retry", "expire", "minimum"
+			};
 			if (rdlen < 20) {
 				dbg("SOA record too short:%d\n", rdlen);
 				return -1;
@@ -845,7 +853,7 @@ static NOINLINE int parse_reply(const unsigned char *msg, size_t len)
 			cp = ns_rr_rdata(rr);
 			n = ns_name_uncompress(ns_msg_base(handle), ns_msg_end(handle),
 			                       cp, dname, sizeof(dname));
-			if (n < 0) {
+			if (n < 0 || n > rdlen) {
 				//printf("Unable to uncompress domain: %s\n", strerror(errno));
 				return -1;
 			}
@@ -855,7 +863,7 @@ static NOINLINE int parse_reply(const unsigned char *msg, size_t len)
 
 			n = ns_name_uncompress(ns_msg_base(handle), ns_msg_end(handle),
 			                       cp, dname, sizeof(dname));
-			if (n < 0) {
+			if (n < 0 || n > rdlen) {
 				//printf("Unable to uncompress domain: %s\n", strerror(errno));
 				return -1;
 			}
@@ -863,19 +871,10 @@ static NOINLINE int parse_reply(const unsigned char *msg, size_t len)
 			printf("\tmail addr = %s\n", dname);
 			cp += n;
 
-			printf("\tserial = %lu\n", ns_get32(cp));
-			cp += 4;
-
-			printf("\trefresh = %lu\n", ns_get32(cp));
-			cp += 4;
-
-			printf("\tretry = %lu\n", ns_get32(cp));
-			cp += 4;
-
-			printf("\texpire = %lu\n", ns_get32(cp));
-			cp += 4;
-
-			printf("\tminimum = %lu\n", ns_get32(cp));
+			// RAF, TODO: max lenght limit or return(-1), pros vs cons?
+			for(k = 0, ip += rdlen; cp+4 <= ip && k < _nstrn; cp += 4, k++)
+				printf("\t%s = %lu\n", prtstr[k], ns_get32(cp));
+			if(k != 5) return -1;
 			break;
 
 		default:

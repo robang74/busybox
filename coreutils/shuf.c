@@ -19,12 +19,12 @@
 //usage:#define shuf_trivial_usage
 //usage:       "[-n NUM] [-o FILE] [-z] [FILE | -e [ARG...] | -i L-H]"
 //usage:#define shuf_full_usage "\n\n"
-//usage:       "Randomly permute lines\n"
-//usage:     "\n	-n NUM	Output at most NUM lines"
-//usage:     "\n	-o FILE	Write to FILE, not standard output"
-//usage:     "\n	-z	NUL terminated output"
-//usage:     "\n	-e	Treat ARGs as lines"
-//usage:     "\n	-i L-H	Treat numbers L-H as lines"
+//usage:       "Randomly permute lines, arguments or integers\n"
+//usage:     "\n	-n NUM   output at most NUM items"
+//usage:     "\n	-o FILE  write to FILE, not standard output"
+//usage:     "\n	-z       null terminated output"
+//usage:     "\n	-e ARGs  treat each argument as a text line"
+//usage:     "\n	-i L-H   for permuting integers in L-H range"
 
 #include "libbb.h"
 
@@ -37,6 +37,47 @@
 #define OPT_z		(1 << 4)
 #define OPT_STR		"ei:n:o:z"
 
+#define murmul1 0xff51afd7ed558ccdULL
+
+#if 0
+static inline
+unsigned random_in_range(unsigned min, unsigned max)
+{
+	unsigned r = rand();
+	/* RAND_MAX can be as small as 32767 */
+	if (max > RAND_MAX)
+		r ^= rand() << 15;
+	return r % max;
+}
+#else
+static inline
+uint32_t random_in_range(uint32_t min, uint32_t max)
+{
+	uint64_t r = rand();
+
+	/* RAND_MAX can be as small as 32767 */
+	if ((max-min) & 0xff000000)
+	r ^= (uint64_t)rand() << 25;
+	r ^= (uint64_t)rand() << 17;
+	r ^= (uint64_t)rand() <<  7;
+	r *= murmul1;
+	r ^= (r >> 32) | (r << 32);
+	r %= max-min; // %-fold ratio 8 bits min.
+	r += min;
+
+	return r;
+}
+#endif
+#define random_numline() random_in_range(0, numlines)
+
+static inline
+void srand_init(void)
+{
+	struct timespec ts;
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	srand( ts.tv_sec ^ ts.tv_nsec );
+}
+
 /*
  * Use the Fisher-Yates shuffle algorithm on an array of lines.
  * If the required number of output lines is less than the total
@@ -44,20 +85,11 @@
  */
 static void shuffle_lines(char **lines, unsigned numlines, unsigned outlines)
 {
-	srand(monotonic_us());
+	srand_init();
 
 	while (outlines != 0) {
 		char *tmp;
-		unsigned r = rand();
-		/* RAND_MAX can be as small as 32767 */
-		if (numlines > RAND_MAX)
-			r ^= rand() << 15;
-		r %= numlines;
-//TODO: the above method is seriously non-uniform when numlines is very large.
-//For example, with numlines of   0xf0000000,
-//values of (r % numlines) in [0, 0x0fffffff] range
-//are more likely: e.g. r=1 and r=0xf0000001 both map to 1,
-//whereas only one value, r=0xefffffff, maps to 0xefffffff.
+		unsigned r = random_numline();
 		numlines--;
 		tmp = lines[numlines];
 		lines[numlines] = lines[r];
@@ -161,10 +193,8 @@ int shuf_main(int argc, char **argv)
 		}
 
 		numlines = hi + 1;
-		lines = xmalloc((size_t)numlines * sizeof(lines[0]));
-		for (i = 0; i < numlines; i++) {
-			lines[i] = (char*)(uintptr_t)i;
-		}
+		/* lines[] is allocated below, when outlines is known */
+		lines = NULL;
 	} else {
 		/* default - read lines from stdin or the input file */
 		FILE *fp;
@@ -196,7 +226,43 @@ int shuf_main(int argc, char **argv)
 			outlines = numlines;
 	}
 
-	shuffle_lines(lines, numlines, outlines);
+	srand(monotonic_us());
+
+	if (opts & OPT_i) {
+		if( (unsigned long long)outlines * outlines / 2 < numlines ) {
+		    /*
+		     * Do not create a "virtual line" for each number in the range:
+		     * a large range with a small -n COUNT would use lots of memory
+		     * and time just to output a few numbers (and worse,
+		     * e.g. "shuf -i 1-2222222222 -n 1" would fail to allocate
+		     * ~17 gigabytes). Instead, pick COUNT distinct random numbers
+		     * from the range. Expected number of comparisons below
+		     * is less than outlines^2 / 2 < numlines - cheaper than
+		     * creating and shuffling the full array.
+		     */
+		    // RAF, RATIONALE
+		    // rejection sampling and partial Fisher-Yates provides in output
+		    // the same distribution: an items permutation without duplicates.
+
+		    lines = xmalloc((size_t)outlines * sizeof(lines[0]));
+		    for (i = 0; i < outlines; i++) {
+			    unsigned j;
+			    uintptr_t v;
+		    again:
+			    v = random_numline();
+			    for (j = 0; j < i; j++)
+				    if ((uintptr_t)lines[j] == v)
+						goto again; /* duplicate, pick another */
+			    lines[i] = (char*)v;
+		    }
+		    numlines = outlines;
+		} else {
+			lines = xmalloc((size_t)numlines * sizeof(lines[0]));
+			for (i = 0; i < numlines; i++)
+				lines[i] = (char*)(uintptr_t)i;
+			shuffle_lines(lines, numlines, outlines);
+		}
+	}
 
 	if (opts & OPT_o)
 		xmove_fd(xopen(opt_o_str, O_WRONLY|O_CREAT|O_TRUNC), STDOUT_FILENO);

@@ -2461,7 +2461,7 @@ initvar(void)
 #if ENABLE_FEATURE_EDITING && ENABLE_FEATURE_EDITING_FANCY_PROMPT
 	vps1.var_text = "PS1=\\w \\$ ";
 #else
-	if (!get_cached_euid(&groupinfo.euid));
+	if (!get_cached_euid(&groupinfo.euid))
 		vps1.var_text = "PS1=# ";
 #endif
 	vp = varinit;
@@ -2587,6 +2587,7 @@ setvareq(char *s, int flags)
 		if (((flags & (VEXPORT|VREADONLY|VSTRFIXED|VUNSET)) | (vp->flags & VSTRFIXED)) == VUNSET) {
 			*vpp = vp->next;
 			free(vp);
+			vp = NULL;
  out_free:
 			if ((flags & (VTEXTFIXED|VSTACK|VNOSAVE)) == VNOSAVE)
 				free(s);
@@ -3664,16 +3665,20 @@ signal_handler(int signo)
 		if (!trap[SIGCHLD])
 			return;
 	}
-#if ENABLE_FEATURE_EDITING
-//TODO: don't do it if it's SIGCHLD?
-	bb_got_signal = signo; /* for read_line_input / read builtin: "we got a signal" */
-#endif
-	gotsig[signo - 1] = 1; /* "run a trap for this later" */
+
 	pending_sig = signo;
+	gotsig[pending_sig - 1] = 1; /* "run a trap for this later" */
+#if ENABLE_FEATURE_EDITING  //TODO: don't do it if it's SIGCHLD?
+	/* for read_line_input / read builtin: "we got a signal" */
+	bb_got_signal = pending_sig;
+#endif
 
 	if (signo == SIGINT && !trap[SIGINT]) {
 		if (!suppress_int) {
 			pending_sig = 0;
+#if ENABLE_FEATURE_EDITING
+			bb_got_signal = pending_sig;
+#endif
 			raise_interrupt(); /* does not return */
 		}
 		pending_int = 1;
@@ -4324,9 +4329,6 @@ getstatus(struct job *job)
 #define DOWAIT_NONBLOCK 0	/* waitpid() will use WNOHANG and won't wait for signals */
 #define DOWAIT_BLOCK    1	/* waitpid() will NOT use WNOHANG */
 #define DOWAIT_CHILD_OR_SIG 2	/* waitpid() will use WNOHANG and if got 0, will wait for signals, then loop back */
-#if BASH_WAIT_N
-# define DOWAIT_JOBSTATUS 0x10  /* OR this to get job's exitstatus instead of pid */
-#endif
 
 static int
 waitproc(int block, int *status)
@@ -4372,16 +4374,12 @@ waitproc(int block, int *status)
 	return err;
 }
 
-static int waitone(int block, struct job *job)
+static struct job *waitone(int block, struct job *job)
 {
 	int pid;
 	int status;
 	struct job *jp;
 	struct job *thisjob = NULL;
-#if BASH_WAIT_N
-	bool want_jobexitstatus = (block & DOWAIT_JOBSTATUS);
-	block = (block & ~DOWAIT_JOBSTATUS);
-#endif
 
 	TRACE(("dowait(0x%x) called\n", block));
 
@@ -4407,7 +4405,7 @@ static int waitone(int block, struct job *job)
 	pid = waitproc(block, &status);
 	TRACE(("wait returns pid %d, status=%d\n", pid, status));
 	if (pid <= 0)
-		goto out;
+		return NULL;
 
 	for (jp = curjob; jp; jp = jp->prev_job) {
 		int jobstate;
@@ -4460,13 +4458,6 @@ static int waitone(int block, struct job *job)
  out:
 	INTON;
 
-#if BASH_WAIT_N
-	if (want_jobexitstatus) {
-		pid = -1;
-		if (thisjob && thisjob->state == JOBDONE)
-			pid = thisjob->ps[thisjob->nprocs - 1].ps_status;
-	}
-#endif
 	if (thisjob && thisjob == job) {
 		char s[48 + 1];
 		int len;
@@ -4478,32 +4469,45 @@ static int waitone(int block, struct job *job)
 			out2str(s);
 		}
 	}
-	return pid;
+
+	return thisjob;
 }
 
-static int dowait(int block, struct job *jp)
+static struct job *dowait_status(void)
+{
+	struct job *jp, *rjp = NULL;
+	int block = DOWAIT_CHILD_OR_SIG;
+
+	do {
+		jp = waitone(block, NULL);
+		if (jp && jp->state == JOBDONE) {
+			rjp = jp;
+			block = DOWAIT_NONBLOCK;
+		}
+		if (pending_sig)
+			break;
+	} while (jp || !rjp);
+
+	return rjp;
+}
+
+static void dowait(int block, struct job *jp)
 {
 	smallint gotchld = *(volatile smallint *)&gotsigchld;
-	int rpid;
-	int pid;
+	struct job *rjp;
 
 	if (jp && jp->state != JOBRUNNING)
 		block = DOWAIT_NONBLOCK;
 
 	if (block == DOWAIT_NONBLOCK && !gotchld)
-		return 1;
-
-	rpid = 1;
+		return;
 
 	do {
-		pid = waitone(block, jp);
-		rpid &= !!pid;
+		rjp = waitone(block, jp);
 
-		if (!pid || (jp && jp->state != JOBRUNNING))
+		if (!rjp || (jp && jp->state != JOBRUNNING))
 			block = DOWAIT_NONBLOCK;
-	} while (pid >= 0);
-
-	return rpid;
+	} while (block != DOWAIT_NONBLOCK || rjp);
 }
 
 /*
@@ -4823,12 +4827,17 @@ waitcmd(int argc UNUSED_PARAM, char **argv)
 	if (!argv[0]) {
 		/* wait for all jobs / one job if -n */
 		for (;;) {
-			jp = curjob;
 #if BASH_WAIT_N
-			if (one && !jp)
+			if (one) {
+				for (jp = curjob; jp; jp = jp->prev_job) {
+					if (jp->state == JOBDONE && !jp->waited)
+						goto oneout;
+				}
 				/* exitcode of "wait -n" with nothing to wait for is 127, not 0 */
 				retval = 127;
+			}
 #endif
+			jp = curjob;
 			while (1) {
 				if (!jp) /* no running procs */
 					goto ret;
@@ -4845,7 +4854,7 @@ waitcmd(int argc UNUSED_PARAM, char **argv)
 	 * the trap is executed."
 	 */
 #if BASH_WAIT_N
-			status = dowait(DOWAIT_CHILD_OR_SIG | DOWAIT_JOBSTATUS, NULL);
+			jp = dowait_status();
 #else
 			dowait(DOWAIT_CHILD_OR_SIG, NULL);
 #endif
@@ -4856,11 +4865,14 @@ waitcmd(int argc UNUSED_PARAM, char **argv)
 			if (pending_sig)
 				goto sigout;
 #if BASH_WAIT_N
-			if (one) {
+			if (one && jp) {
 				/* wait -n waits for one _job_, not one _process_.
 				 *  date; sleep 3 & sleep 2 | sleep 1 & wait -n; date
 				 * should wait for 2 seconds. Not 1 or 3.
 				 */
+oneout:
+				jp->waited = 1;
+				status = jp->ps[jp->nprocs - 1].ps_status;
 				if (status != -1 && !WIFSTOPPED(status)) {
 					retval = WEXITSTATUS(status);
 					if (WIFSIGNALED(status))
@@ -5574,6 +5586,7 @@ write2pipe(int pip[2], const char *p, size_t len)
 
 /* openhere needs this forward reference */
 static void expandhere(union node *arg);
+static void ifsfree(void);
 static int
 openhere(union node *redir)
 {
@@ -5998,6 +6011,17 @@ redirect(union node *redir, int flags)
 	//	preverrout_fd = copied_fd2;
 }
 
+static void
+restore_handler_expandarg(struct jmploc *savehandler, int err)
+{
+	exception_handler = savehandler;
+	ifsfree(); // RAF: main reason of this handler existence
+	if (err) { // always do it before the longjmp() --> trap
+		if (exception_type != EXERROR)
+			longjmp(exception_handler->loc, 1);
+	}
+}
+
 static int
 redirectsafe(union node *redir, int flags)
 {
@@ -6013,9 +6037,7 @@ redirectsafe(union node *redir, int flags)
 		exception_handler = &jmploc;
 		redirect(redir, flags);
 	}
-	exception_handler = savehandler;
-	if (err && exception_type != EXERROR)
-		longjmp(exception_handler->loc, 1);
+	restore_handler_expandarg(savehandler, err);
 	RESTORE_INT(saveint);
 	return err;
 }
@@ -9608,6 +9630,11 @@ dotrap(void)
 		savestatus = status;
 	}
 	pending_sig = 0;
+#if ENABLE_FEATURE_EDITING
+// RAF: something can happen here which alter pending_sig value
+// but bb_got_signal is set by current the value of pending_sig
+	bb_got_signal = pending_sig;
+#endif
 	barrier();
 
 	TRACE(("dotrap entered\n"));
@@ -9792,9 +9819,7 @@ evaltree(union node *n, int flags)
 			trap_depth--;
 			in_trap_ERR = 0;
 
-			exception_handler = savehandler;
-			if (err && exception_type != EXERROR)
-				longjmp(exception_handler->loc, 1);
+			restore_handler_expandarg(savehandler, err);
 
 			exitstatus = savestatus;
 		}
@@ -12088,22 +12113,15 @@ showvars(const char *sep_prefix, int on, int off)
 	sep = *sep_prefix ? " " : sep_prefix;
 
 	for (; ep < epend; ep++) {
-		const char *p;
-		const char *q;
-
-		p = endofname(*ep);
-/* Used to have simple "p = strchrnul(*ep, '=')" here instead, but this
- * makes "export -p" to have output not suitable for "eval":
- * import os
- * os.environ["test-test"]="test"
- * if os.fork() == 0:
- *   os.execv("ash", [ 'ash', '-c', 'eval $(export -p); echo OK' ])  # fixes this
- * os.execv("ash", [ 'ash', '-c', 'env | grep test-test' ])
- */
-		q = nullstr;
-		if (*p == '=')
-			q = single_quote(++p);
-		out1fmt("%s%s%.*s%s\n", sep_prefix, sep, (int)(p - *ep), *ep, q);
+		/*
+		 * omit variables with invalid names, so `export -p` can be eval'ed:
+		 *   env -i 'test-test=test' busybox ash -c 'eval $(export -p)'
+		 */
+		const char *p = endofname(*ep);
+		if (*p == '=') {
+			const char *q = single_quote(++p);
+			out1fmt("%s%s%.*s%s\n", sep_prefix, sep, (int)(p - *ep), *ep, q);
+        }
 	}
 	return 0;
 }
@@ -14009,9 +14027,7 @@ expandstr(const char *ps, int syntax_type)
 	result = stackblock();
 
 out:
-	exception_handler = savehandler;
-	if (err && exception_type != EXERROR)
-		longjmp(exception_handler->loc, 1);
+	restore_handler_expandarg(savehandler, err);
 
 	doprompt = saveprompt;
 	/* Try: PS1='`xxx(`' */

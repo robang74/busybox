@@ -315,9 +315,12 @@ static int FAST_FUNC dir_act(struct recursive_state *state,
 		return FALSE;
 	cmdline_buf[n] = '\0';
 
+	/* don't write process-controlled argv[0] to the user's terminal as-is */
+	const char *argv0base = printable_string(bb_basename(cmdline_buf));
+
 	/* go through all files in /proc/PID/fd and check whether they are sockets */
 	strcpy(proc_pid_fname + len - (sizeof("cmdline")-1), "fd");
-	pid_slash_progname = concat_path_file(pid, bb_basename(cmdline_buf)); /* "PID/argv0" */
+	pid_slash_progname = concat_path_file(pid, argv0base); /* "PID/argv0" */
 	n = recursive_action(proc_pid_fname,
 			ACTION_RECURSE | ACTION_QUIET,
 			add_to_prg_cache_if_socket,
@@ -471,7 +474,7 @@ static void print_inet_line(struct inet_params *param,
 			state_str);
 #if ENABLE_FEATURE_NETSTAT_PRG
 		if (option_mask32 & OPT_prg)
-			printf("%."PROGNAME_WIDTH_STR"s", prg_cache_get(param->inode));
+			printf("%."PROGNAME_WIDTH_STR"s", printable_string(prg_cache_get(param->inode)));
 #endif
 		bb_putchar('\n');
 		free(l);
@@ -645,7 +648,7 @@ static int FAST_FUNC unix_do_one(char *line)
 
 #if ENABLE_FEATURE_NETSTAT_PRG
 	if (option_mask32 & OPT_prg)
-		printf("%-"PROGNAME_WIDTH_STR"s", prg_cache_get(inode));
+		printf("%-"PROGNAME_WIDTH_STR"s", printable_string(prg_cache_get(inode)));
 #endif
 
 	/* TODO: currently we stop at first NUL byte. Is it a problem? */

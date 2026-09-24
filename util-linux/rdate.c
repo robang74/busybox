@@ -103,8 +103,10 @@ int rdate_main(int argc UNUSED_PARAM, char **argv)
 		}
 	}
 
-	if (flags != 1) /* not lone -s */
-		printf("%s", ctime(&remote_time));
+	if (flags != 1) { /* not lone -s */
+		char tbuf[CTIME_BUF_MAXLEN];
+		printf("%s", ctime_r(&remote_time,tbuf));
+	}
 
 	return EXIT_SUCCESS;
 }

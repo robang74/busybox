@@ -1,0 +1,44 @@
+#####################################################
+# create test archive
+#####################################################
+echo "data 1" > file1.txt
+echo "data 2" > file2.txt
+echo "data 3" > file3.txt
+printf '%s\n' file1.txt file2.txt file3.txt | busybox cpio -o -H newc > archive.cpio
+
+mkdir output
+cd output
+
+#####################################################
+# cpio -v --to-stdout: verbose goes to to stderr instead
+#####################################################
+busybox cpio -iv --to-stdout < ../archive.cpio 2> stderr.txt > /dev/null
+
+cat > expected.txt << 'EOF'
+file1.txt
+file2.txt
+file3.txt
+1 blocks
+EOF
+
+cmp expected.txt stderr.txt
+
+rm -f file1.txt file2.txt file3.txt
+
+#####################################################
+# is stdout/stderr properly synchronized?
+#####################################################
+busybox cpio -iv --to-stdout < ../archive.cpio > output.txt 2>&1
+
+cat > expected.txt << 'EOF'
+data 1
+file1.txt
+data 2
+file2.txt
+data 3
+file3.txt
+1 blocks
+EOF
+
+cmp expected.txt output.txt
+

@@ -10,6 +10,9 @@ lib-y:=
 
 INSERT
 
+CFLAGS_crc32.o += -O2
+CFLAGS_REMOVE_crc32.o = -Os -O0 -O1
+
 lib-y += alloc_affinity.o
 lib-y += appletlib.o
 lib-y += ask_confirmation.o
@@ -40,6 +43,7 @@ lib-y += find_pid_by_name.o
 lib-y += find_root_device.o
 lib-y += full_write.o
 lib-y += get_console.o
+lib-y += get_d_namlen.o
 lib-y += get_last_path_component.o
 lib-y += get_line_from_file.o
 lib-y += getpty.o

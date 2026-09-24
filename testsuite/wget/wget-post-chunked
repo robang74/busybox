@@ -1,0 +1,24 @@
+test x"$SKIP_INTERNET_TESTS" != x"" && exit
+
+mkfifo sync
+trap 'rm -f sync' EXIT
+
+busybox nc -l -p 31415 > foo < sync &
+printf 'HTTP/1.0 200 OK\r\n\r\n' > sync
+dd if=/dev/zero of=/dev/stdout bs=256k count=11 | busybox wget --header 'Content-Type: application/octet-stream' --post-file - -O - http://localhost:31415
+wait
+
+printf "POST / HTTP/1.1\r\n" > expected
+printf "Host: localhost:31415\r\n" >> expected
+printf "User-Agent: Wget\r\n" >> expected
+printf "Connection: close\r\n" >> expected
+printf "Content-Type: application/octet-stream\r\n" >> expected
+printf "Transfer-Encoding: chunked\r\n" >> expected
+printf "\r\n" >> expected
+printf "200000\r\n" >> expected
+dd if=/dev/zero of=expected conv=notrunc oflag=append bs=256K count=8
+printf "\r\nc0000\r\n" >> expected
+dd if=/dev/zero of=expected conv=notrunc oflag=append bs=256K count=3
+printf "\r\n0\r\n\r\n" >> expected
+
+diff -au foo expected

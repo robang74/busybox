@@ -24,8 +24,216 @@ testing "awk if operator >= "  "awk 'BEGIN{if(23>=23) print \"foo\"}'" "foo\n" "
 testing "awk if operator < "   "awk 'BEGIN{if(2 < 13) print \"foo\"}'" "foo\n" "" ""
 testing "awk if string == "    "awk 'BEGIN{if(\"a\"==\"ab\") print \"bar\"}'" "" "" ""
 
+# width and precision
+optional DESKTOP
+testing "awk %* only width" \
+"awk 'BEGIN { printf \"%*d\", 10, -42 }'" "       -42" "" ""
+
+testing "awk %* negative width" \
+"awk 'BEGIN { printf \"%*s\", -10, \"hello\" }'" "hello     " "" ""
+
+testing "awk %.* only precision" \
+"awk 'BEGIN { printf \"%.*f\n\", 2, 3.14159 }'" "3.14\n" "" ""
+
+testing "awk %*.* width and precision" \
+"awk 'BEGIN { printf \"%*.*f\", 10, 2, 3.14159 }'" "      3.14" "" ""
+
+testing "awk %0*.* 0 padding with width and precision" \
+"awk 'BEGIN { printf \"%0*.*f\", 10, 2, 3.14 }'" "0000003.14" "" ""
+
+testing "awk multiple format specifications" \
+"awk 'BEGIN { printf \"%d %*d %d\", 1, 5, 2, 3 }'" "1     2 3" "" ""
+
+testing "awk %*c width with char" \
+"awk 'BEGIN { printf \"%*c\", 5, 65 }'" "    A" "" ""
+
+testing "awk %-*c width with char" \
+"awk 'BEGIN { printf \"%-*c\", 5, 65 }'" "A    " "" ""
+
+# For some reason, this works in GNU Awk 5.3.0
+# (why does it work? does it allow flag chars _after_ width, not only before width?)
+# This is undocumented, and we do not support this.
+## testing "awk %*-c width with char" \
+## "awk 'BEGIN { printf \"%*-c\", 5, 65 }'" "A    " "" ""
+
+testing "awk %*c width with NUL" \
+"awk 'BEGIN { printf \"%*c\", 5, 0 }'" "    \0" "" ""
+
+testing "awk %-*c width with NUL" \
+"awk 'BEGIN { printf \"%-*c\", 5, 0 }'" "\0    " "" ""
+
+testing "awk %W%d - W is unknown format specifier" \
+"awk 'BEGIN { printf \"[%W%d]\n\", 42; }'" "[%W0]\n" "" ""
+
+# do not truncate large integer outout
+# (the ...008 instead of ...000 is due to limited precision of 64-bit floats)
+testing "awk %d 99999999999999000.1234" \
+"awk 'BEGIN { printf \"%ld\n\", 99999999999999000.1234; }'" "99999999999999008\n" "" ""
+
+testing "awk %ld large integer (robust value)" \
+"awk 'BEGIN { printf \"%ld\n\", 9007199254740992; }'" "9007199254740992\n" "" ""
+
+
+# .precision on integer formatting allowed and ignored
+testing "awk %.3d 99999999999999000.1234" \
+"awk 'BEGIN { printf \"%.3ld\n\", 99999999999999000.1234; }'" "99999999999999008\n" "" ""
+testing "awk %.*d 3 99999999999999000.1234" \
+"awk 'BEGIN { printf \"%.*ld\n\", 3, 99999999999999000.1234; }'" "99999999999999008\n" "" ""
+
+# fractioals are rounded towards 0
+testing "awk %d -1.9" \
+"awk 'BEGIN { printf \"%d\n\", -1.9; }'" "-1\n" "" ""
+testing "awk %u -1.9" \
+"awk 'BEGIN { printf \"%lu\n\", -1.9; }'" "18446744073709551615\n" "" ""
+testing "awk %x -1.9" \
+"awk 'BEGIN { printf \"%lx\n\", -1.9; }'" "ffffffffffffffff\n" "" ""
+
+# New tests integrated into awk.tests format
+testing "awk printf multiple %% with value" "awk 'BEGIN { printf \"%% %d %%\n\", 42 }'" "% 42 %\n" "" ""
+testing "awk printf %% adjacent to format specifier" "awk 'BEGIN { printf \"%%%d%%\n\", 7 }'" "%7%\n" "" ""
+testing "awk printf trailing %" "awk 'BEGIN { printf \"hello%\" }'" "hello%" "" ""
+testing "awk printf %% with %*d and %%" "awk 'BEGIN { printf \"%%%*d%%\n\", 5, 3 }'" "%    3%\n" "" ""
+testing "awk printf %*.*f with width and precision" "awk 'BEGIN { printf \"[%*.*f]\n\", 10, 3, 3.14159 }'" "[     3.142]\n" "" ""
+testing "awk printf multiple specifiers with * width and precision" "awk 'BEGIN { printf \"%*s -> %.*d\n\", 8, \"OK\", 5, 42 }'" "      OK -> 00042\n" "" ""
+testing "awk printf %*s with negative width" "awk 'BEGIN { printf \"[%*s]\n\", -10, \"test\" }'" "[test      ]\n" "" ""
+testing "awk printf %.*d with negative precision" "awk 'BEGIN { printf \"[%.*d]\n\", -5, 123 }'" "[123]\n" "" ""
+testing "awk printf %+0*d with flag and asterisk" "awk 'BEGIN { printf \"[%+0*d]\n\", 6, 42 }'" "[+00042]\n" "" ""
+testing "awk printf very long format width specifier" "awk 'BEGIN { printf \"%000000000000000000000000000000000000000000000000000000000000d\n\", 1 }'" "1\n" "" ""
+testing "awk printf literal text adjacent to %*d" "awk 'BEGIN { printf \"Output:%*dUnits\n\", 5, 7 }'" "Output:    7Units\n" "" ""
+testing "awk printf %*c with ASCII code" "awk 'BEGIN { printf \"[%*c]\n\", 5, 65 }'" "[    A]\n" "" ""
+testing "awk printf %*c with string takes first char" "awk 'BEGIN { printf \"[%*c]\n\", -5, \"XYZ\" }'" "[X    ]\n" "" ""
+testing "awk printf %*c with NUL character" "awk 'BEGIN { printf \"[%*c]\n\", 4, 0 }'" "[   \0]\n" "" ""
+testing "awk printf %*.*e and %*.*g with asterisks" "awk 'BEGIN { printf \"%*.*e | %*.*g\n\", 12, 4, 1234.56789, 10, 2, 1234.56789 }'" "  1.2346e+03 |    1.2e+03\n" "" ""
+
+# Invalid format test, the output can be arbitrary
+testing "awk printf unknown specifier %*W" "awk 'BEGIN { printf \"[%*W]\n\", 5 }'" "[%5W]\n" "" ""
+
+# These two depends on the implementation: with or without %ld support (64bit or 32bit arch)
+testing "awk printf %*d with large integer exceeding 32-bit" "awk 'BEGIN { printf \"[%*d]\n\", 15, 3000000000 }'" "[     3000000000]\n" "" ""
+testing "awk printf %*d with large integer exceeding 32-bit" "awk 'BEGIN { printf \"[%*d]\n\", 15, 3000000000 }'" "[    -1294967296]\n" "" ""
+testing "awk printf %*ld with large integer exceeding 32-bit" "awk 'BEGIN { printf \"[%*ld]\n\", 15, 3000000000 }'" "[     3000000000]\n" "" ""
+
+testing "awk printf %*s with empty string" "awk 'BEGIN { printf \"[%*s]\n\", 5, \"\" }'" "[     ]\n" "" ""
+testing "awk printf positional precision GNU extension" "awk 'BEGIN { printf \"%*.*2$f\n\", 10, 5, 44 }'" "" "" ""
+testing "awk printf invalid *.*.* sequence" "awk 'BEGIN { printf \"%5*.*.*d\n\", 5, 42 }'" "" "" ""
+testing "awk printf expressions as width and precision args" "awk 'BEGIN { printf \"[%*.*f]\n\", (2+3), (1+1), 3.14159 }'" "[ 3.14]\n" "" ""
+testing "awk printf multiple specifiers with %% literals" "awk 'BEGIN { printf \"Start %% %*d Mid %% %*s End\n\", 5, 1, 10, \"two\" }'" "Start %     1 Mid %        two End\n" "" ""
+testing "awk printf multiple distinct dynamic specifiers" "awk 'BEGIN { printf \"|%*s| or |%*d|\n\", 5, \"abc\", 8, 123 }'" "|  abc| or |     123|\n" "" ""
+
+# Invalid format test, the output can be arbitrary
+testing "awk printf double star with extra argument" "awk 'BEGIN { printf \"[%**d]\n\", 5, 99, 42 }'" "[%5*d]\n" "" ""
+
+testing "awk printf dynamic expressions for width and precision" "awk 'BEGIN { printf \"[%*.*f]\n\", (3 + 4), (1 * 3), 3.14159265 }'" "[  3.142]\n" "" ""
+testing "awk printf %% before asterisk format" "awk 'BEGIN { printf \"Progress: %% %*d%%\n\", 5, 85 }'" "Progress: %    85%\n" "" ""
+SKIP=
+
 # 4294967295 = 0xffffffff
 testing "awk bitwise op"  "awk '{ print or(4294967295,1) }'" "4294967295\n" "" "\n"
+
+# bitwise AND
+testing "awk bitwise and basic" \
+    "awk 'BEGIN { print and(0xff, 0x0f) }'" \
+    "15\n" "" ""
+
+testing "awk bitwise and with large hex" \
+    "awk 'BEGIN { print and(0xffffffff, 0x0f0f0f0f) }'" \
+    "252645135\n" "" ""
+
+testing "awk bitwise and with zero" \
+    "awk 'BEGIN { print and(0xffffffff, 0) }'" \
+    "0\n" "" ""
+
+# bitwise XOR
+testing "awk bitwise xor basic" \
+    "awk 'BEGIN { print xor(0xff, 0x0f) }'" \
+    "240\n" "" ""
+
+testing "awk bitwise xor with large hex" \
+    "awk 'BEGIN { print xor(0xffffffff, 0x0f0f0f0f) }'" \
+    "4042322160\n" "" ""
+
+testing "awk bitwise xor same value" \
+    "awk 'BEGIN { print xor(0x12345678, 0x12345678) }'" \
+    "0\n" "" ""
+
+# bitwise complement, these test would fail also with gawk
+testing "awk bitwise compl zero" \
+    "awk 'BEGIN { print compl(0) }'" \
+    "4294967295\n" "" ""
+
+testing "awk bitwise compl with hex" \
+    "awk 'BEGIN { print compl(0x0f0f0f0f) }'" \
+    "4042322160\n" "" ""
+
+testing "awk printf unsigned from bitwise compl" \
+    "awk 'BEGIN { printf \"%u\\n\", compl(0) }'" \
+    "4294967295\n" "" ""
+
+# shift operations
+testing "awk bitwise lshift basic" \
+    "awk 'BEGIN { print lshift(1, 8) }'" \
+    "256\n" "" ""
+
+testing "awk bitwise lshift to high bit" \
+    "awk 'BEGIN { print lshift(1, 31) }'" \
+    "2147483648\n" "" ""
+
+testing "awk bitwise rshift basic" \
+    "awk 'BEGIN { print rshift(256, 8) }'" \
+    "1\n" "" ""
+
+testing "awk bitwise rshift from max unsigned" \
+    "awk 'BEGIN { print rshift(0xffffffff, 1) }'" \
+    "2147483647\n" "" ""
+
+testing "awk bitwise rshift high bit" \
+    "awk 'BEGIN { print rshift(0x80000000, 1) }'" \
+    "1073741824\n" "" ""
+
+# combinations
+testing "awk bitwise or then and" \
+    "awk 'BEGIN { print and(or(0x00ff00ff, 0xff00ff00), 0xffffffff) }'" \
+    "4294967295\n" "" ""
+
+testing "awk bitwise and then or" \
+    "awk 'BEGIN { print or(and(0x00ff00ff, 0xff00ff00), 0x000000ff) }'" \
+    "255\n" "" ""
+
+# float truncation (awk truncates toward zero before bitwise)
+testing "awk bitwise or with float args" \
+    "awk 'BEGIN { print or(1.9, 2.9) }'" \
+    "3\n" "" ""
+
+testing "awk bitwise and with float args" \
+    "awk 'BEGIN { print and(1.9, 2.9) }'" \
+    "0\n" "" ""
+
+# printf formats with bitwise results (these should always work)
+testing "awk printf hex from bitwise or" \
+    "awk 'BEGIN { printf \"%x\\n\", or(0x80000000, 1) }'" \
+    "80000001\n" "" ""
+
+testing "awk printf oct from bitwise or" \
+    "awk 'BEGIN { printf \"%o\\n\", or(01000, 02000) }'" \
+    "3000\n" "" ""
+
+# print vs printf behavior (reveals the OFMT precision issue)
+testing "awk print and printf agree on bitwise result" \
+    "awk 'BEGIN { v = or(0xffffffff, 1); print v; printf \"%u\\n\", v }'" \
+    "4294967295\n4294967295\n" "" ""
+
+# edge cases
+testing "awk bitwise or with zero" \
+    "awk 'BEGIN { print or(0, 0) }'" \
+    "0\n" "" ""
+
+testing "awk bitwise with negative arg" \
+    "awk 'BEGIN { print and(-1, 0xff) }'" \
+    "255\n" "" ""
+
+testing "awk bitwise precision limit 2^53" \
+    "awk 'BEGIN { print and(9007199254740992, 1) }'" \
+    "0\n" "" ""
 
 # we were testing for a non-empty body when deciding if a function was
 # defined or not. The testcase below caused:
@@ -334,7 +542,7 @@ testing "awk FS assignment" "awk '{FS=\":\"; print \$1}'" \
 	"a:b c:d\ne:f g:h"
 
 optional FEATURE_AWK_LIBM
-testing "awk large integer" \
+testing "awk large integer (libm)" \
 	"awk 'BEGIN{n=(2^31)-1; print n, int(n), n%1, ++n, int(n), n%1}'" \
 	"2147483647 2147483647 0 2147483648 2147483648 0\n" \
 	"" ""
@@ -562,12 +770,12 @@ testing "awk = and ?: precedence" \
 # TODO: gawk can do this: awk 'BEGIN { u=v=w=1; print u=0?v=4:w=5; print u,v,w}'
 # and even this: u=0?v=4?5:6:w=7?8:9
 
-testing 'awk gensub backslashes \' \
+testing 'awk gensub backslashes x1' \
 	'awk '$sq'BEGIN { s="\\"; print "s=" s; print gensub("a", s, "g", "a|a") }'$sq \
 	's=\\
 \\|\\
 ' '' ''
-testing 'awk gensub backslashes \\' \
+testing 'awk gensub backslashes x2' \
 	'awk '$sq'BEGIN { s="\\\\"; print "s=" s; print gensub("a", s, "g", "a|a") }'$sq \
 	's=\\\\
 \\|\\
@@ -575,12 +783,12 @@ testing 'awk gensub backslashes \\' \
 # gawk 5.1.1 handles trailing unpaired \ inconsistently.
 # If replace string is single \, it is used verbatim,
 # but if it is \\\ (three slashes), gawk uses "\<NUL>" (!!!), not "\\" as you would expect.
-testing 'awk gensub backslashes \\\' \
+testing 'awk gensub backslashes x3' \
 	'awk '$sq'BEGIN { s="\\\\\\"; print "s=" s; print gensub("a", s, "g", "a|a") }'$sq \
 	's=\\\\\\
 \\\\|\\\\
 ' '' ''
-testing 'awk gensub backslashes \\\\' \
+testing 'awk gensub backslashes x4' \
 	'awk '$sq'BEGIN { s="\\\\\\\\"; print "s=" s; print gensub("a", s, "g", "a|a") }'$sq \
 	's=\\\\\\\\
 \\\\|\\\\
@@ -590,12 +798,12 @@ testing 'awk gensub backslashes \&' \
 	's=\\&
 &|&
 ' '' ''
-testing 'awk gensub backslashes \0' \
+testing 'awk gensub backslashes \\0' \
 	'awk '$sq'BEGIN { s="\\0"; print "s=" s; print gensub("a", s, "g", "a|a") }'$sq \
 	's=\\0
 a|a
 ' '' ''
-testing 'awk gensub backslashes \\0' \
+testing 'awk gensub backslashes \\\\0' \
 	'awk '$sq'BEGIN { s="\\\\0"; print "s=" s; print gensub("a", s, "g", "a|a") }'$sq \
 	's=\\\\0
 \\0|\\0
@@ -612,9 +820,16 @@ b
 # Currently we use REG_STARTEND ("This flag is a BSD extension, not present in POSIX")
 # to implement the code to handle this correctly, but if your libc has no REG_STARTEND,
 # the alternative code mishandles this case.
-testing 'awk gsub erroneous word start match' \
+test x"$SKIP_KNOWN_BUG_AWK_WORDMATCH" = x"" \
+&& testing 'awk gsub erroneous word start match' \
 	"awk 'BEGIN { a=\"abc\"; gsub(/\<b*/,\"\",a); print a }'" \
 	'abc\n' \
 	'' ''
+
+#optional CONFIG_DEBUG_SANITIZE
+testing 'awk detects no OOB read after backslash-newline at EOF' \
+	'set +e; awk -f awk_next_token_oob.awk 2>&1; echo $?' \
+	"awk: awk_next_token_oob.awk:1: Unexpected end of string\n1\n" \
+	"" ""
 
 exit $FAILCOUNT

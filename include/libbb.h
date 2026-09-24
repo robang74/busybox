@@ -21,6 +21,77 @@
 #include <setjmp.h>
 #include <signal.h>
 #include <paths.h>
+
+#if defined(__GLIBC__) || defined(__gnu_linux__)
+#  define LIBC_IS_GNUL     1
+#elif defined(ANDROID) || defined(__ANDROID__)
+#  define LIBC_IS_GNUL     0
+#elif !defined(__linux__)
+#  define LIBC_IS_GNUL     0
+#elif defined(__UCLIBC__)
+#  define LIBC_IS_GNUL     0
+#else
+#  define LIBC_IS_GNUL     0 // RAF: inverse logic
+#endif
+
+#if LIBC_IS_GNUL
+#  define LIBC_IS_MUSL     0
+#elif defined(__linux__) && defined(__NEED_fsblkcnt_t) && defined(__NEED_fsfilcnt_t)
+/*
+ * RAF: this check about musl internal is from util-linux/hwclock.c
+ */
+ // musl has no __MUSL__ or similar define to check for,
+ // but its <sys/types.h> has these lines:
+ //   #define __NEED_fsblkcnt_t
+ //   #define __NEED_fsfilcnt_t
+#  define LIBC_IS_MUSL     1
+#else
+#  define LIBC_IS_MUSL     0 // RAF: inverse logic
+#endif
+
+#if LIBC_IS_MUSL
+#  ifdef BB_COMPILE_SINGLE_PRINTOUTS
+#  warning "musl do not offer yescrypt, yet"
+#  endif
+#  define YESCRYPT_STR ""
+#elif ENABLE_USE_BB_CRYPT
+#  ifdef BB_COMPILE_SINGLE_PRINTOUTS
+#  warning "busybox yescrypt disabled by RAF"
+#  endif
+#  define YESCRYPT_STR ""
+#elif LIBC_IS_GNUL
+#  ifdef BB_COMPILE_SINGLE_PRINTOUTS
+#  pragma message "libc yescrypt support active"
+#  endif
+#  define YESCRYPT_STR ",yescrypt"
+#else
+#  ifdef BB_COMPILE_SINGLE_PRINTOUTS
+#  warning "busybox yescrypt disabled"
+#  endif
+#  define YESCRYPT_STR ""
+#endif
+
+#if !LIBC_IS_GNUL
+/*
+ * RAF: yescrypt internal minimal-footprint implementation is not going
+ * to receive the same level of auditing and maintenance of the libc one.
+ * The main reason for busybox to have yescrypt is to build a static linked
+ * rescue system to deploy in every standard distribution installation.
+ * Once deployed with SUID privileges and a "potentially weaker" yescrypt
+ * implementation, it risks being a universal backdooring gate. No thanks!
+ */
+#undef  ENABLE_USE_BB_CRYPT_YES
+#define ENABLE_USE_BB_CRYPT_YES 0
+#endif
+
+#if !ENABLE_USE_BB_CRYPT
+# define CRYPT_METHODS_HELP_STR "des,md5,sha256/512"YESCRYPT_STR \
+        " (default "CONFIG_FEATURE_DEFAULT_PASSWD_ALGO")"
+#else
+# define CRYPT_METHODS_HELP_STR "des,md5"IF_USE_BB_CRYPT_SHA(",sha256/512")IF_USE_BB_CRYPT_YES(YESCRYPT_STR) \
+        " (default "CONFIG_FEATURE_DEFAULT_PASSWD_ALGO")"
+#endif
+
 #if defined __UCLIBC__ /* TODO: and glibc? */
 /* use inlined versions of these: */
 # define sigfillset(s)    __sigfillset(s)
@@ -80,8 +151,23 @@
  * Include sys/sysinfo.h only in those files which need it.
  */
 #if ENABLE_SELINUX
+/*
+ * RAF: the two main goals here are to change the code as less as possible
+ * to keep the most of compatibility for independent patches application
+ * and at the same time keep the original type definition but without the
+ * deprecated warnings because busybox is peculiar and some embedded systems
+ * might use a different implementation of SELinux which might also have a
+ * different definition of the security_context_t type and having a single
+ * point of re/definition is the most friendly way to make this renewation.
+ */
+# define security_context_t _deprected_security_context_t
 # include <selinux/selinux.h>
 # include <selinux/context.h>
+# undef security_context_t
+# ifdef BB_COMPILE_SINGLE_PRINTOUTS
+# warning "SElinux security_context_t over-typedefed in char* by RAF"
+# endif
+typedef char* security_context_t;
 #endif
 #if ENABLE_FEATURE_UTMP
 # if defined __UCLIBC__ && ( \
@@ -190,6 +276,10 @@ int klogctl(int type, char *b, int len);
 #endif
 #ifndef BUFSIZ
 # define BUFSIZ 4096
+#endif
+
+#ifndef CTIME_BUF_MAXLEN
+#define CTIME_BUF_MAXLEN 26
 #endif
 
 #if __GNUC_PREREQ(5,0)
@@ -584,6 +674,7 @@ char *bb_get_last_path_component_nostrip(const char *path) FAST_FUNC;
 const char *bb_basename(const char *name) FAST_FUNC;
 /* NB: can violate const-ness (similarly to strchr) */
 char *last_char_is(const char *s, int c) FAST_FUNC;
+char *last_char_is_fast(const char *s, int c, int len) FAST_FUNC;
 const char* endofname(const char *name) FAST_FUNC;
 char *is_prefixed_with(const char *string, const char *key) FAST_FUNC;
 char *is_suffixed_with(const char *string, const char *key) FAST_FUNC;
@@ -660,7 +751,7 @@ int sigprocmask2(int how, sigset_t *set) FAST_FUNC;
 /* SIG_BLOCK all signals, return old set: */
 int sigblockall(sigset_t *set) FAST_FUNC;
 /* Standard handler which just records signo */
-extern smallint bb_got_signal;
+extern volatile smallint bb_got_signal;
 void record_signo(int signo); /* not FAST_FUNC! */
 
 
@@ -922,6 +1013,9 @@ struct hostent *xgethostbyname(const char *name) FAST_FUNC;
 // Also mount.c and inetd.c are using gethostbyname(),
 // + inet_common.c has additional IPv4-only stuff
 
+#define BB_DEFAULT_WWW_PATH "/var/www"
+//const char *safe_default_running_path(void); //RAF: set as static unless needed as public
+char *xcheck_for_safe_pwd(const char *path, bool requested); //RAF: to adopt and yet to test
 
 struct tls_aes {
 	uint32_t key[60];
@@ -1836,9 +1930,12 @@ void config_close(parser_t *parser) FAST_FUNC;
  * If path is NULL, it is assumed to be "/".
  * filename should not be NULL. */
 char *concat_path_file(const char *path, const char *filename) FAST_FUNC;
+char *concat_path_file_fast(const char *path, const struct dirent *dirp) FAST_FUNC;
 /* Returns NULL on . and .. */
 char *concat_subpath_file(const char *path, const char *filename) FAST_FUNC;
+char *concat_subpath_file_fast(const char *path, const struct dirent *dirp) FAST_FUNC;
 
+size_t get_d_namlen(const struct dirent * const dirent) FAST_FUNC;
 
 int bb_make_directory(char *path, long mode, int flags) FAST_FUNC;
 
@@ -1886,6 +1983,19 @@ extern context_t set_security_context_component(security_context_t cur_context,
 						char *user, char *role, char *type, char *range) FAST_FUNC;
 extern void setfscreatecon_or_die(security_context_t scontext) FAST_FUNC;
 extern void selinux_preserve_fcontext(int fdesc) FAST_FUNC;
+# if ENABLE_DESKTOP
+/*
+ * RAF: replacing the deprecated matchpathcon() increases the footprint
+ * in a way which is acceptable for a desktop use but it might not as much
+ * acceptable in embedded systems with very constrained resources and possibly
+ * relying on old/custom SELinux implementations. Hence, the transition is
+ * starting with the desktop build first while waiting for downstreams feedback
+ * before porting also the embedded build on the SELinux modernisation.
+ */
+extern int bb_match_path_context(const char *path, mode_t mode, security_context_t *con) FAST_FUNC;
+# else
+# define bb_match_path_context matchpathcon
+# endif
 #else
 #define selinux_preserve_fcontext(fdesc) ((void)0)
 #endif
@@ -2391,7 +2501,8 @@ unsigned FAST_FUNC hmac_peek_hash(hmac_ctx_t *ctx, uint8_t *out, ...);
 
 extern uint32_t *global_crc32_table;
 uint32_t *crc32_filltable(uint32_t *tbl256, int endian) FAST_FUNC;
-uint32_t *crc32_new_table_le(void) FAST_FUNC;
+//RAF: only global table
+//uint32_t *crc32_new_table_le(void) FAST_FUNC;
 uint32_t *global_crc32_new_table_le(void) FAST_FUNC;
 uint32_t crc32_block_endian1(uint32_t val, const void *buf, unsigned len, uint32_t *crc_table) FAST_FUNC;
 uint32_t crc32_block_endian0(uint32_t val, const void *buf, unsigned len, uint32_t *crc_table) FAST_FUNC;
@@ -2456,6 +2567,11 @@ extern const char bb_msg_standard_output[] ALIGN1;
 
 /* NB: (bb_hexdigits_upcase[i] | 0x20) -> lowercase hex digit */
 extern const char bb_hexdigits_upcase[] ALIGN1;
+
+#define bb_hexdigits_mshb(_x) bb_hexdigits_upcase[(_x) >> 4]
+#define bb_hexdigits_lshb(_x) bb_hexdigits_upcase[(_x) & 15]
+
+char* FAST_FUNC url_sanitizer_to_dest(char *dst, const char *name);
 
 extern const char bb_path_wtmp_file[] ALIGN1;
 

@@ -344,6 +344,7 @@ int conf_write(const char *name)
 	char *env;
 	char *source_date_epoch;
 	struct tm *build_time;
+	struct tm tres;
 
 	dirname[0] = 0;
 	if (name && name[0]) {
@@ -384,24 +385,26 @@ int conf_write(const char *name)
 	source_date_epoch = getenv("SOURCE_DATE_EPOCH");
 	if (source_date_epoch && *source_date_epoch) {
 		now = strtoull(source_date_epoch, NULL, 10);
-		build_time = gmtime(&now);
+		build_time = gmtime_r(&now,&tres);
 	} else {
 		time(&now);
-		build_time = localtime(&now);
+		build_time = localtime_r(&now,&tres);
 	}
 
 	env = getenv("KCONFIG_NOTIMESTAMP");
 	if (env && *env)
 		use_timestamp = 0;
-
-	fprintf(out, _("#\n"
-		       "# Automatically generated make config: don't edit\n"
-		       "# Busybox version: %s\n"
-		       "%s%s"
-		       "#\n"),
-		     sym_get_string_value(sym),
-		     use_timestamp ? "# " : "",
-		     use_timestamp ? ctime(&now) : "");
+	{ // RAF: explicit scope limitation
+		char tbuf[CTIME_BUF_MAXLEN];
+		fprintf(out, _("#\n"
+				   "# Automatically generated make config: don't edit\n"
+				   "# Busybox version: %s\n"
+				   "%s%s"
+				   "#\n"),
+				 sym_get_string_value(sym),
+				 use_timestamp ? "# " : "",
+				 use_timestamp ? ctime_r(&now,tbuf) : "");
+	}
 	if (out_h) {
 		char buf[sizeof("#define AUTOCONF_TIMESTAMP "
 				"\"YYYY-MM-DD HH:MM:SS some_timezone\"\n")];

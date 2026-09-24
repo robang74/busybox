@@ -37,18 +37,9 @@
 #include <sys/utsname.h>
 #include "rtc_.h"
 
-
-//musl has no __MUSL__ or similar define to check for,
-//but its <sys/types.h> has these lines:
-// #define __NEED_fsblkcnt_t
-// #define __NEED_fsfilcnt_t
-#if defined(__linux__) && defined(__NEED_fsblkcnt_t) && defined(__NEED_fsfilcnt_t)
-# define LIBC_IS_MUSL 1
+#if LIBC_IS_MUSL
 # include <sys/syscall.h>
-#else
-# define LIBC_IS_MUSL 0
 #endif
-
 
 /* diff code is disabled: it's not sys/hw clock diff, it's some useless
  * "time between hwclock was started and we saw CMOS tick" quantity.
@@ -103,10 +94,12 @@ static void show_clock(const char **pp_rtcname, int utc)
 #if ENABLE_LOCALE_SUPPORT
 	/* Standard hwclock uses locale-specific output format */
 	char cp[64];
-	struct tm *ptm = localtime(&t);
+	struct tm tres;
+	struct tm *ptm = localtime_r(&t,&tres);
 	strftime(cp, sizeof(cp), "%c", ptm);
 #else
-	char *cp = ctime(&t);
+	char tbuf[CTIME_BUF_MAXLEN];
+	char *cp = ctime_r(&t,tbuf);
 	chomp(cp);
 #endif
 
@@ -168,6 +161,7 @@ static void set_kernel_tz(const struct timezone *tz)
 static void set_kernel_timezone_and_clock(int utc, const struct timeval *hctosys)
 {
 	time_t cur;
+	struct tm tres;
 	struct tm *broken;
 	struct timezone tz = { 0 };
 
@@ -180,7 +174,7 @@ static void set_kernel_timezone_and_clock(int utc, const struct timeval *hctosys
 //...but it does NOT include DST shift (IOW: it's WRONG, usually by one hour,
 //if DST is in effect!) Thus this ridiculous dance:
 	cur = time(NULL);
-	broken = localtime(&cur);
+	broken = localtime_r(&cur,&tres);
 	tz.tz_minuteswest = -broken->tm_gmtoff / 60;
 	/*tz.tz_dsttime = 0; already is */
 	set_kernel_tz(&tz); /* MIGHT warp_clock() if 1st call since boot */

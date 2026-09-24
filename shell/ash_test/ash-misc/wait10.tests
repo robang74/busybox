@@ -1,0 +1,62 @@
+# Wait for any of p1, p2. p2 finishes first.
+(sleep 2; exit 41) & p1=$!
+(sleep 1; exit 42) & p2=$!
+wait -n $p1 $p2
+echo "Wait 1 returned: $?. (expects 42)"
+kill -0 $p1 2>/dev/null; echo "p1 active: $? (expects 0)"
+kill -0 $p2 2>/dev/null; echo "p2 active: $? (expects 1)"
+
+# wait $p1
+wait $p1
+echo "Wait 2 returned: $? (expects 41)"
+
+# wait -n $p1 again.
+# bash as script returns 41 while command (-c) returns 127
+wait -n $p1
+echo "Wait 3 returned: $? (expects 41)"
+
+# wait -n (no args) with only already-waited jobs should return 127
+wait -n
+echo "Wait 4 returned: $? (expects 127)"
+# Test: wait -n with a job that finished before wait was called
+(sleep 1; exit 42) & p3=$!
+sleep 2
+# p3 is done but not reaped. wait -n should return 42.
+wait -n $p3
+echo "Wait 5 returned: $? (expects 42)"
+# wait -n $p3 again should return 42
+wait -n $p3
+echo "Wait 6 returned: $? (expects 42)"
+# wait $p3 again should return 42
+wait $p3
+echo "Wait 7 returned: $? (expects 42)"
+# wait -n $p3 should return 42
+wait -n $p3
+echo "Wait 8 returned: $? (expects 42)"
+
+# Test: wait -n with multiple already finished jobs
+(sleep 1; exit 42) & p4=$!
+(sleep 1; exit 42) & p5=$!
+sleep 2
+# Both p4 and p5 are done.
+wait -n
+echo "Wait 9 returned: $? (expects 42)"
+wait -n
+echo "Wait 10 returned: $? (expects 42)"
+wait -n
+echo "Wait 11 returned: $? (expects 127)"
+
+# Test: wait -n with a buried finished job (p6 done, p7 running)
+# This used to deadlock.
+(sleep 1; exit 42) & p6=$!
+(sleep 5; exit 41) & p7=$!
+sleep 2
+wait -n
+echo "Wait 12 returned: $? (expects 42)"
+# p7 should still be running
+kill -0 $p7 2>/dev/null; echo "p7 active: $? (expects 0)"
+wait $p7
+
+# Test: wait -n with no jobs at all
+wait -n
+echo "Wait 13 returned: $? (expects 127)"
