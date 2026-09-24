@@ -21,7 +21,6 @@
 //usage:     "\n	-L LBL	Label"
 
 #include "libbb.h"
-#include "common_bufsiz.h"
 
 /* from Linux 2.6.23 */
 /*
@@ -79,5 +78,5 @@ int swaplabel_main(int argc UNUSED_PARAM, char **argv)
 	if (ENABLE_FEATURE_CLEAN_UP)
 		close(fd);
 
-	return 0;
+	fflush_stdout_and_exit_SUCCESS();
 }
