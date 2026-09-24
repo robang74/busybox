@@ -33,6 +33,8 @@ Already present in the original git repository:
 - [INSTALL](INSTALL): how to build & install
 - [TODO](TODO): pending wishlist
 
+Incorporated changes from last [Ubuntu busybox](https://launchpad.net/ubuntu/+source/busybox/1:1.38.0-3ubuntu3) release
+
 <br>
 
 ### Repository
