@@ -514,17 +514,30 @@ int patch_main(int argc UNUSED_PARAM, char **argv)
 		// but a missing ,value means the value is 1.
 		} else if (state == 1 && is_prefixed_with(patchline, "@@ -")) {
 			int i;
-			char *s = patchline+4;
+			char *s = patchline+4, *start = s;
 
 			// Read oldline[,oldlen] +newline[,newlen]
 
 			TT.oldlen = oldlen = TT.newlen = newlen = 1;
 			TT.oldline = strtol(s, &s, 10);
-			if (*s == ',') TT.oldlen = oldlen = strtol(s+1, &s, 10);
-			if (s[0] != ' ' || s[1] != '+')
+			if (s == start) {
+invalid_hunk_header:
 				bb_error_msg_and_die("invalid hunk header: %s", patchline);
+			}
+			if (s[0] == ',') {
+				start = s + 1;
+				TT.oldlen = oldlen = strtol(s+1, &s, 10);
+				if (s == start) goto invalid_hunk_header;
+			}
+			if (s[0] != ' ' || s[1] != '+') goto invalid_hunk_header;
+			start = s + 2;
 			TT.newline = strtol(s+2, &s, 10);
-			if (*s == ',') TT.newlen = newlen = strtol(s+1, &s, 10);
+			if (s == start) goto invalid_hunk_header;
+			if (s[0] == ',') {
+				start = s + 1;
+				TT.newlen = newlen = strtol(s+1, &s, 10);
+				if (s == start) goto invalid_hunk_header;
+			}
 
 			if (oldlen < 1 && newlen < 1)
 				bb_error_msg_and_die("Really? %s", patchline);
