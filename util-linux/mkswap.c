@@ -124,7 +124,7 @@ int mkswap_main(int argc UNUSED_PARAM, char **argv)
 	getopt32(argv, "^" "L:" "\0" "-1"/*at least one arg*/, &label);
 	argv += optind;
 
-	fd = xopen(argv[0], O_WRONLY);
+	fd = xopen(argv[0], O_RDWR);
 
 	/* Figure out how big the device is */
 	len = get_volume_size_in_bytes(fd, argv[1], 1024, /*extend:*/ 1);
