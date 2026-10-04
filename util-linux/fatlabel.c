@@ -80,6 +80,12 @@ struct msdos_volume_info { // (offsets are relative to start of boot sector)
 	uint32_t volume_id32;     // 043 volume ID number
 	char     volume_label[11];// 047 volume label
 	char     fs_type[8];      // 052 typically "FATnn   "
+// Wikipedia: "If both total logical sectors entries at offset 0x020 and 0x013
+// are 0 on volumes using a FAT32 EBPB with signature 0x29, volumes with more
+// than 4,294,967,295 (232-1) sectors (f.e. some DR-DOS volumes with 32-bit
+// cluster entries) can use this entry as 64-bit total logical sectors entry
+// instead. In this case, the OEM label at sector offset 0x003 may be retrieved
+// as new-style file system type instead."
 } PACKED;                         // 05a end. Total size 26 (0x1a) bytes
 
 struct msdos_boot_sector {
@@ -109,7 +115,7 @@ struct msdos_boot_sector {
 	struct msdos_volume_info vi; // 040
 	char     boot_code[0x200 - 0x5a - 2]; // 05a
 #define BOOT_SIGN 0xAA55
-	uint16_t boot_sign;          // 1fe
+	uint16_t boot_sign;          // 1fe 55,aa here means "bootable". Offset is the same even for sectors > 512 bytes
 } PACKED;
 
 // Microsoft's EFI FAT32 specification states that any FAT file system with
@@ -173,11 +179,14 @@ static int bad_fat32(const struct msdos_boot_sector *boot_blk)
 	return ((uint8_t)(boot_blk->fats - 1) > 1 // 0 or >2
 	 || boot_blk->fat16_sect_per_fat != 0
 	 || boot_blk->dir_entries != 0
-	 || boot_blk->vi.ext_boot_sign != 0x29
-	 || boot_blk->boot_sign != SWAP_LE16(BOOT_SIGN)
+	 || boot_blk->vi.ext_boot_sign != 0x29 // can be 0x28 in valid FAT32, but then it has no volume_label[] at offset 0x47
 	 || bytes_per_sect16 != SWAP_LE16(SECTOR_SIZE)
 	 || boot_blk->fat32_info_sector != SWAP_LE16(0x0001)
+	//maybe? || boot_blk->fat32_root_cluster < 2
 	//WRONG: || boot_blk->fat32_backup_boot != SWAP_LE16(0x0006)
+	//WRONG: || boot_blk->boot_sign != SWAP_LE16(BOOT_SIGN)
+	// ^^^^ non-bootable FAT32 partitions may well NOT have this signature.
+	// Linux does not check it on mount.
 	);
 }
 
