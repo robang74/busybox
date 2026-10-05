@@ -4380,15 +4380,21 @@ waitproc(int block, int *status)
 	return pid;
 }
 
-static int waitone(int block, struct job *job)
+#if !BASH_WAIT_N
+#define waitone(block, status, job) \
+	waitone(block, job)
+#endif
+static int waitone(int block, int *status, struct job *job)
 {
 	int pid;
-	int status;
 	struct job *jp;
 	struct job *thisjob = NULL;
 #if BASH_WAIT_N
 	bool want_jobexitstatus = (block & DOWAIT_JOBSTATUS);
 	block = (block & ~DOWAIT_JOBSTATUS);
+#else
+	int nstatus;
+#define status (&nstatus)
 #endif
 
 	TRACE(("waitone(0x%x) called\n", block));
@@ -4412,8 +4418,8 @@ static int waitone(int block, struct job *job)
 	 * SIG_DFL handler does not wake sigsuspend().
 	 */
 	INTOFF;
-	pid = waitproc(block, &status);
-	TRACE(("waitproc returns pid %d, status=%d\n", pid, status));
+	pid = waitproc(block, status);
+	TRACE(("waitproc returns pid %d, status=%d\n", pid, *status));
 	if (pid <= 0)
 		goto out;
 
@@ -4428,8 +4434,8 @@ static int waitone(int block, struct job *job)
 		sp = jp->ps;
 		do {
 			if (sp->ps_pid == pid) {
-				TRACE(("Job %d: changing status of proc %d from 0x%x to 0x%x\n", jobno(jp), pid, sp->ps_status, status));
-				sp->ps_status = status;
+				TRACE(("Job %d: changing status of proc %d from 0x%x to 0x%x\n", jobno(jp), pid, sp->ps_status, *status));
+				sp->ps_status = *status;
 				thisjob = jp;
 			}
 			if (sp->ps_status == -1)
@@ -4470,19 +4476,20 @@ static int waitone(int block, struct job *job)
 
 #if BASH_WAIT_N
 	if (want_jobexitstatus) {
-		pid = -1;
 		if (thisjob && thisjob->state == JOBDONE)
-			pid = thisjob->ps[thisjob->nprocs - 1].ps_status;
-		/* else: the job is not found, or not fully completed:
-		 * "wait -n" should NOT yet finish. Giving it -1, it will retry.
-		 */
+			*status = thisjob->ps[thisjob->nprocs - 1].ps_status;
+		else {
+			/* The job is not found, or not fully completed:
+			 * "wait -n" should NOT yet finish. Giving it -1, it will retry. */
+			*status = -1;
+		}
 	}
 #endif
 	if (thisjob && thisjob == job) {
 		char s[48 + 1];
 		int len;
 
-		len = sprint_status48(s, status, 1);
+		len = sprint_status48(s, *status, 1);
 		if (len) {
 			s[len] = '\n';
 			s[len + 1] = '\0';
@@ -4490,18 +4497,28 @@ static int waitone(int block, struct job *job)
 		}
 	}
 	return pid;
+#undef status
 }
 
-static int dowait(int block, struct job *jp)
+#if !BASH_WAIT_N
+#define dowait(block, status, jp) \
+	dowait(block, jp)
+#endif
+static int dowait(int block, int *status, struct job *jp)
 {
 	smallint gotchld = *(volatile smallint *)&gotsigchld;
 	int pid;
+	int local_status;
 
 	if (jp && jp->state != JOBRUNNING)
 		block = DOWAIT_NONBLOCK;
-
 	if (block == DOWAIT_NONBLOCK && !gotchld)
 		return 1;
+
+#if BASH_WAIT_N
+	if (!status)
+		status = &local_status;
+#endif
 
 	/* In what cases we loop here:
 	 * = If we waited in blocking mode and got pid > 0,
@@ -4520,9 +4537,9 @@ static int dowait(int block, struct job *jp)
 	 * one nonblocking wait and if it gives nothing, wait for signals.
 	 */
 	do {
-		pid = waitone(block, jp);
+		pid = waitone(block, status, jp);
 		if (block & DOWAIT_JOBSTATUS)
-			break; /* waitone() gave us the status, not pid (for "wait -n") */
+			break;
 			/* on signals, unknown pids, or not-fully completed jobs we get -1 */
 			/* it is always DOWAIT_CHILD_OR_SIG in this case */
 		if (pid == 0)
@@ -4594,7 +4611,7 @@ waitforjob(struct job *jp)
 	 * ^\^\^\^\hi <--- pressing ^\ (SIGQUIT)
 	 * $ _
 	 */
-	dowait(jp ? DOWAIT_BLOCK : DOWAIT_NONBLOCK, jp);
+	dowait(jp ? DOWAIT_BLOCK : DOWAIT_NONBLOCK, /*status:*/ NULL, jp);
 	if (!jp)
 		return exitstatus;
 
@@ -4709,7 +4726,7 @@ showjobs(int mode)
 	TRACE(("showjobs(0x%x) called\n", mode));
 
 	/* Handle all finished jobs */
-	dowait(DOWAIT_NONBLOCK, NULL);
+	dowait(DOWAIT_NONBLOCK, /*status:*/ NULL, /*job:*/ NULL);
 
 	for (jp = curjob; jp; jp = jp->prev_job) {
 		if (!(mode & SHOW_CHANGED) || jp->changed) {
@@ -4841,11 +4858,13 @@ waitcmd(int argc UNUSED_PARAM, char **argv)
 {
 	struct job *job;
 	int retval;
+	pid_t pid;
 	struct job *jp;
 #if BASH_WAIT_N
 	int status;
-	char one = nextopt("n");
+	char wait_n = nextopt("n");
 #else
+	const int wait_n = 0;
 	nextopt(nullstr);
 #endif
 	retval = 0;
@@ -4855,14 +4874,12 @@ waitcmd(int argc UNUSED_PARAM, char **argv)
 		/* wait for all jobs / one job if -n */
 		for (;;) {
 			jp = curjob;
-#if BASH_WAIT_N
-			if (one && !jp)
-				/* exitcode of "wait -n" with nothing to wait for is 127, not 0 */
-				retval = 127;
-#endif
 			while (1) {
-				if (!jp) /* no running procs */
+				if (!jp) { /* no running procs */
+					if (wait_n) /* exitcode of "wait -n" with nothing to wait for is 127, not 0 */
+						retval = 127;
 					goto ret;
+				}
 				if (jp->state == JOBRUNNING)
 					break;
 				jp->waited = 1;
@@ -4876,9 +4893,9 @@ waitcmd(int argc UNUSED_PARAM, char **argv)
 	 * the trap is executed."
 	 */
 #if BASH_WAIT_N
-			status = dowait(DOWAIT_CHILD_OR_SIG | DOWAIT_JOBSTATUS, NULL);
+			pid = dowait(DOWAIT_CHILD_OR_SIG | DOWAIT_JOBSTATUS, &status, /*job:*/ NULL);
 #else
-			dowait(DOWAIT_CHILD_OR_SIG, NULL);
+			dowait(DOWAIT_CHILD_OR_SIG, /*status:*/ NULL, /*job:*/ NULL);
 #endif
 			/* if child sends us a signal *and immediately exits*,
 			 * dowait() returns pid > 0. Check this case,
@@ -4887,26 +4904,41 @@ waitcmd(int argc UNUSED_PARAM, char **argv)
 			if (pending_sig)
 				goto sigout;
 #if BASH_WAIT_N
-			if (one) {
+			if (wait_n) {
 				/* wait -n waits for one _job_, not one _process_.
 				 *  date; sleep 3 & sleep 2 | sleep 1 & wait -n; date
 				 * should wait for 2 seconds. Not 1 or 3.
 				 */
-				if (status != -1 && !WIFSTOPPED(status)) {
-					retval = WEXITSTATUS(status);
-					if (WIFSIGNALED(status))
-						retval = 128 | WTERMSIG(status);
-					goto ret;
+				if (pid > 0) { /* some process did exit */
+					if (status != -1) {
+# if JOBS /* only possible if JOBS */
+						if (WIFSTOPPED(status))
+							continue; /* not interested in stops, find another process */
+# endif
+						retval = WEXITSTATUS(status);
+						if (WIFSIGNALED(status))
+							retval = 128 | WTERMSIG(status);
+						goto ret;
+					}
+					/* else: not entire job has exited (only a process), wait more */
+				} else {
+					/* There are no alive jobs. Are there dead ones? */
+					/* (bash-5.3.9 does this) */
+					if (curjob) {
+						retval = getstatus(curjob);
+						freejob(curjob);
+						goto ret;
+					}
 				}
 			}
 #endif
-		}
+		} /* for (;;) */
 	}
 
 	retval = 127;
 	do {
 		if (**argv != '%') {
-			pid_t pid = number(*argv);
+			pid = number(*argv);
 			job = curjob;
 			while (1) {
 				if (!job)
@@ -4919,7 +4951,7 @@ waitcmd(int argc UNUSED_PARAM, char **argv)
 			job = getjob(*argv, 0);
 		}
 		/* loop until process terminated or stopped */
-		dowait(DOWAIT_CHILD_OR_SIG, job);
+		dowait(DOWAIT_CHILD_OR_SIG, /*status:*/ NULL, job);
 		if (pending_sig)
 			goto sigout;
 		job->waited = 1;
