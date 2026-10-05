@@ -4473,6 +4473,9 @@ static int waitone(int block, struct job *job)
 		pid = -1;
 		if (thisjob && thisjob->state == JOBDONE)
 			pid = thisjob->ps[thisjob->nprocs - 1].ps_status;
+		/* else: the job is not found, or not fully completed:
+		 * "wait -n" should NOT yet finish. Giving it -1, it will retry.
+		 */
 	}
 #endif
 	if (thisjob && thisjob == job) {
@@ -4518,16 +4521,20 @@ static int dowait(int block, struct job *jp)
 	 */
 	do {
 		pid = waitone(block, jp);
+		if (block & DOWAIT_JOBSTATUS)
+			break; /* waitone() gave us the status, not pid (for "wait -n") */
+			/* on signals, unknown pids, or not-fully completed jobs we get -1 */
+			/* it is always DOWAIT_CHILD_OR_SIG in this case */
 		if (pid == 0)
-			return 0; /* got a signal */
+			break; /* return 0: got a signal */
 		if (jp && jp->state != JOBRUNNING) {
 			/* no more running procs in this job, stop waiting */
-			return 1; /* did not get a signal */
+			break; /* return pid != 0: did not get a signal */
 		}
 		/* if we saw a process changing state, wait again (is there more?) */
 	} while (pid > 0);
 
-	return 1; /* did not get a signal */
+	return pid;
 }
 
 /*
