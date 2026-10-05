@@ -2181,7 +2181,6 @@ static int check_user_passwd(const char *path, char *user_and_passwd)
 # if ENABLE_FEATURE_SHADOWPASSWDS && !ENABLE_PAM
 			char sp_buf[256];
 # endif
-
 			colon_after_user = strchr(user_and_passwd, ':');
 			if (!colon_after_user)
 				goto bad_input;
@@ -2236,8 +2235,9 @@ static int check_user_passwd(const char *path, char *user_and_passwd)
 					 * At least glibc 2.4 does this. Be extra paranoid here. */
 					struct spwd *result = NULL;
 					r = getspnam_r(pw->pw_name, &spw, sp_buf, sizeof(sp_buf), &result);
-					if (r == 0 && result)
-						passwd = result->sp_pwdp;
+					if (r != 0 || !result)
+						continue; /* no shadow, and passwd entry is bogus one-char string */
+					passwd = result->sp_pwdp;
 				}
 #  endif
 				/* In this case, passwd is ALWAYS encrypted:
@@ -2250,9 +2250,7 @@ static int check_user_passwd(const char *path, char *user_and_passwd)
 
 			if (passwd[0] == '$' && (isdigit(passwd[1]) || passwd[1] == 'y')) {
 				char *encrypted;
-# if !ENABLE_PAM
- check_encrypted:
-# endif
+ IF_NOT_PAM(check_encrypted:)
 				/* encrypt pwd from peer and check match with local one */
 				encrypted = pw_encrypt(
 					/* pwd (from peer): */  colon_after_user + 1,
