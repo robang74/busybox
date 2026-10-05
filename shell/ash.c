@@ -4351,6 +4351,9 @@ waitproc(int block, int *status)
 
 		if (err) /* waitpid() returned PID or error? */
 			break; /* return it */
+
+		/* We are here only if DOWAIT_NONBLOCK or DOWAIT_CHILD_OR_SIG */
+
 		err = -!block;
 		if (err) /* block == DOWAIT_NONBLOCK (0)? */
 			break; /* return -1 */
@@ -4493,7 +4496,6 @@ static int waitone(int block, struct job *job)
 static int dowait(int block, struct job *jp)
 {
 	smallint gotchld = *(volatile smallint *)&gotsigchld;
-	int rpid;
 	int pid;
 
 	if (jp && jp->state != JOBRUNNING)
@@ -4501,8 +4503,6 @@ static int dowait(int block, struct job *jp)
 
 	if (block == DOWAIT_NONBLOCK && !gotchld)
 		return 1;
-
-	rpid = 1;
 
 	/* In what cases we loop here:
 	 * = If we waited in blocking mode and got pid > 0,
@@ -4514,22 +4514,24 @@ static int dowait(int block, struct job *jp)
 	 * we should see whether more processes have terminated,
 	 * we have to wait in non-blocking mode again.
 	 * The users are
-	 *  showjobs() -> dowait(DOWAIT_NONBLOCK)
-	 *  waitforjob(NULL) -> dowait(DOWAIT_NONBLOCK)
+	 *  showjobs() -> dowait(DOWAIT_NONBLOCK, NULL)
+	 *  waitforjob(NULL) -> dowait(DOWAIT_NONBLOCK, NULL)
 	 * waitcmd() does its own looping while it sees at least one JOBRUNNING
 	 * job, it does not need us to loop here - only to do
 	 * one nonblocking wait and if it gives nothing, wait for signals.
 	 */
 	do {
 		pid = waitone(block, jp);
-		rpid &= !!pid;
+		if (pid == 0)
+			return 0; /* got a signal */
+		if (jp && jp->state != JOBRUNNING) {
+			/* no more running procs in this job, stop waiting */
+			return 1; /* did not get a signal */
+		}
+		/* if we saw a process changing state, wait again (is there more?) */
+	} while (pid > 0);
 
-		if (!pid || (jp && jp->state != JOBRUNNING))
-			block = DOWAIT_NONBLOCK;
-	} while (pid >= 0); //WRONG? should be "pid > 0"
-
-	/* Return: 0 if seen a signal, 1 otherwise */
-	return rpid;
+	return 1; /* did not get a signal */
 }
 
 /*
