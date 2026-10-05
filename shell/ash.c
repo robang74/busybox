@@ -4349,11 +4349,11 @@ waitproc(int block, int *status)
 			err = waitpid(-1, status, flags);
 		while (err < 0 && errno == EINTR);
 
-		/* Return if error (for example, ECHILD); or if pid found;
-		 * or if "block" is DOWAIT_NONBLOCK (=0), in this case return -1.
-		 */
-		if (err || (err = -!block))
-			break;
+		if (err) /* waitpid() returned PID or error? */
+			break; /* return it */
+		err = -!block;
+		if (err) /* block == DOWAIT_NONBLOCK (0)? */
+			break; /* return -1 */
 
 		/* "block" is DOWAIT_CHILD_OR_SIG. All children are running
 		 * (waitpid(WNOHAG) above returned 0), wait for signals:
@@ -4372,6 +4372,12 @@ waitproc(int block, int *status)
 	} while (gotsigchld);
 	/* If we fall off the loop, err is 0, which means we got a !SIGCHLD signal */
 
+	/* Possible returns:
+	 * PID of successfully waited-for child.
+	 * -1 on waitpid() error (can get ECHILD: no one to wait for)
+	 * -1 if DOWAIT_NONBLOCK
+	 * 0 if there were no waitable children and got a signal (not SIGCHLD)
+	 */
 	return err;
 }
 
