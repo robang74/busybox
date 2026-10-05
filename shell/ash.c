@@ -4392,7 +4392,7 @@ static int waitone(int block, struct job *job)
 	block = (block & ~DOWAIT_JOBSTATUS);
 #endif
 
-	TRACE(("dowait(0x%x) called\n", block));
+	TRACE(("waitone(0x%x) called\n", block));
 
 	/* It's wrong to call waitpid() outside of INTOFF region:
 	 * signal can arrive just after syscall return and handler can
@@ -4414,7 +4414,7 @@ static int waitone(int block, struct job *job)
 	 */
 	INTOFF;
 	pid = waitproc(block, &status);
-	TRACE(("wait returns pid %d, status=%d\n", pid, status));
+	TRACE(("waitproc returns pid %d, status=%d\n", pid, status));
 	if (pid <= 0)
 		goto out;
 
@@ -4504,14 +4504,31 @@ static int dowait(int block, struct job *jp)
 
 	rpid = 1;
 
+	/* In what cases we loop here:
+	 * = If we waited in blocking mode and got pid > 0,
+	 * but the job we waiting for is still running
+	 * (jp->state == JOBRUNNING), we have to wait in blocking mode again,
+	 * until it's not JOBRUNNING.
+	 * The user is waitforjob(jp) -> dowait(DOWAIT_BLOCK, jp).
+	 * = If we waited in non-blocking mode and got pid > 0,
+	 * we should see whether more processes have terminated,
+	 * we have to wait in non-blocking mode again.
+	 * The users are
+	 *  showjobs() -> dowait(DOWAIT_NONBLOCK)
+	 *  waitforjob(NULL) -> dowait(DOWAIT_NONBLOCK)
+	 * waitcmd() does its own looping while it sees at least one JOBRUNNING
+	 * job, it does not need us to loop here - only to do
+	 * one nonblocking wait and if it gives nothing, wait for signals.
+	 */
 	do {
 		pid = waitone(block, jp);
 		rpid &= !!pid;
 
 		if (!pid || (jp && jp->state != JOBRUNNING))
 			block = DOWAIT_NONBLOCK;
-	} while (pid >= 0);
+	} while (pid >= 0); //WRONG? should be "pid > 0"
 
+	/* Return: 0 if seen a signal, 1 otherwise */
 	return rpid;
 }
 
