@@ -4336,7 +4336,7 @@ waitproc(int block, int *status)
 {
 	sigset_t oldmask;
 	int flags = block == DOWAIT_BLOCK ? 0 : WNOHANG;
-	int err;
+	int pid;
 
 #if JOBS
 	if (jobctl)
@@ -4345,23 +4345,19 @@ waitproc(int block, int *status)
 
 	do {
 		gotsigchld = 0;
-		do
-			err = waitpid(-1, status, flags);
-		while (err < 0 && errno == EINTR);
+		//do
+		//	pid = waitpid(-1, status, flags);
+		//while (pid < 0 && errno == EINTR);
+		pid = safe_waitpid(-1, status, flags);
 
-		if (err) /* waitpid() returned PID or error? */
+		if (pid != 0) /* waitpid() returned PID or error? */
 			break; /* return it */
 
 		/* We are here only if DOWAIT_NONBLOCK or DOWAIT_CHILD_OR_SIG */
+		if (block == DOWAIT_NONBLOCK)
+			return -1;
 
-		err = -!block;
-		if (err) /* block == DOWAIT_NONBLOCK (0)? */
-			break; /* return -1 */
-
-		/* "block" is DOWAIT_CHILD_OR_SIG. All children are running
-		 * (waitpid(WNOHAG) above returned 0), wait for signals:
-		 */
-
+		/* DOWAIT_CHILD_OR_SIG: children exist and running, wait for a signal */
 		//simpler, but unsafe: a signal can set pending_sig after check, but before pause():
 		//while (!gotsigchld && !pending_sig)
 		//	pause();
@@ -4373,7 +4369,7 @@ waitproc(int block, int *status)
 
 		sigclearmask();
 	} while (gotsigchld);
-	/* If we fall off the loop, err is 0, which means we got a !SIGCHLD signal */
+	/* If we fall off the loop, pid is 0, which means we got a !SIGCHLD signal */
 
 	/* Possible returns:
 	 * PID of successfully waited-for child.
@@ -4381,7 +4377,7 @@ waitproc(int block, int *status)
 	 * -1 if DOWAIT_NONBLOCK
 	 * 0 if there were no waitable children and got a signal (not SIGCHLD)
 	 */
-	return err;
+	return pid;
 }
 
 static int waitone(int block, struct job *job)
