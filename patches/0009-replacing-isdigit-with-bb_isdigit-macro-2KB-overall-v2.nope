@@ -1,18 +1,15 @@
-From 447608b73faf433d5d227d79a84cc0a18c043bea Mon Sep 17 00:00:00 2001
+From 7640cdc446cfe9b818cb16ad458a37e955c611fa Mon Sep 17 00:00:00 2001
 From: "Roberto A. Foglietta" <roberto.foglietta@gmail.com>
-Date: Fri, 8 May 2026 02:49:07 +0200
-Subject: [PATCH] Replacing isdigit() with bb_isdigit() macro: -2KB
- all-yes-config
+Date: Tue, 6 Oct 2026 22:50:16 +0200
+Subject: [PATCH] Replacing isdigit() with bb_isdigit() macro: -2KB, v2
 
 define bb_isdigit(c) ({ uint8_t _c = (c); (_c-'0' < 10); })
 
-   text	   data	    bss	    dec	    hex	filename
-  19329	      0	      0	  19329	   4b81	editors/awk.o
-1153518	  18124	   2056	1173698	 11e8c2	busybox
-
-   text	   data	    bss	    dec	    hex	filename
-  19353	      0	      0	  19353	   4b99	editors/awk.o
-1155521	  18124	   2056	1175701	 11f095	busybox
+     text    data     bss     dec     hex filename
+  1193431   19275    1992 1214698  1288ea busybox
+  1191448   19275    1992 1212715  12812b busybox v1
+  1191441   19275    1992 1212708  128124 busybox v2
+                            -1990
 
 Signed-off-by: Roberto A. Foglietta <roberto.foglietta@gmail.com>
 ---
@@ -73,7 +70,7 @@ Signed-off-by: Roberto A. Foglietta <roberto.foglietta@gmail.com>
  54 files changed, 127 insertions(+), 126 deletions(-)
 
 diff --git a/archival/dpkg.c b/archival/dpkg.c
-index c4a0f0c94..d8ac7f094 100644
+index 2bf582ee5..732eb3982 100644
 --- a/archival/dpkg.c
 +++ b/archival/dpkg.c
 @@ -230,7 +230,7 @@ static int order(char x)
@@ -90,7 +87,7 @@ index c4a0f0c94..d8ac7f094 100644
  		int first_diff;
  
 -		while ((*val && !isdigit(*val)) || (*ref && !isdigit(*ref))) {
-+		while ((*val && !bb_isdigit(*val)) || (*ref && !isdigit(*ref))) {
++		while ((*val && !bb_isdigit(*val)) || (*ref && !bb_isdigit(*ref))) {
  			int vc = order(*val);
  			int rc = order(*ref);
  			if (vc != rc)
@@ -99,7 +96,7 @@ index c4a0f0c94..d8ac7f094 100644
  
  		first_diff = 0;
 -		while (isdigit(*val) && isdigit(*ref)) {
-+		while (bb_isdigit(*val) && isdigit(*ref)) {
++		while (bb_isdigit(*val) && bb_isdigit(*ref)) {
  			if (first_diff == 0)
  				first_diff = *val - *ref;
  			val++;
@@ -256,10 +253,10 @@ index 3cd48cfcc..2ba3eb9c4 100644
  						++direc_length;
  					}
 diff --git a/coreutils/shuf.c b/coreutils/shuf.c
-index 0d23382a2..761b651f2 100644
+index 1b6849e0b..c50ca0330 100644
 --- a/coreutils/shuf.c
 +++ b/coreutils/shuf.c
-@@ -128,7 +128,7 @@ int shuf_main(int argc, char **argv)
+@@ -160,7 +160,7 @@ int shuf_main(int argc, char **argv)
  			if (padding_width > 5 && padding_width == strlen(b)) {
  				/* How long is it? */
  				pfx = a;
@@ -269,10 +266,10 @@ index 0d23382a2..761b651f2 100644
  				) {
  					a++;
 diff --git a/coreutils/sort.c b/coreutils/sort.c
-index 2e952f81c..589f86f90 100644
+index 505c20ee1..6c442d378 100644
 --- a/coreutils/sort.c
 +++ b/coreutils/sort.c
-@@ -432,7 +432,7 @@ static int compare_keys(const void *xarg, const void *yarg)
+@@ -439,7 +439,7 @@ static int compare_keys(const void *xarg, const void *yarg)
  static unsigned str2u(char **str)
  {
  	unsigned long lu;
@@ -337,10 +334,10 @@ index f7e93497d..16c149c68 100644
  			cp++;
  		}
 diff --git a/editors/awk.c b/editors/awk.c
-index dd8f4ac42..5a0ee7cba 100644
+index d4aedc8b9..3779028d5 100644
 --- a/editors/awk.c
 +++ b/editors/awk.c
-@@ -939,12 +939,12 @@ static double my_strtod_or_hexoct(char **pp)
+@@ -942,12 +942,12 @@ static double my_strtod_or_hexoct(char **pp)
  	if (cp[0] == '0') {
  		/* Might be hex or octal integer: 0x123abc or 07777 */
  		char c = (cp[1] | 0x20);
@@ -355,7 +352,7 @@ index dd8f4ac42..5a0ee7cba 100644
  				return ull;
  			/* else: it may be a floating number. Examples:
  			 * 009.123 (*pp points to '9')
-@@ -1239,7 +1239,7 @@ static uint32_t next_token(uint32_t expected)
+@@ -1374,7 +1374,7 @@ static uint32_t next_token(uint32_t expected)
  			tc = TC_REGEXP;
  			debug_printf_parse("%s: token found:'%s' TC_REGEXP\n", __func__, t_string);
  
@@ -385,7 +382,7 @@ index a02634ec7..69107fa28 100644
  				haveNum = TRUE;
  				break;
 diff --git a/editors/sed.c b/editors/sed.c
-index 029e9b8e7..013a83c4e 100644
+index 4dd89fa8d..b684ae552 100644
 --- a/editors/sed.c
 +++ b/editors/sed.c
 @@ -379,7 +379,7 @@ static int get_address(const char *my_str, int *linenum, regex_t ** regex)
@@ -462,10 +459,10 @@ index ba607bcfd..1eaad45bf 100644
  	cnt = dot - begin_line(dot);
  	// Try to stay off of the Newline
 diff --git a/include/libbb.h b/include/libbb.h
-index ea6f3238e..e26cee88a 100644
+index 7f6829b8c..d1111d062 100644
 --- a/include/libbb.h
 +++ b/include/libbb.h
-@@ -179,6 +179,7 @@
+@@ -265,6 +265,7 @@ typedef char* security_context_t;
  # define STRERROR_ERRNO  ,strerror(errno)
  #endif
  
@@ -474,10 +471,10 @@ index ea6f3238e..e26cee88a 100644
  /* Some libc's forget to declare these, do it ourself */
  
 diff --git a/init/bootchartd.c b/init/bootchartd.c
-index a5447c6ad..15cd285bc 100644
+index 8c92b8dbc..06ed24789 100644
 --- a/init/bootchartd.c
 +++ b/init/bootchartd.c
-@@ -241,7 +241,7 @@ static void do_logging(unsigned sample_period_us, int process_accounting)
+@@ -246,7 +246,7 @@ static void do_logging(unsigned sample_period_us, int process_accounting)
  		p = strchr(G.jiffy_line, '.');
  		if (!p)
  			goto wait_more;
@@ -607,7 +604,7 @@ index b41b40a7e..0b33e2ab2 100644
  		else if ((c|0x20) >= 'a' && (c|0x20) <= 'f')
  			val |= (c|0x20) - ('a' - 10);
 diff --git a/loginutils/getty.c b/loginutils/getty.c
-index 232fa2b84..71f4bd960 100644
+index 190088ae3..a2592567b 100644
 --- a/loginutils/getty.c
 +++ b/loginutils/getty.c
 @@ -194,7 +194,7 @@ static void parse_args(char **argv)
@@ -669,7 +666,7 @@ index 1ef8f418d..6218d13e0 100644
  		else
  			s = bc_error_bad_character(c);
 diff --git a/miscutils/crond.c b/miscutils/crond.c
-index 6a384fdfb..fec4bfd64 100644
+index 05c537afa..d36d7fc09 100644
 --- a/miscutils/crond.c
 +++ b/miscutils/crond.c
 @@ -240,7 +240,7 @@ static void ParseField(char *user, char *ary, int modvalue, int off,
@@ -682,7 +679,7 @@ index 6a384fdfb..fec4bfd64 100644
  			if (n1 < 0) {
  				n1 = strtol(ptr, &endp, 10) + off;
 diff --git a/miscutils/devfsd.c b/miscutils/devfsd.c
-index d57691414..c3572be7a 100644
+index 65eab9b1d..e5391bd82 100644
 --- a/miscutils/devfsd.c
 +++ b/miscutils/devfsd.c
 @@ -1147,7 +1147,7 @@ static int get_uid_gid(int flag, const char *string)
@@ -690,7 +687,7 @@ index d57691414..c3572be7a 100644
  	const char *msg;
  
 -	if (isdigit(string[0]) || ((string[0] == '-') && isdigit(string[1])))
-+	if (bb_isdigit(string[0]) || ((string[0] == '-') && isdigit(string[1])))
++	if (bb_isdigit(string[0]) || ((string[0] == '-') && bb_isdigit(string[1])))
  		return atoi(string);
  
  	if (flag == UID && (pw_ent = getpwnam(string)) != NULL)
@@ -822,7 +819,7 @@ index 1172850ce..f4517d1ff 100644
  	buf[3] = '\0';
  	n = xatou(buf);
 diff --git a/networking/httpd.c b/networking/httpd.c
-index 3b811cb71..7ce303d60 100644
+index 4659b3c75..0b764cffb 100644
 --- a/networking/httpd.c
 +++ b/networking/httpd.c
 @@ -2240,7 +2240,7 @@ static int check_user_passwd(const char *path, char *user_and_passwd)
@@ -844,7 +841,7 @@ index 3b811cb71..7ce303d60 100644
  				cp++;
  			}
 diff --git a/networking/interface.c b/networking/interface.c
-index 6b6c0944a..6db61f1e2 100644
+index 6b6c0944a..02cea86a7 100644
 --- a/networking/interface.c
 +++ b/networking/interface.c
 @@ -112,7 +112,7 @@ static int INET_getsock(char *bufp, struct sockaddr *sap)
@@ -870,7 +867,7 @@ index 6b6c0944a..6db61f1e2 100644
  			return 0;
  		}
 -		if (!isdigit(*a) && isdigit(*(a+1))) {
-+		if (!bb_isdigit(*a) && isdigit(*(a+1))) {
++		if (!bb_isdigit(*a) && bb_isdigit(*(a+1))) {
  			a_ptr = a+1;
  			b_ptr = b+1;
  		}
@@ -879,12 +876,12 @@ index 6b6c0944a..6db61f1e2 100644
  	}
  
 -	if (isdigit(*a) && isdigit(*b)) {
-+	if (bb_isdigit(*a) && isdigit(*b)) {
++	if (bb_isdigit(*a) && bb_isdigit(*b)) {
  		return xatoul(a_ptr) > xatoul(b_ptr) ? 1 : -1;
  	}
  	return *a - *b;
 diff --git a/networking/netstat.c b/networking/netstat.c
-index d31928957..07898037b 100644
+index be1fa2f72..15bc4cee6 100644
 --- a/networking/netstat.c
 +++ b/networking/netstat.c
 @@ -306,7 +306,7 @@ static int FAST_FUNC dir_act(struct recursive_state *state,
@@ -897,10 +894,10 @@ index d31928957..07898037b 100644
  
  	len = snprintf(proc_pid_fname, sizeof(proc_pid_fname), "%s/cmdline", fileName);
 diff --git a/networking/wget.c b/networking/wget.c
-index ec3767793..81641d372 100644
+index d6d1837ef..2c0129c1f 100644
 --- a/networking/wget.c
 +++ b/networking/wget.c
-@@ -523,7 +523,7 @@ static int ftpcmd(const char *s1, const char *s2, FILE *fp)
+@@ -551,7 +551,7 @@ static int ftpcmd(const char *s1, const char *s2, FILE *fp)
  	G.wget_buf[3] = 0;
  	do {
  		fgets_trim_sanitize(fp, "%s\n");
@@ -958,7 +955,7 @@ index 795b4ccb7..74f827a6c 100644
  				//bb_error_msg("G.st_irq[%u][%u].irq_nr + %u = %lld",
  				// current, cpu_index[cpu] + 1, ic->interrupts, irq_i->irq_nr);
 diff --git a/procps/nmeter.c b/procps/nmeter.c
-index fd8907aac..604852e9e 100644
+index 265d72c4b..22b1910f4 100644
 --- a/procps/nmeter.c
 +++ b/procps/nmeter.c
 @@ -280,7 +280,7 @@ static int rdval_diskstats(const char* p, ullong *vec)
@@ -1024,7 +1021,7 @@ index a2231788b..41ce05a67 100644
  			memset(&s, 0, sizeof(s));
  			s.st_mode = 0555;
 diff --git a/shell/ash.c b/shell/ash.c
-index fb887f31b..afd27fe7d 100644
+index dd7fe6644..257525421 100644
 --- a/shell/ash.c
 +++ b/shell/ash.c
 @@ -647,9 +647,9 @@ static void trace_vprintf(const char *fmt, va_list va);
@@ -1048,7 +1045,7 @@ index fb887f31b..afd27fe7d 100644
  			return 0;
  	} while (*++p != '\0');
  	return 1;
-@@ -10041,7 +10041,7 @@ expredir(union node *n)
+@@ -10066,7 +10066,7 @@ expredir(union node *n)
  				if (fn.list == NULL)
  					ash_msg_and_raise_error("redir error");
  #if BASH_REDIR_OUTPUT
@@ -1057,7 +1054,7 @@ index fb887f31b..afd27fe7d 100644
  					/* >&file, not >&fd */
  					if (redir->nfile.fd != 1) /* 123>&file - BAD */
  						ash_msg_and_raise_error("redir error");
-@@ -13221,7 +13221,7 @@ readtoken1(int c, int syntax, struct heredoc *eofmark)
+@@ -13239,7 +13239,7 @@ readtoken1(int c, int syntax, struct heredoc *eofmark)
  		if ((c == '>' || c == '<' IF_BASH_REDIR_OUTPUT( || c == 0x100 + '>'))
  		 && quotef == 0
  		) {
@@ -1066,7 +1063,7 @@ index fb887f31b..afd27fe7d 100644
  				PARSEREDIR(); /* passed as params: out, c */
  				lasttoken = TREDIR;
  				return lasttoken;
-@@ -13440,12 +13440,12 @@ parsesub: {
+@@ -13458,12 +13458,12 @@ parsesub: {
  				STPUTC(c, out);
  				c = pgetc_eatbnl();
  			} while (is_in_name(c));
@@ -1081,7 +1078,7 @@ index fb887f31b..afd27fe7d 100644
  		} else if (c != '}') {
  			/* $[{[#]]<specialchar>[}] */
  			int cc = c;
-@@ -14720,13 +14720,13 @@ umaskcmd(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+@@ -14736,13 +14736,13 @@ umaskcmd(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
  		char *modestr = *argptr;
  		/* numeric umasks are taken as-is */
  		/* symbolic umasks are inverted: "umask a=rx" calls umask(222) */
@@ -1098,7 +1095,7 @@ index fb887f31b..afd27fe7d 100644
  		umask(mask);
  	}
 diff --git a/shell/hush.c b/shell/hush.c
-index 23e7f512f..843960618 100644
+index dcc6b2239..6ff0da500 100644
 --- a/shell/hush.c
 +++ b/shell/hush.c
 @@ -4630,7 +4630,7 @@ static int parse_redir_right_fd(o_string *as_string, struct in_str *input)
@@ -1206,10 +1203,10 @@ index b99e8af74..ba54375aa 100644
  	for (c = codetab; c->c_name; c++) {
  		if (!strcasecmp(name, c->c_name)) {
 diff --git a/util-linux/fdisk.c b/util-linux/fdisk.c
-index 5ab350c74..94645e4e1 100644
+index 1de73dda1..7ee71b350 100644
 --- a/util-linux/fdisk.c
 +++ b/util-linux/fdisk.c
-@@ -623,7 +623,7 @@ partname(const char *dev, int pno, int lth)
+@@ -625,7 +625,7 @@ partname(const char *dev, int pno, int lth)
  	w = strlen(dev);
  	p = "";
  
@@ -1218,7 +1215,7 @@ index 5ab350c74..94645e4e1 100644
  		p = "p";
  
  	/* devfs kludge - note: fdisk partition names are not supposed
-@@ -1627,7 +1627,7 @@ read_int(sector_t low, sector_t dflt, sector_t high, sector_t base, const char *
+@@ -1629,7 +1629,7 @@ read_int(sector_t low, sector_t dflt, sector_t high, sector_t base, const char *
  		do {
  			printf(fmt, mesg, low, high, dflt);
  			read_maybe_empty("");
@@ -1227,7 +1224,7 @@ index 5ab350c74..94645e4e1 100644
  		 && *line_ptr != '-' && *line_ptr != '+');
  
  		if (*line_ptr == '+' || *line_ptr == '-') {
-@@ -1642,7 +1642,7 @@ read_int(sector_t low, sector_t dflt, sector_t high, sector_t base, const char *
+@@ -1644,7 +1644,7 @@ read_int(sector_t low, sector_t dflt, sector_t high, sector_t base, const char *
  			/* (1) if 2nd char is digit, use_default = 0.
  			 * (2) move line_ptr to first non-digit.
  			 */
@@ -1236,7 +1233,7 @@ index 5ab350c74..94645e4e1 100644
  				use_default = 0;
  
  			scale_shift = 0;
-@@ -1700,7 +1700,7 @@ read_int(sector_t low, sector_t dflt, sector_t high, sector_t base, const char *
+@@ -1702,7 +1702,7 @@ read_int(sector_t low, sector_t dflt, sector_t high, sector_t base, const char *
  				value = strtoul(line_ptr, NULL, 10);
  			else
  				value = strtoull(line_ptr, NULL, 10);
@@ -1245,7 +1242,7 @@ index 5ab350c74..94645e4e1 100644
  				line_ptr++;
  				use_default = 0;
  			}
-@@ -2256,7 +2256,7 @@ list_table(int xtra)
+@@ -2258,7 +2258,7 @@ list_table(int xtra)
  	 * then the partition is called /dev/foo1p3.
  	 */
  	w = strlen(disk_device);
@@ -1254,7 +1251,7 @@ index 5ab350c74..94645e4e1 100644
  		w++;
  	if (w < 7)
  		w = 7;
-@@ -3012,7 +3012,7 @@ static int is_whole_disk(const char *disk)
+@@ -3014,7 +3014,7 @@ static int is_whole_disk(const char *disk)
  	/* Treat "nameN" as a partition name, not whole disk */
  	/* note: mmcblk0 should work from the geometry check above */
  	len = strlen(disk);
