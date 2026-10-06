@@ -4390,7 +4390,11 @@ static int waitone(int block, int *status, struct job *job)
 	struct job *jp;
 	struct job *thisjob = NULL;
 #if BASH_WAIT_N
-	bool want_jobexitstatus = (block & DOWAIT_JOBSTATUS);
+	int want_jobexitstatus;
+	int local_status;
+	if (!status)
+		status = &local_status;
+	want_jobexitstatus = (block & DOWAIT_JOBSTATUS);
 	block = (block & ~DOWAIT_JOBSTATUS);
 #else
 	int nstatus;
@@ -4508,17 +4512,11 @@ static int dowait(int block, int *status, struct job *jp)
 {
 	smallint gotchld = *(volatile smallint *)&gotsigchld;
 	int pid;
-	int local_status;
 
 	if (jp && jp->state != JOBRUNNING)
 		block = DOWAIT_NONBLOCK;
 	if (block == DOWAIT_NONBLOCK && !gotchld)
 		return 1;
-
-#if BASH_WAIT_N
-	if (!status)
-		status = &local_status;
-#endif
 
 	/* In what cases we loop here:
 	 * = If we waited in blocking mode and got pid > 0,
@@ -4538,10 +4536,12 @@ static int dowait(int block, int *status, struct job *jp)
 	 */
 	do {
 		pid = waitone(block, status, jp);
+#if BASH_WAIT_N
 		if (block & DOWAIT_JOBSTATUS)
 			break;
 			/* on signals, unknown pids, or not-fully completed jobs we get -1 */
 			/* it is always DOWAIT_CHILD_OR_SIG in this case */
+#endif
 		if (pid == 0)
 			break; /* return 0: got a signal */
 		if (jp && jp->state != JOBRUNNING) {
