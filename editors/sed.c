@@ -1525,6 +1525,24 @@ static void add_cmd_block(char *cmdstr)
 	free(sv);
 }
 
+static ALWAYS_INLINE void add_cmd_file(const char *fname)
+{
+	char *line;
+	FILE *cmdfile;
+
+	cmdfile = xfopen_stdin(fname);
+	while ((line = xmalloc_fgetline(cmdfile)) != NULL) {
+		add_cmd(line);
+		free(line);
+	}
+	fclose_if_not_stdin(cmdfile);
+}
+
+static ALWAYS_INLINE int is_in(const char *optarg, const char *arg)
+{
+	return optarg >= arg && optarg <= arg + strlen(arg);
+}
+
 int sed_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
 int sed_main(int argc UNUSED_PARAM, char **argv)
 {
@@ -1568,8 +1586,6 @@ int sed_main(int argc UNUSED_PARAM, char **argv)
 			sed_longopts,
 			&opt_i, &opt_e, &opt_f,
 			&G.be_quiet); /* counter for -n */
-	//argc -= optind;
-	argv += optind;
 	if (opt & OPT_in_place) { // -i
 		die_func = cleanup_outname;
 	}
@@ -1577,18 +1593,15 @@ int sed_main(int argc UNUSED_PARAM, char **argv)
 		G.regex_type |= REG_EXTENDED; // -r or -E
 	//if (opt & 8)
 	//	G.be_quiet++; // -n (implemented with a counter instead)
-	while (opt_e) { // -e
-		add_cmd_block(llist_pop(&opt_e));
-	}
-	while (opt_f) { // -f
-		char *line;
-		FILE *cmdfile;
-		cmdfile = xfopen_stdin(llist_pop(&opt_f));
-		while ((line = xmalloc_fgetline(cmdfile)) != NULL) {
-			add_cmd(line);
-			free(line);
-		}
-		fclose_if_not_stdin(cmdfile);
+	argv += optind;
+	if(opt_e || opt_f) {
+	    for (char **argp = argv - optind + 1; argp < argv; argp++) {
+		    if (opt_e && is_in(opt_e->data, *argp))
+			    add_cmd_block(llist_pop(&opt_e));
+		    else
+		    if (opt_f && is_in(opt_f->data, *argp))
+			    add_cmd_file(llist_pop(&opt_f));
+	    }
 	}
 	/* if we didn't get a pattern from -e or -f, use argv[0] */
 	if (!(opt & 0x30)) {
