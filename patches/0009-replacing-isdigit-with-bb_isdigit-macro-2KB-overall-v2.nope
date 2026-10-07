@@ -1,15 +1,14 @@
-From 7640cdc446cfe9b818cb16ad458a37e955c611fa Mon Sep 17 00:00:00 2001
+From f793363ddc0e1d670125dacbbece7bb52d294b0c Mon Sep 17 00:00:00 2001
 From: "Roberto A. Foglietta" <roberto.foglietta@gmail.com>
 Date: Tue, 6 Oct 2026 22:50:16 +0200
-Subject: [PATCH] Replacing isdigit() with bb_isdigit() macro: -2KB, v2
+Subject: [PATCH] Replacing isdigit() with bb_isdigit() macro, v3
 
-define bb_isdigit(c) ({ uint8_t _c = (c); (_c-'0' < 10); })
+  #define bb_isdigit(c) ({ uint8_t _c = (c)-'0'; (_c < 10); })
 
      text    data     bss     dec     hex filename
   1193431   19275    1992 1214698  1288ea busybox
-  1191448   19275    1992 1212715  12812b busybox v1
-  1191441   19275    1992 1212708  128124 busybox v2
-                            -1990
+  1193376   19275    1992 1214643  1288b3 busybox v3
+                              +55
 
 Signed-off-by: Roberto A. Foglietta <roberto.foglietta@gmail.com>
 ---
@@ -382,7 +381,7 @@ index a02634ec7..69107fa28 100644
  				haveNum = TRUE;
  				break;
 diff --git a/editors/sed.c b/editors/sed.c
-index 4dd89fa8d..b684ae552 100644
+index ca61b9333..b275a6ff2 100644
 --- a/editors/sed.c
 +++ b/editors/sed.c
 @@ -379,7 +379,7 @@ static int get_address(const char *my_str, int *linenum, regex_t ** regex)
@@ -459,14 +458,14 @@ index ba607bcfd..1eaad45bf 100644
  	cnt = dot - begin_line(dot);
  	// Try to stay off of the Newline
 diff --git a/include/libbb.h b/include/libbb.h
-index 7f6829b8c..d1111d062 100644
+index 7f6829b8c..f89d69122 100644
 --- a/include/libbb.h
 +++ b/include/libbb.h
 @@ -265,6 +265,7 @@ typedef char* security_context_t;
  # define STRERROR_ERRNO  ,strerror(errno)
  #endif
  
-+#define bb_isdigit(c) ({ uint8_t _c = (c); (_c-'0' < 10); })
++#define bb_isdigit(c) ({ uint8_t _c = (c)-'0'; (_c < 10); })
  
  /* Some libc's forget to declare these, do it ourself */
  
