@@ -4480,9 +4480,10 @@ static int waitone(int block, int *status, struct job *job)
 
 #if BASH_WAIT_N
 	if (want_jobexitstatus) {
-		if (thisjob && thisjob->state == JOBDONE)
+		if (thisjob && thisjob->state == JOBDONE) {
 			*status = thisjob->ps[thisjob->nprocs - 1].ps_status;
-		else {
+			thisjob->waited = 1;
+		} else {
 			/* The job is not found, or not fully completed:
 			 * "wait -n" should NOT yet finish. Giving it -1, it will retry. */
 			*status = -1;
@@ -4864,7 +4865,7 @@ waitcmd(int argc UNUSED_PARAM, char **argv)
 	int status;
 	char wait_n = nextopt("n");
 #else
-	const int wait_n = 0;
+	int wait_n = 0; /* never changes if !BASH_WAIT_N */
 	nextopt(nullstr);
 #endif
 	retval = 0;
@@ -4875,14 +4876,28 @@ waitcmd(int argc UNUSED_PARAM, char **argv)
 		for (;;) {
 			jp = curjob;
 			while (1) {
-				if (!jp) { /* no running procs */
-					if (wait_n) /* exitcode of "wait -n" with nothing to wait for is 127, not 0 */
+				if (!jp) { /* no more jobs */
+					if (wait_n == 1)
+						break; /* there is a live job */
+					if (wait_n == 'n') /* exitcode of "wait -n" with nothing to wait for is 127, not 0 */
 						retval = 127;
 					goto ret;
 				}
-				if (jp->state == JOBRUNNING)
-					break;
-				jp->waited = 1;
+				if (!wait_n) {
+					if (jp->state != JOBDONE)
+						break;
+					jp->waited = 1;
+				} else {
+					if (jp->state != JOBDONE) {
+						wait_n = 1; /* replace 'n': mark that we found a live job */
+					} else if (!jp->waited) {
+						jp->waited = 1;
+						/* "wait -n" returns status of unwaited-for dead jobs immediately */
+						/* (bash-5.3.9 does this in -c 'CMDs' and scripts only) */
+						retval = getstatus(jp);
+						goto ret;
+					}
+				}
 				jp = jp->prev_job;
 			}
 	/* man bash:
@@ -4911,7 +4926,7 @@ waitcmd(int argc UNUSED_PARAM, char **argv)
 				 */
 				if (pid > 0) { /* some process did exit */
 					if (status != -1) {
-# if JOBS /* only possible if JOBS */
+# if JOBS /* processes can be stopped even if !JOBS, but we never wait for them with WUNTRACED - never see stops */
 						if (WIFSTOPPED(status))
 							continue; /* not interested in stops, find another process */
 # endif
@@ -4921,14 +4936,6 @@ waitcmd(int argc UNUSED_PARAM, char **argv)
 						goto ret;
 					}
 					/* else: not entire job has exited (only a process), wait more */
-				} else {
-					/* There are no alive jobs. Are there dead ones? */
-					/* (bash-5.3.9 does this) */
-					if (curjob) {
-						retval = getstatus(curjob);
-						freejob(curjob);
-						goto ret;
-					}
 				}
 			}
 #endif
@@ -4950,7 +4957,7 @@ waitcmd(int argc UNUSED_PARAM, char **argv)
 		} else {
 			job = getjob(*argv, 0);
 		}
-		/* loop until process terminated or stopped */
+		/* loop until process terminated (but stops do not count) */
 		dowait(DOWAIT_CHILD_OR_SIG, /*status:*/ NULL, job);
 		if (pending_sig)
 			goto sigout;
