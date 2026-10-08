@@ -73,7 +73,6 @@ testing "awk %d 99999999999999000.1234" \
 testing "awk %ld large integer (robust value)" \
 "awk 'BEGIN { printf \"%ld\n\", 9007199254740992; }'" "9007199254740992\n" "" ""
 
-
 # .precision on integer formatting allowed and ignored
 testing "awk %.3d 99999999999999000.1234" \
 "awk 'BEGIN { printf \"%.3ld\n\", 99999999999999000.1234; }'" "99999999999999008\n" "" ""
