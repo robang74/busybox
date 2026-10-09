@@ -4547,6 +4547,7 @@ static int dowait_n(int block, struct job *jp, int *pstatus, struct job **done_j
 
 	return pid;
 }
+/* nake dowait() calls look the same as in dash: */
 #if !BASH_WAIT_N
 # define dowait(block, jp) dowait_n((block), (jp), UNUSED, UNUSED)
 #else
@@ -4855,14 +4856,13 @@ stoppedjobs(void)
 #define stoppedjobs() 0
 #endif
 
-#if BASH_WAIT_N
 static struct job*
 getjob_match_last_pid(pid_t pid)
 {
 	struct job *jp = curjob;
 	while (jp) {
-		// WRONG: "wait -n $PID;echo $?;wait -n $PID;echo $?" should work
-		// and produce the same exitcode the second time
+		// WRONG: "wait -n $PID;echo $?;wait -n $PID;echo $?"
+		// should work and produce the same exitcode the second time
 		//if (/* jp->state == JOBDONE && */ jp->waited)
 		//	; /* these never match (pids can be very stale) */
 		//else
@@ -4872,24 +4872,25 @@ getjob_match_last_pid(pid_t pid)
 	}
 	return jp;
 }
+#if BASH_WAIT_N
 static int
-match_pid_or_jobspecs(pid_t pid, struct job *done_job, char **name, int status)
+match_pid_or_jobspecs(pid_t pid, struct job *done_job, char **argp, int status)
 {
-	while (*name) {
-		if (**name != '%') {
+	while (*argp) {
+		if (**argp != '%') {
 			/* number() can't fail here: known to be valid number */
-			if (pid == number(*name)) {
+			if (pid == number(*argp)) {
 				if (WIFEXITED(status))
 					return WEXITSTATUS(status);
 				return 128 | WTERMSIG(status);
 			}
 		} else if (done_job) {
 			/* getjob() can't fail here either */
-			struct job *jp = getjob(*name, /*must_be_jobctl:*/ 0);
+			struct job *jp = getjob(*argp, /*must_be_jobctl:*/ 0);
 			if (jp == done_job)
 				return getstatus(jp);
 		}
-		name++;
+		argp++;
 	}
 	return -1;
 }
@@ -5015,6 +5016,7 @@ waitcmd(int argc UNUSED_PARAM, char **argv)
 				status = match_pid_or_jobspecs(pid, done_job, argv, status);
 				if (status >= 0) {
 					/* even if we did "wait -n PID", not %JOB, if this matches exited job's last pid... */
+					/* ("CMD1|CMD2 & bg=$!; wait -n $bg" idiom uses pid of CMD2 intending to wait for the whole job) */
 					if (done_job && done_job->ps[done_job->nprocs - 1].ps_pid == pid)
 						done_job->waited = 1; /* ...the job is now "waited for" */
 					retval = status;
