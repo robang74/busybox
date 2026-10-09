@@ -12623,11 +12623,13 @@ pipeline(void)
 
 	negate = 0;
 	TRACE(("pipeline: entered\n"));
-	if (readtoken() == TNOT) {
+	/* At least bash 5.2.15 allows multiple negations */
+	/* "! ! CMD" does not mean "normalize to only 0 or 1", it just nullifies first ! */
+	while (readtoken() == TNOT) {
 		negate = !negate;
-		checkkwd = CHKKWD | CHKALIAS;
-	} else
-		tokpushback = 1;
+		checkkwd = CHKKWD | CHKALIAS; /* restore what readtoken() cleared */
+	}
+	tokpushback = 1;
 	n1 = parse_command();
 	if (readtoken() == TPIPE) {
 		pipenode = stzalloc(sizeof(struct npipe));
@@ -14011,13 +14013,10 @@ readtoken(void)
 	int t;
 	int kwd = checkkwd;
 #if DEBUG
-	smallint alreadyseen = tokpushback;
+	int alreadyseen = tokpushback;
 #endif
 
-#if ENABLE_ASH_ALIAS
- top:
-#endif
-
+ IF_ASH_ALIAS(top:)
 	t = xxreadtoken();
 
 	/*
