@@ -2555,9 +2555,9 @@ static int awk_getline(rstream *rsm, var *v)
 #endif
 static char *awk_printf(node *n, size_t *len)
 {
-	char *b;
-	char *fmt, *f;
-	size_t i;
+	char *fmt, *fmt_cur;
+	char *res_buf;
+	size_t res_len;
 
 	//tmpvar = nvalloc(1);
 #define TMPVAR (&G.awk_printf__tmpvar)
@@ -2565,18 +2565,20 @@ static char *awk_printf(node *n, size_t *len)
 	// to decrease memory consumption in deeply-recursive awk programs.
 	// The rule to work safely is to never call evaluate() while our static
 	// TMPVAR's value is still needed.
-	fmt = f = xstrdup(getvar_s(evaluate(nextarg(&n), TMPVAR)));
+	fmt = fmt_cur = xstrdup(getvar_s(evaluate(nextarg(&n), TMPVAR)));
 	// ^^^^^^^^^ here we immediately strdup() the value, so the later call
 	// to evaluate() potentially recursing into another awk_printf() can't
 	// mangle the value.
 
-	b = NULL;
-	i = 0;
+	res_buf = NULL;
+	res_len = 0;
 	while (1) { /* "print one format spec" loop */
-		char *s;
 		char c;
 		char sv;
 		var *arg;
+		/* s is the next string to append to res_buf */
+		/* it can be either a literal trailing segment of fmt (if c == NUL), or allocated result of the formatting */
+		char *s;
 		size_t slen;
 		char *fmt_str = NULL;
 #if ENABLE_DESKTOP
@@ -2593,38 +2595,38 @@ static char *awk_printf(node *n, size_t *len)
 #endif
 #endif
 		/* Find end of the next format spec, or end of line */
-		s = f;
+		s = fmt_cur;
 		while (1) {
-			c = *f;
+			c = *fmt_cur;
 			if (!c) /* no percent chars found at all */
 				goto nul;
-			f++;
+			fmt_cur++;
 			if (c == '%')
 				break;
 		}
 #if ENABLE_DESKTOP
-		p = f - 1;
+		p = fmt_cur - 1;
 		*out++ = '%'; //RAF: sze--, but already computed in fmt_buf_size-2
 #endif
 		/* we are past % in "....%..." */
-		c = *f;
+		c = *fmt_cur;
 		if (!c) { /* "....%" */
 nul:
-			slen = f - s;
+			slen = fmt_cur - s;
 			goto tail;
 	    }
 		if (c == '%') { /* "....%%...." */
-			slen = f - s;
+			slen = fmt_cur - s;
 			s = xstrndup(s, slen);
-			f++;
-			goto append; /* print "....%" part verbatim */
+			fmt_cur++;
+			goto append; /* append "....%" part verbatim */
 		}
 
 #if ENABLE_DESKTOP
 		/* flags */
 		while (c && strchr("+- 0#", c)) {
 			*out++ = c;
-			c = *++f;
+			c = *++fmt_cur;
 			chksze(1);
 		}
 
@@ -2637,14 +2639,14 @@ star_again:
 			wrn = sprintf(out, "%d", w);
 			out += wrn;
 			chksze(wrn);
-			c = *++f;
+			c = *++fmt_cur;
 			if (c >= '0' && c <= '9') /* invalidate "^^^%5.*8f^^^" */
 //invalid:
 				syntax_error("invalid format specifier");
 		} else {
 			while (c >= '0' && c <= '9') {
 				*out++ = c;
-				c = *++f;
+				c = *++fmt_cur;
 				chksze(1);
 			}
 		}
@@ -2652,7 +2654,7 @@ star_again:
 		/* precision */
 		if (c == '.') {
 			*out++ = '.';
-			c = *++f;
+			c = *++fmt_cur;
 			chksze(1);
 			has_prec=1;
 			goto star_again;
@@ -2666,7 +2668,7 @@ star_again:
 		/* long integer */
 		if (strchr(fmt_num_types_l, c)) {
 			*out++ = c;
-			c = *++f;
+			c = *++fmt_cur;
 			chksze(1);
 		}
 #if 0
@@ -2685,8 +2687,8 @@ star_again:
 		/* Result can be arbitrarily long. Example:
 		 *  printf "%99999s", "BOOM"
 		 */
-		sv = *++f;
-		*f = '\0';
+		sv = *++fmt_cur;
+		*fmt_cur = '\0';
 #if ENABLE_DESKTOP
 		*out++ = c;
 		chksze(1);
@@ -2719,21 +2721,21 @@ star_again:
 			}
 			slen = strlen(s);
 		}
-		*f = sv;
+		*fmt_cur = sv;
 #if ENABLE_DESKTOP
 		if (has_star)
 			free(fmt_str);
 #endif
  append:
-		if (i == 0) {
-			b = s;
-			i = slen;
+		if (res_len == 0) {
+			res_buf = s;
+			res_len = slen;
 			continue;
 		}
  tail:
-		b = xrealloc(b, i + slen + 1);
-		strcpy(b + i, s);
-		i += slen;
+		res_buf = xrealloc(res_buf, res_len + slen + 1);
+		strcpy(res_buf + res_len, s);
+		res_len += slen;
 		if (!c) /* s is NOT allocated and this is the last part of string? */
 			break;
 		free(s);
@@ -2745,9 +2747,9 @@ star_again:
 
 #if ENABLE_FEATURE_AWK_GNU_EXTENSIONS
 	if (len)
-		*len = i;
+		*len = res_len;
 #endif
-	return b;
+	return res_buf;
 }
 
 /* Common substitution routine.
