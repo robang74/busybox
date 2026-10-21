@@ -2300,8 +2300,8 @@ static const struct {
 	 */
 	{ VSTRFIXED|VTEXTFIXED       , defifsvar   , NULL            },
 #if ENABLE_ASH_MAIL
-	{ VSTRFIXED|VTEXTFIXED|VUNSET, "MAIL"      , changemail      },
-	{ VSTRFIXED|VTEXTFIXED|VUNSET, "MAILPATH"  , changemail      },
+	{ VSTRFIXED|VTEXTFIXED|VUNSET, "MAIL\0"    , changemail      },
+	{ VSTRFIXED|VTEXTFIXED|VUNSET, "MAILPATH\0", changemail      },
 #endif
 	{ VSTRFIXED|VTEXTFIXED       , bb_PATH_root_path, changepath },
 #if ENABLE_FEATURE_EDITING_FANCY_PROMPT
