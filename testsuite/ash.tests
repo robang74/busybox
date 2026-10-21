@@ -8,6 +8,36 @@
 . ./testing.sh
 test -f "$bindir/.config" && . "$bindir/.config"
 
+# MAIL/MAILPATH must never have been set in this session: a runtime set
+# (or even a runtime unset) reallocates var_text in the correct "NAME\0\0"
+# form, masking the static-entry overread that made mailval() (var_text + 5)
+# read the bytes past "MAIL". Mailcheck reports only mtime CHANGES, so the
+# test bumps mtimes with absolute dates (busybox touch -d, no spaces).
+optional ASH_MAIL
+testing "ash mailcheck reads past never-set MAIL/MAILPATH" '
+	unset MAIL MAILPATH
+	echo x >MAILPATH
+	echo x >mymail
+	printf "%s\n" \
+	  "touch -d 2030-01-01 MAILPATH" \
+	  "MAIL=./mymail" \
+	  "touch -d 2031-01-01 mymail" \
+	  "exit" \
+	| PS1=p: busybox ash -i >mail.log 2>&1
+	n=$(grep -c "you have mail" mail.log)
+	if [ "$n" -ge 2 ]; then
+		echo "BUG: OOB bytes used as mail paths while MAIL was unset"
+		cat mail.log
+	elif [ "$n" -eq 1 ]; then
+		echo "ok"
+	else
+		echo "BUG: mailcheck broken after MAIL is set"
+		cat mail.log
+	fi
+	rm -f MAILPATH mymail mail.log
+' \
+"ok\n" "" ""
+
 test x"CONFIG_SCRIPT" = x"y" || exit 0
 test x"CONFIG_HEXDUMP" = x"y" || exit 0
 test x"CONFIG_FEATURE_DEVPTS" = x"y" || exit 0
