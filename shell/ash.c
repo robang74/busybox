@@ -2252,6 +2252,7 @@ struct localvar {
 #define VSTRFIXED       0x04    /* variable struct is statically allocated */
 #define VTEXTFIXED      0x08    /* text is statically allocated */
 #define VSTACK          0x10    /* text is allocated on the stack */
+//^^^ is VSTACK unused?
 #define VUNSET          0x20    /* the variable is not set */
 #define VNOFUNC         0x40    /* don't call the callback function */
 #define VNOSET          0x80    /* do not set variable - just readonly test */
@@ -2300,6 +2301,8 @@ static const struct {
 	 */
 	{ VSTRFIXED|VTEXTFIXED       , defifsvar   , NULL            },
 #if ENABLE_ASH_MAIL
+	// Two NULs are necessary since mailval()/mpathval() use var_text+5/+9
+	// to skip over var name and '=' sign (if variable is set).
 	{ VSTRFIXED|VTEXTFIXED|VUNSET, "MAIL\0"    , changemail      },
 	{ VSTRFIXED|VTEXTFIXED|VUNSET, "MAILPATH\0", changemail      },
 #endif
@@ -2655,6 +2658,7 @@ setvar(const char *name, const char *val, int flags)
 		*p++ = '=';
 		strcpy(p, val);
 	}
+	// else: the string is "VARNAME\0\0". Important for var_text+5 to work correctly for "MAIL" et al
 	vp = setvareq(nameeq, flags | VNOSAVE);
 	INTON;
 
