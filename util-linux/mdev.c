@@ -1202,6 +1202,15 @@ static void daemon_loop(char *temp, int fd)
 
 		len = safe_read(fd, netbuf, sizeof(netbuf) - 1);
 		if (len < 0) {
+#if ENABLE_DESKTOP
+			if (errno == EAGAIN || errno == EWOULDBLOCK) {
+			/* Blocking netlink read is not supposed to return EAGAIN, but
+			 * userspace netlink stacks have been seen to report it (lost
+			 * wakeup race). Retry instead of dying; do not remove. */
+				usleep(1000);
+				continue;
+			}
+#endif
 			if (errno == ENOBUFS) {
 				/*
 				 * We ran out of socket receive buffer space.
