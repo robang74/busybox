@@ -1009,7 +1009,7 @@ clean: archclean $(clean-dirs)
 	@find . $(RCS_FIND_IGNORE) \
 		\( -name '*.[oas]' -o -name '*.ko' -o -name '.*.cmd' \
 		-o -name '.*.d' -o -name '.*.tmp' -o -name '*.mod.c' \) \
-		-type f -print | xargs rm -f
+		-type f -print0 | xargs -0 rm -f
 
 PHONY += doc-clean
 doc-clean: rm-files := docs/busybox.pod \
@@ -1043,7 +1043,7 @@ distclean: mrproper
 		-o -name '*.bak' -o -name '#*#' -o -name '.*.orig' \
 		-o -name '.*.rej' -o -name '*.tmp' -o -size 0 \
 		-o -name '*%' -o -name '.*.cmd' -o -name 'core' \) \
-		-type f -print | xargs rm -f
+		-type f -print0 | xargs -0 rm -f
 
 
 # Packaging of the kernel to various formats
