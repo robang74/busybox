@@ -185,7 +185,9 @@ void FAST_FUNC data_extract_all(archive_handle_t *archive_handle)
 		break;
 	case S_IFLNK:
 		/* Symlink */
-//TODO: what if file_header->link_target == NULL (say, corrupted tarball?)
+		/* An empty linkname leaves link_target NULL */
+		if (!file_header->link_target)
+			bb_error_msg_and_die("symlink '%s' has no target", dst_name);
 
 		/* To avoid a directory traversal attack via symlinks,
 		 * do not restore symlinks with ".." components
