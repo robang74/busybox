@@ -67,6 +67,69 @@ enum
 #define TCA_PRIO_MAX    (__TCA_PRIO_MAX - 1)
 #endif
 
+#if ENABLE_FEATURE_TC_CBQ
+/*
+ * Linux v6.8 removed the CBQ definitions from <linux/pkt_sched.h>
+ * (see https://git.kernel.org/linus/33241dca48626), as the CBQ qdisc
+ * itself was retired. The kernel ABI of CBQ never changed, so provide
+ * private copies of the definitions needed for printing CBQ options.
+ * In this way TC_CBQ builds and runs with both old and new kernels.
+ * ref.: https://github.com/vda-linux/busybox_mirror/issues/56
+ */
+#ifndef TCA_CBQ_MAX
+#warning "Using fallback definition for legacy CBQ qdisc UAPI"
+
+#define TC_CBQ_MAXPRIO          8
+struct tc_cbq_lssopt {
+	unsigned char change;
+	unsigned char flags;
+#define TCF_CBQ_LSS_BOUNDED     1
+#define TCF_CBQ_LSS_ISOLATED    2
+	unsigned char ewma_log;
+	unsigned char level;
+	uint32_t maxidle;
+	uint32_t minidle;
+	uint32_t offtime;
+	uint32_t avpkt;
+};
+
+struct tc_cbq_wrropt {
+	unsigned char flags;
+	unsigned char priority;
+	unsigned char cpriority;
+	unsigned char __reserved;
+	uint32_t allot;
+	uint32_t weight;
+};
+
+struct tc_cbq_ovl {
+	unsigned char strategy;
+	unsigned char priority2;
+	uint16_t pad;
+	uint32_t penalty;
+};
+
+struct tc_cbq_fopt {
+	uint32_t split;
+	uint32_t defmap;
+	uint32_t defchange;
+};
+
+enum {
+	TCA_CBQ_UNSPEC,
+	TCA_CBQ_LSSOPT,
+	TCA_CBQ_WRROPT,
+	TCA_CBQ_FOPT,
+	TCA_CBQ_OVL_STRATEGY,
+	TCA_CBQ_RATE,
+	TCA_CBQ_RTAB,
+	TCA_CBQ_POLICE,
+	__TCA_CBQ_MAX
+};
+#define TCA_CBQ_MAX     (__TCA_CBQ_MAX - 1)
+#endif /* TCA_CBQ_MAX */
+#endif /* ENABLE_FEATURE_TC_CBQ */
+
 #define parse_rtattr_nested(tb, max, rta) \
 	(parse_rtattr((tb), (max), RTA_DATA(rta), RTA_PAYLOAD(rta)))
 
@@ -182,7 +245,7 @@ static int get_tc_classid(uint32_t *h, const char *str)
 	return 0;
 }
 
-#if ENABLE_FEATURE_TC_CBQ //&& defined(TCA_CBQ_MAX)
+#if ENABLE_FEATURE_TC_CBQ
 static void print_rate(char *buf, int len, uint32_t rate)
 {
 	double tmp = (double)rate*8;
@@ -203,7 +266,7 @@ static void print_rate(char *buf, int len, uint32_t rate)
 			snprintf(buf, len, "%.0fbit",  tmp);
 	}
 }
-#endif
+#endif /* #if ENABLE_FEATURE_TC_CBQ */
 
 #if 0
 /* This is "pfifo_fast".  */
@@ -232,7 +295,7 @@ static int prio_print_opt(struct rtattr *opt)
 	return 0;
 }
 
-#if ENABLE_FEATURE_TC_CBQ //&& defined(TCA_CBQ_MAX)
+#if ENABLE_FEATURE_TC_CBQ
 #if 0
 /* Class Based Queue */
 static int cbq_parse_opt(int argc, char **argv, struct nlmsghdr *n)
@@ -383,7 +446,7 @@ static FAST_FUNC int print_qdisc(
 		if (qqq == 0) { /* pfifo_fast aka prio */
 			prio_print_opt(tb[TCA_OPTIONS]);
 		} else if (qqq == 1) { /* class based queuing */
-#if ENABLE_FEATURE_TC_CBQ //&& defined(TCA_CBQ_MAX)
+#if ENABLE_FEATURE_TC_CBQ
 			cbq_print_opt(tb[TCA_OPTIONS]);
 #endif
 		} else {
@@ -456,7 +519,7 @@ static FAST_FUNC int print_class(
 			/* nothing. */ /*prio_print_opt(tb[TCA_OPTIONS]);*/
 		} else if (qqq == 1) { /* class based queuing */
 			/* cbq_print_copt() is identical to cbq_print_opt(). */
-#if ENABLE_FEATURE_TC_CBQ  //&& defined(TCA_CBQ_MAX)
+#if ENABLE_FEATURE_TC_CBQ
 			cbq_print_opt(tb[TCA_OPTIONS]);
 #endif
 		} else {
