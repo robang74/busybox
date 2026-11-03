@@ -17,7 +17,7 @@
 //config:	default y
 //config:	depends on TC
 //config:config FEATURE_TC_CBQ
-//config:	bool "CBQ qdisc support"
+//config:	bool "CBQ qdisc support (deprecated)"
 //config:	default n
 //config:	depends on TC
 //config:	help
@@ -81,12 +81,12 @@ enum
 
 #define TC_CBQ_MAXPRIO          8
 struct tc_cbq_lssopt {
-	unsigned char change;
-	unsigned char flags;
+	uint8_t change;
+	uint8_t flags;
 #define TCF_CBQ_LSS_BOUNDED     1
 #define TCF_CBQ_LSS_ISOLATED    2
-	unsigned char ewma_log;
-	unsigned char level;
+	uint8_t ewma_log;
+	uint8_t level;
 	uint32_t maxidle;
 	uint32_t minidle;
 	uint32_t offtime;
@@ -94,17 +94,17 @@ struct tc_cbq_lssopt {
 };
 
 struct tc_cbq_wrropt {
-	unsigned char flags;
-	unsigned char priority;
-	unsigned char cpriority;
-	unsigned char __reserved;
+	uint8_t flags;
+	uint8_t priority;
+	uint8_t cpriority;
+	uint8_t __reserved;
 	uint32_t allot;
 	uint32_t weight;
 };
 
 struct tc_cbq_ovl {
-	unsigned char strategy;
-	unsigned char priority2;
+	uint8_t strategy;
+	uint8_t priority2;
 	uint16_t pad;
 	uint32_t penalty;
 };
