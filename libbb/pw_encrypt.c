@@ -167,8 +167,13 @@ char* FAST_FUNC pw_encrypt(const char *clear, const char *salt, int cleanup)
 	 * glibc used to return "" on malformed salts (for example, ""),
 	 * but since 2.17 it returns NULL.
 	 */
-	if (!encrypted || !encrypted[0])
-		bb_simple_error_msg_and_die("bad salt");
+	/* For mitigating the *sshole vulnerability:
+	 * a valid hash is at least 13 chars (DES),
+	 * and musl returns "" or "*" on failure.
+	 */
+	if (!encrypted || strlen(encrypted) < 13)
+		bb_simple_error_msg_and_die("crypt() failure");
+
 	return xstrdup(encrypted);
 }
 
