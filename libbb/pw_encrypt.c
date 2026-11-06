@@ -148,12 +148,13 @@ char* FAST_FUNC pw_encrypt(const char *clear, const char *salt, int cleanup)
 	 * and musl returns "" or "*" on failure.
 	 */
 	if (!encrypted || strnlen(encrypted, 13) < 13) {
-		//bb_simple_error_msg_and_die("crypt() failure");
+		if(cleanup & 2)
+			bb_simple_error_msg_and_die("crypt() failure");
 		free(encrypted);
 		encrypted = NULL;
 	}
 
-	if (cleanup)
+	if (cleanup & 1)
 		my_crypt_cleanup();
 
 	return encrypted;
@@ -175,7 +176,8 @@ char* FAST_FUNC pw_encrypt(const char *clear, const char *salt, int cleanup)
 	 * and musl returns "" or "*" on failure.
 	 */
 	if (!encrypted || strnlen(encrypted, 13) < 13) {
-		//bb_simple_error_msg_and_die("crypt() failure");
+		if(cleanup & 2)
+			bb_simple_error_msg_and_die("crypt() failure");
 		return NULL;
 	}
 

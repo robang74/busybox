@@ -156,10 +156,7 @@ int cryptpw_main(int argc UNUSED_PARAM, char **argv)
 	}
 
 	if (password)
-		password = pw_encrypt(password, salt, 1);
-	if (password == NULL)
-		bb_simple_error_msg_and_die("pw_encrypt() failure");
-	puts(password);
+		puts(pw_encrypt(password, salt, 3));
 
 	return EXIT_SUCCESS;
 }
