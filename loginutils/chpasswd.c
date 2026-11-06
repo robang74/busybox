@@ -52,7 +52,7 @@ int chpasswd_main(int argc UNUSED_PARAM, char **argv)
 	char *name;
 	const char *algo = CONFIG_FEATURE_DEFAULT_PASSWD_ALGO;
 	const char *root = NULL;
-	int opt;
+	int opt, ret = EXIT_SUCCESS;
 
 	if (getuid() != 0)
 		bb_simple_error_msg_and_die(bb_msg_perm_denied_are_you_root);
@@ -104,14 +104,18 @@ int chpasswd_main(int argc UNUSED_PARAM, char **argv)
 			rc = update_passwd(bb_path_passwd_file, name, pass, NULL);
 		/* LOGMODE_BOTH logs to syslog also */
 		logmode = LOGMODE_BOTH;
-		if (rc < 0)
+		if (rc < 0) {
 error_on_update:
-			bb_error_msg_and_die("an error occurred updating password for %s", name);
+			bb_error_msg("an error occurred updating password for %s", name);
+			ret = EXIT_FAILURE;
+			goto free_and_continue;
+		}
 		if (rc)
 			bb_info_msg("password for '%s' changed", name);
 		logmode = LOGMODE_STDIO;
+free_and_continue:
 		free(name);
 		free(free_me);
 	}
-	return EXIT_SUCCESS;
+	return ret;
 }
