@@ -2037,7 +2037,7 @@ static ALWAYS_INLINE int is_tty_secure(const char *short_tty UNUSED_PARAM) { ret
 int check_password(const struct passwd *pw, const char *plaintext) FAST_FUNC;
 int ask_and_check_password_extended(const struct passwd *pw, int timeout, const char *prompt) FAST_FUNC;
 int ask_and_check_password(const struct passwd *pw) FAST_FUNC;
-/* Returns a malloced string */
+/* Returns a malloced string or silently NULL in case of failure */
 #if !ENABLE_USE_BB_CRYPT
 #define pw_encrypt(clear, salt, cleanup) pw_encrypt(clear, salt)
 #endif

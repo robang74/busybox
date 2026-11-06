@@ -147,8 +147,11 @@ char* FAST_FUNC pw_encrypt(const char *clear, const char *salt, int cleanup)
 	 * a valid hash is at least 13 chars (DES),
 	 * and musl returns "" or "*" on failure.
 	 */
-	if (!encrypted || strlen(encrypted) < 13)
-		bb_simple_error_msg_and_die("crypt() failure");
+	if (!encrypted || strnlen(encrypted, 13) < 13) {
+		//bb_simple_error_msg_and_die("crypt() failure");
+		free(encrypted);
+		encrypted = NULL;
+	}
 
 	if (cleanup)
 		my_crypt_cleanup();
@@ -171,8 +174,10 @@ char* FAST_FUNC pw_encrypt(const char *clear, const char *salt, int cleanup)
 	 * a valid hash is at least 13 chars (DES),
 	 * and musl returns "" or "*" on failure.
 	 */
-	if (!encrypted || strlen(encrypted) < 13)
-		bb_simple_error_msg_and_die("crypt() failure");
+	if (!encrypted || strnlen(encrypted, 13) < 13) {
+		//bb_simple_error_msg_and_die("crypt() failure");
+		return NULL;
+	}
 
 	return xstrdup(encrypted);
 }

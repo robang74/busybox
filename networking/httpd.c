@@ -2251,7 +2251,7 @@ static int check_user_passwd(const char *path, char *user_and_passwd)
 					/* salt: */ passwd,
 					/* cleanup: */ 0
 				);
-				r = strcmp(encrypted, passwd);
+				r = encrypted && strcmp(encrypted, passwd);
 				free(encrypted);
 			} else {
 				/* local passwd is from httpd.conf and it's plaintext */
