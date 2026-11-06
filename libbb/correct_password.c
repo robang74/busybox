@@ -80,7 +80,7 @@ int FAST_FUNC check_password(const struct passwd *pw, const char *plaintext)
 	}
 
 	encrypted = pw_encrypt(plaintext, /*salt:*/ pw_pass, 1);
-	r = (strcmp(encrypted, pw_pass) == 0);
+	r = encrypted && (strcmp(encrypted, pw_pass) == 0);
 	free(encrypted);
 	return r;
 }

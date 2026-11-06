@@ -89,6 +89,7 @@ int chpasswd_main(int argc UNUSED_PARAM, char **argv)
 
 			crypt_make_pw_salt(salt, algo);
 			free_me = pass = pw_encrypt(pass, salt, 0);
+			if(!pass) goto error_on_update;
 		}
 
 		/* This is rather complex: if user is not found in /etc/shadow,
@@ -104,6 +105,7 @@ int chpasswd_main(int argc UNUSED_PARAM, char **argv)
 		/* LOGMODE_BOTH logs to syslog also */
 		logmode = LOGMODE_BOTH;
 		if (rc < 0)
+error_on_update:
 			bb_error_msg_and_die("an error occurred updating password for %s", name);
 		if (rc)
 			bb_info_msg("password for '%s' changed", name);
