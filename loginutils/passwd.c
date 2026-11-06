@@ -54,8 +54,8 @@ static char* new_password(const struct passwd *pw, uid_t myuid, const char *algo
 		orig = bb_ask_noecho_stdin("Old password: "); /* returns malloced str */
 		if (!orig)
 			goto err_ret;
-		encrypted = pw_encrypt(orig, pw->pw_passwd, 1); /* returns malloced str */
-		if (!encrypted || strcmp(encrypted, pw->pw_passwd) != 0) {
+		encrypted = pw_encrypt(orig, pw->pw_passwd, 3); /* returns malloced str */
+		if (strcmp(encrypted, pw->pw_passwd) != 0) {
 			syslog(LOG_WARNING, "incorrect password for %s", pw->pw_name);
 			pause_after_failed_login();
 			puts("Incorrect password");
@@ -78,7 +78,6 @@ static char* new_password(const struct passwd *pw, uid_t myuid, const char *algo
 	if (!cp)
 		goto err_ret;
 	if (strcmp(cp, newp) != 0) {
-pass_dont_match:
 		puts("Passwords don't match");
 		goto err_ret;
 	}
@@ -86,8 +85,7 @@ pass_dont_match:
 	crypt_make_pw_salt(salt, algo);
 
 	/* pw_encrypt returns malloced str */
-	ret = pw_encrypt(newp, salt, 1);
-	if (!ret) goto pass_dont_match;
+	ret = pw_encrypt(newp, salt, 3);
 	/* whee, success! */
 
  err_ret:
