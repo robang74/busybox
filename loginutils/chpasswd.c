@@ -112,8 +112,8 @@ error_on_update:
 		}
 		if (rc)
 			bb_info_msg("password for '%s' changed", name);
-		logmode = LOGMODE_STDIO;
 free_and_continue:
+		logmode = LOGMODE_STDIO;
 		free(name);
 		free(free_me);
 	}
