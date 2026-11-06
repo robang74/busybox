@@ -2257,7 +2257,7 @@ static int check_user_passwd(const char *path, char *user_and_passwd)
 					/* salt: */ passwd,
 					/* cleanup: */ 0
 				);
-				r = encrypted && strcmp(encrypted, passwd);
+				r = encrypted ? strcmp(encrypted, passwd) : 1;
 				free(encrypted);
 			} else {
 				/* local passwd is from httpd.conf and it's plaintext */
@@ -3084,7 +3084,7 @@ int httpd_main(int argc UNUSED_PARAM, char **argv)
 		salt[1] = '1';
 		salt[2] = '$';
 		crypt_make_rand64encoded(salt + 3, 8 / 2); /* 8 chars */
-		puts(pw_encrypt(pass, salt, /*cleanup:*/ 0));
+		puts(pw_encrypt(pass, salt, /*die:*/ 2));
 		return 0;
 	}
 #endif
