@@ -811,6 +811,10 @@ static NOINLINE int parse_reply(const unsigned char *msg, size_t len)
 			// RAF, TODO: max lenght limit or return(-1), pros vs cons?
 			if(n > rdlen - 1) n = rdlen - 1;
 			if (n > 0) {
+				if (rdlen <= n) {
+					//printf("TXT record too short\n");
+					return -1;
+				}
 				memset(dname, 0, sizeof(dname));
 				memcpy(dname, ns_rr_rdata(rr) + 1, n);
 				printf("%s\ttext = \"%s\"\n", ns_rr_name(rr), dname);
@@ -847,7 +851,6 @@ static NOINLINE int parse_reply(const unsigned char *msg, size_t len)
 				dbg("SOA record too short:%d\n", rdlen);
 				return -1;
 			}
-
 			printf("%s\n", ns_rr_name(rr));
 
 			cp = ns_rr_rdata(rr);
