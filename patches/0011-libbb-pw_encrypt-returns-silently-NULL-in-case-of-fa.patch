@@ -1,0 +1,232 @@
+From 378aaff874017772535b62e3292cc97a428fc07a Mon Sep 17 00:00:00 2001
+From: "Roberto A. Foglietta" <roberto.foglietta@gmail.com>
+Date: Fri, 6 Nov 2026 10:28:13 +0100
+Subject: [PATCH 2/2] libbb: pw_encrypt() returns silently NULL in case of
+ failure
+
+Avoid terminating processes with die() inside pw_encrypt() to prevent
+httpd termination and unexpected exits during batch passwd operations.
+
+The third pw_encrypt() parameter 'cleanup' was used as a boolean variable,
+this patch changes its use as a bit-flags container and in particular,
+it uses the 2nd bit to die() instead of returning NULL.  This change
+let us save 25 bytes compared to checking for NULL everywhere.
+
+The total size drops to 55 bytes, as long as the cryptpw_main() and
+new_password() will never be used by a script that processes many items
+at once. This depends on which applets these two functions are serving.
+
+This patch extends the previous to the !ENABLE_USE_BB_CRYPT branch and
+fix the previous about the other branch. It requires:
+
+- pw_encrypt.c: *sshole CVE mitigation for when compiled w/ musl
+
+Some configurations are not allowed, all the others compile.
+
+CONFIG_USE_BB_CRYPT: enabled
+-----------------------------------------------------------
+CONFIG_FEATURE_SHADOWPASSWDS  y   n   n   n   n   y   y   y
+CONFIG_USE_BB_PWD_GRP         y   y   n   y   n   y   n   n
+CONFIG_USE_BB_SHADOW          y   y   y   n   n   n   n   y
+-----------------------------------------------------------
+Compile outcome:             ok  ok  na  ok  ok  ok  ok  na
+
+CONFIG_USE_BB_CRYPT: disabled
+------------------------------------------------------------
+CONFIG_FEATURE_SHADOWPASSWDS  y   n   n   n   n   y   y   y
+CONFIG_USE_BB_PWD_GRP         y   y   n   y   n   y   n   n
+CONFIG_USE_BB_SHADOW          y   y   y   n   n   n   n   y
+------------------------------------------------------------
+Compile outcome:             ok  na  na  ok  na  na   ok  na
+
+make defconfig:
+   text    data     bss     dec     hex filename
+1102785   16723    1656 1121164  111b8c busybox  484e887ce
+                            +21
+1102806   16723    1656 1121185  111ba1 busybox  pw_encrypt()
+                            +34
+1102840   16723    1656 1121219  111bc3 busybox  this patch
+                            +55  total
+
+Signed-off-by: Roberto A. Foglietta <roberto.foglietta@gmail.com>
+---
+ include/libbb.h          |  5 +----
+ libbb/correct_password.c |  2 +-
+ libbb/pw_encrypt.c       | 19 +++++++++++++------
+ loginutils/chpasswd.c    | 14 ++++++++++----
+ loginutils/cryptpw.c     |  2 +-
+ loginutils/passwd.c      |  4 ++--
+ networking/httpd.c       |  4 ++--
+ 7 files changed, 30 insertions(+), 20 deletions(-)
+
+diff --git a/include/libbb.h b/include/libbb.h
+index 062413fd7..3abb8366b 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -1930,10 +1930,7 @@ static ALWAYS_INLINE int is_tty_secure(const char *short_tty UNUSED_PARAM) { ret
+ int check_password(const struct passwd *pw, const char *plaintext) FAST_FUNC;
+ int ask_and_check_password_extended(const struct passwd *pw, int timeout, const char *prompt) FAST_FUNC;
+ int ask_and_check_password(const struct passwd *pw) FAST_FUNC;
+-/* Returns a malloced string */
+-#if !ENABLE_USE_BB_CRYPT
+-#define pw_encrypt(clear, salt, cleanup) pw_encrypt(clear, salt)
+-#endif
++/* Returns a malloced string or silently NULL in case of failure, flags: 1:cleanup; 2:die */
+ extern char *pw_encrypt(const char *clear, const char *salt, int cleanup) FAST_FUNC;
+ extern int obscure(const char *old, const char *newval, const struct passwd *pwdp) FAST_FUNC;
+ /*
+diff --git a/libbb/correct_password.c b/libbb/correct_password.c
+index cbe6cb387..eaab4bc3b 100644
+--- a/libbb/correct_password.c
++++ b/libbb/correct_password.c
+@@ -80,7 +80,7 @@ int FAST_FUNC check_password(const struct passwd *pw, const char *plaintext)
+ 	}
+ 
+ 	encrypted = pw_encrypt(plaintext, /*salt:*/ pw_pass, 1);
+-	r = (strcmp(encrypted, pw_pass) == 0);
++	r = encrypted && (strcmp(encrypted, pw_pass) == 0);
+ 	free(encrypted);
+ 	return r;
+ }
+diff --git a/libbb/pw_encrypt.c b/libbb/pw_encrypt.c
+index 0c7951823..b7288f6e0 100644
+--- a/libbb/pw_encrypt.c
++++ b/libbb/pw_encrypt.c
+@@ -145,12 +145,16 @@ char* FAST_FUNC pw_encrypt(const char *clear, const char *salt, int cleanup)
+ 	encrypted = my_crypt(clear, salt);
+ 	/* For mitigating the *sshole vulnerability:
+ 	 * a valid hash is at least 13 chars (DES),
+-	 * and musl returns "" or "*" on failure.
++	 * and musl can return "*" on failure.
+ 	 */
+-	if (!encrypted || strlen(encrypted) < 13)
+-		bb_simple_error_msg_and_die("crypt() failure");
++	if (!encrypted || strnlen(encrypted, 13) < 13) {
++		if (cleanup & 2)
++			bb_simple_error_msg_and_die("password or salt invalid");
++		free(encrypted);
++		encrypted = NULL;
++	}
+ 
+-	if (cleanup)
++	if (cleanup & 1)
+ 		my_crypt_cleanup();
+ 
+ 	return encrypted;
+@@ -171,8 +175,11 @@ char* FAST_FUNC pw_encrypt(const char *clear, const char *salt, int cleanup)
+ 	 * a valid hash is at least 13 chars (DES),
+ 	 * and musl returns "" or "*" on failure.
+ 	 */
+-	if (!encrypted || strlen(encrypted) < 13)
+-		bb_simple_error_msg_and_die("crypt() failure");
++	if (!encrypted || strnlen(encrypted, 13) < 13) {
++		if (cleanup & 2)
++			bb_simple_error_msg_and_die("password or salt invalid");
++		return NULL;
++	}
+ 
+ 	return xstrdup(encrypted);
+ }
+diff --git a/loginutils/chpasswd.c b/loginutils/chpasswd.c
+index 353f19961..c33403a3f 100644
+--- a/loginutils/chpasswd.c
++++ b/loginutils/chpasswd.c
+@@ -52,7 +52,7 @@ int chpasswd_main(int argc UNUSED_PARAM, char **argv)
+ 	char *name;
+ 	const char *algo = CONFIG_FEATURE_DEFAULT_PASSWD_ALGO;
+ 	const char *root = NULL;
+-	int opt;
++	int opt, ret = EXIT_SUCCESS;
+ 
+ 	if (getuid() != 0)
+ 		bb_simple_error_msg_and_die(bb_msg_perm_denied_are_you_root);
+@@ -89,6 +89,7 @@ int chpasswd_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 			crypt_make_pw_salt(salt, algo);
+ 			free_me = pass = pw_encrypt(pass, salt, 0);
++			if(!pass) goto error_on_update;
+ 		}
+ 
+ 		/* This is rather complex: if user is not found in /etc/shadow,
+@@ -103,13 +104,18 @@ int chpasswd_main(int argc UNUSED_PARAM, char **argv)
+ 			rc = update_passwd(bb_path_passwd_file, name, pass, NULL);
+ 		/* LOGMODE_BOTH logs to syslog also */
+ 		logmode = LOGMODE_BOTH;
+-		if (rc < 0)
+-			bb_error_msg_and_die("an error occurred updating password for %s", name);
++		if (rc < 0) {
++error_on_update:
++			bb_error_msg("an error occurred for %s", name);
++			ret = EXIT_FAILURE;
++			goto free_and_continue;
++		}
+ 		if (rc)
+ 			bb_info_msg("password for '%s' changed", name);
++free_and_continue:
+ 		logmode = LOGMODE_STDIO;
+ 		free(name);
+ 		free(free_me);
+ 	}
+-	return EXIT_SUCCESS;
++	return ret;
+ }
+diff --git a/loginutils/cryptpw.c b/loginutils/cryptpw.c
+index 666deff0b..29b5f0e3a 100644
+--- a/loginutils/cryptpw.c
++++ b/loginutils/cryptpw.c
+@@ -156,7 +156,7 @@ int cryptpw_main(int argc UNUSED_PARAM, char **argv)
+ 	}
+ 
+ 	if (password)
+-		puts(pw_encrypt(password, salt, 1));
++		puts(pw_encrypt(password, salt, 3));
+ 
+ 	return EXIT_SUCCESS;
+ }
+diff --git a/loginutils/passwd.c b/loginutils/passwd.c
+index 1e8449627..46c584ecf 100644
+--- a/loginutils/passwd.c
++++ b/loginutils/passwd.c
+@@ -54,7 +54,7 @@ static char* new_password(const struct passwd *pw, uid_t myuid, const char *algo
+ 		orig = bb_ask_noecho_stdin("Old password: "); /* returns malloced str */
+ 		if (!orig)
+ 			goto err_ret;
+-		encrypted = pw_encrypt(orig, pw->pw_passwd, 1); /* returns malloced str */
++		encrypted = pw_encrypt(orig, pw->pw_passwd, 3); /* returns malloced str */
+ 		if (strcmp(encrypted, pw->pw_passwd) != 0) {
+ 			syslog(LOG_WARNING, "incorrect password for %s", pw->pw_name);
+ 			pause_after_failed_login();
+@@ -85,7 +85,7 @@ static char* new_password(const struct passwd *pw, uid_t myuid, const char *algo
+ 	crypt_make_pw_salt(salt, algo);
+ 
+ 	/* pw_encrypt returns malloced str */
+-	ret = pw_encrypt(newp, salt, 1);
++	ret = pw_encrypt(newp, salt, 3);
+ 	/* whee, success! */
+ 
+  err_ret:
+diff --git a/networking/httpd.c b/networking/httpd.c
+index a6daba044..d1610608d 100644
+--- a/networking/httpd.c
++++ b/networking/httpd.c
+@@ -2257,7 +2257,7 @@ static int check_user_passwd(const char *path, char *user_and_passwd)
+ 					/* salt: */ passwd,
+ 					/* cleanup: */ 0
+ 				);
+-				r = strcmp(encrypted, passwd);
++				r = encrypted ? strcmp(encrypted, passwd) : 1;
+ 				free(encrypted);
+ 			} else {
+ 				/* local passwd is from httpd.conf and it's plaintext */
+@@ -3084,7 +3084,7 @@ int httpd_main(int argc UNUSED_PARAM, char **argv)
+ 		salt[1] = '1';
+ 		salt[2] = '$';
+ 		crypt_make_rand64encoded(salt + 3, 8 / 2); /* 8 chars */
+-		puts(pw_encrypt(pass, salt, /*cleanup:*/ 0));
++		puts(pw_encrypt(pass, salt, /*die:*/ 2));
+ 		return 0;
+ 	}
+ #endif
+-- 
+2.34.1
+
