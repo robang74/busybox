@@ -145,11 +145,11 @@ char* FAST_FUNC pw_encrypt(const char *clear, const char *salt, int cleanup)
 	encrypted = my_crypt(clear, salt);
 	/* For mitigating the *sshole vulnerability:
 	 * a valid hash is at least 13 chars (DES),
-	 * and musl returns "" or "*" on failure.
+	 * and musl can return "*" on failure.
 	 */
 	if (!encrypted || strnlen(encrypted, 13) < 13) {
-		if(cleanup & 2)
-			bb_simple_error_msg_and_die("crypt() failure");
+		if (cleanup & 2)
+			bb_simple_error_msg_and_die("password or salt invalid");
 		free(encrypted);
 		encrypted = NULL;
 	}
@@ -176,8 +176,8 @@ char* FAST_FUNC pw_encrypt(const char *clear, const char *salt, int cleanup)
 	 * and musl returns "" or "*" on failure.
 	 */
 	if (!encrypted || strnlen(encrypted, 13) < 13) {
-		if(cleanup & 2)
-			bb_simple_error_msg_and_die("crypt() failure");
+		if (cleanup & 2)
+			bb_simple_error_msg_and_die("password or salt invalid");
 		return NULL;
 	}
 
