@@ -292,7 +292,7 @@ unpack_lzma_stream(transformer_state_t *xstate)
 				pos = buffer_pos - rep0;
 				if ((int32_t)pos < 0) {
 					pos += header.dict_size;
-					if ((int32_t)pos < 0)
+					if ((int32_t)pos < 0 || pos >= buffer_size)
 						goto bad;
 				}
 				match_byte = buffer[pos];
