@@ -18,9 +18,15 @@ const char* FAST_FUNC skip_unsafe_prefix(const char *str)
 		 * is_prefixed_with(cp, "../") is slower than open-coding it,
 		 * with minimal code growth (~few bytes).
 		 */
-		if (cp[0] == '.' && cp[1] == '.' && cp[2] == '/') {
-			cp += 3;
-			continue;
+		if (cp[0] == '.' && cp[1] == '.') {
+			if (cp[2] == '/') {
+			    cp += 3;
+			    continue;
+			}
+			if (cp[2] == '\0') {
+			    cp += 2;
+			    return cp;
+			}
 		}
 		cp2 = cp;
  find_dotdot:
