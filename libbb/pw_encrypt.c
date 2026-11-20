@@ -143,11 +143,31 @@ char* FAST_FUNC pw_encrypt(const char *clear, const char *salt, int cleanup)
 	char *encrypted;
 
 	encrypted = my_crypt(clear, salt);
+#if ENABLE_INCLUDE_SUSv2
+	/* Author: Natanael Copa <ncopa@alpinelinux.org>
+	 * musl returns "*" on bad "$2" salts, and a 13-char DES hash
+	 * for unknown "$id$" (e.g. "$y$"): essentially, musl
+	 * uses "$y" as a *DES* salt, even though it is invalid
+	 * (contains chars not in "./0-9A-Za-z" set).
+	 */
+	if (!encrypted || !encrypted[0]
+	/* '$' salt and 13-char DES result? not ok, should be longer, non-DES result */
+	|| (salt[0] == '$' && strlen(encrypted) <= 13))
+	/* RAF: legacy support should go under pre-SUSv3 features
+	 * DES is retained for legacy compatibility, not recommended for
+	 * generating new password hashes. The libxcrypt documentation
+	 * makes exactly that distinction. However the pw_encrypt() in
+	 * busybox is used also to change and create new passwords, and
+	 * this support the insecure habit for legacy DES passwords use.
+	 */
+#else
 	/* For mitigating the *sshole vulnerability:
 	 * a valid hash is at least 13 chars (DES),
-	 * and musl can return "*" on failure.
+	 * and musl returns "" or "*" on failure.
 	 */
-	if (!encrypted || strnlen(encrypted, 13) < 13) {
+	if (!encrypted || strnlen(encrypted, 13) < 13)
+#endif
+	{
 		if (cleanup & 2)
 			bb_simple_error_msg_and_die("password or salt invalid");
 		free(encrypted);
@@ -171,11 +191,31 @@ char* FAST_FUNC pw_encrypt(const char *clear, const char *salt, int cleanup)
 	 * glibc used to return "" on malformed salts (for example, ""),
 	 * but since 2.17 it returns NULL.
 	 */
+#if ENABLE_INCLUDE_SUSv2
+	/* Author: Natanael Copa <ncopa@alpinelinux.org>
+	 * musl returns "*" on bad "$2" salts, and a 13-char DES hash
+	 * for unknown "$id$" (e.g. "$y$"): essentially, musl
+	 * uses "$y" as a *DES* salt, even though it is invalid
+	 * (contains chars not in "./0-9A-Za-z" set).
+	 */
+	if (!encrypted || !encrypted[0]
+	/* '$' salt and 13-char DES result? not ok, should be longer, non-DES result */
+	|| (salt[0] == '$' && strlen(encrypted) <= 13)
+	/* RAF: legacy support should go under pre-SUSv3 features
+	 * DES is retained for legacy compatibility, not recommended for
+	 * generating new password hashes. The libxcrypt documentation
+	 * makes exactly that distinction. However the pw_encrypt() in
+	 * busybox is used also to change and create new passwords, and
+	 * this support the insecure habit for legacy DES passwords use.
+	 */
+#else
 	/* For mitigating the *sshole vulnerability:
 	 * a valid hash is at least 13 chars (DES),
 	 * and musl returns "" or "*" on failure.
 	 */
-	if (!encrypted || strnlen(encrypted, 13) < 13) {
+	if (!encrypted || strnlen(encrypted, 13) < 13)
+#endif
+	{
 		if (cleanup & 2)
 			bb_simple_error_msg_and_die("password or salt invalid");
 		return NULL;
