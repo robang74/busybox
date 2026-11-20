@@ -429,6 +429,8 @@ char FAST_FUNC get_header_tar(archive_handle_t *archive_handle)
  skip_ext_hdr:
 	{
 		off_t sz;
+		if ((uoff_t)file_header->size > (((~(uoff_t)0) >> 1) - 511))
+			bb_simple_error_msg_and_die("corrupted octal value in tar header");
 		bb_error_msg("warning: skipping header '%c'", tar_typeflag);
 		sz = (file_header->size + 511) & ~(off_t)511;
 		archive_handle->offset += sz;
