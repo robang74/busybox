@@ -3,6 +3,7 @@
  * $RANDOM support.
  *
  * Copyright (C) 2009 Denys Vlasenko
+ * Copyright (C) 2026 Roberto A. Foglietta
  *
  * Licensed under GPLv2, see file LICENSE in this source tree.
  */
@@ -12,6 +13,60 @@
  * gcc -O2 -Wall -DRANDTEST random.c -o random
  * ./random | dieharder -g 200 -a
  */
+
+/* RAF /////////////////////////////////////////////////////////////////////////
+ *
+ * RATIONALE
+ *
+ * dieharder is a weak testing tool compared with PractRand but at that
+ * time (2009, October) -- even if it was available in its first version
+ * (2009, April) -- it was almost unknown. Until 2010 when academic
+ * literature commonly started to cite PractRand.
+ *
+ * Moreover, a period of 3E38 seems great but there is still a problem
+ * (also at full 32-bit, but $RANDOM uses the last 15-bit) which is about
+ * hyperplane correlation. In worst cases a single process alredy fails.
+ * When it doesn't, it can be tested with mixing parallel runnings,
+ * like gnu parallel x8 bb-rand (mixer) | PractRand RNG_test stdin32.
+ *
+ * Busybox's random requires a stage of whitening otherwise fails to
+ * be a minimum acceptable PRNG as this quick test below shows:
+ *
+ *******************************************************************************
+
+$ gcc -O2 -g0 shell/random.c -Ishell/ -DRANDTEST -o ./bboxrnd
+
+random.c: In function ‘main’:
+random.c:154:17: warning: ignoring return value of ‘write’ declared
+with attribute ‘warn_unused_result’ [-Wunused-result]
+  154 |                 write(1, buf, sizeof(buf));
+      |                 ^~~~~~~~~~~~~~~~~~~~~~~~~~
+
+$ ./bboxrnd | ~/robang74/uchaosys/prnd/RNG_test stdin32
+
+RNG_test using PractRand version 0.96
+RNG = RNG_stdin32, seed = unknown
+test set = core, folding = standard (32 bit)
+
+ rng=RNG_stdin32, seed=unknown
+length= 256 megabytes (2^28 bytes), time= 2.7 seconds
+  Test Name                         Raw       Processed     Evaluation
+  [Low8/32]BRank(12):score:1280(15) R=+673.0  p~=  1          FAIL !!!!!!!!
+  [Low1/32]BRank(12):score:512(12)  R= +8182  p~=  1          FAIL !!!!!!!!
+  ...and 154 test result(s) without anomalies
+
+ *******************************************************************************
+ *
+ * Conversely, with the murmux3() implementation from from uChaoSys,
+ * it can pass gigabytes of PractRand test (tested up to 16GB)
+ *
+ * ./bboxrnd | ~/robang74/uchaosys/prnd/RNG_test stdin32
+ *
+ * About speed, running 8 threads on a Intel i5-8365, it runs at 1.4GB/s, circa
+ *
+ * ( for i in $(seq 1 8); do ./bboxrnd & done; wait; ) | dd bs=1M of=/dev/null
+ *
+ * ////////////////////////////////////////////////////////////////////////// */
 
 #if !defined RANDTEST
 
@@ -31,6 +86,35 @@
 # include "random.h"
 # define RAND_BASH_MASK 0xffffffff /* off */
 #endif
+
+/* RAF /////////////////////////////////////////////////////////////////////////
+ *
+ * uchaos_dev.h - Character device for uchaos-based jitter hashing
+ * (c) 2026, Roberto A. Foglietta <roberto.foglietta@gmail.com>, GPLv2
+ * extracted from:
+ * https://github.com/robang74/uchaosys/blob/v074/kdev/uchaos_dev.h
+ *
+ ******************************************************************************/
+
+#define AB  (5)
+#define ABN (1<<AB)       // 32 or 64
+#define ABx ((ABN>>1)-1)  // 15 or 31
+
+#define murmul1    0xff51afd7ed558ccdULL
+#define murmul2    0xc4ceb9fe1a85ec53ULL
+#define murmul3    0x9E3779B9045d9f3bULL
+
+typedef uint32_t archul_t;
+
+__attribute__((always_inline))
+static inline archul_t murmux3(register archul_t z, register archul_t p) {
+	z =  p ^ ((z >> (ABx-2)) * murmul1);
+	z = (z ^ ( z <<  ABx  )) * murmul2;
+	z =  z ^ ( z >> (ABx+2));
+	return z;
+}
+
+/* ////////////////////////////////////////////////////////////////////////// */
 
 uint32_t FAST_FUNC
 next_random(random_t *rnd)
@@ -134,6 +218,8 @@ next_random(random_t *rnd)
 	 * It does not add meaningful strength, could use xor operation instead.
 	 */
 	t = rnd->galois_LFSR - rnd->LCG + rnd->xs64_y;
+	/* RAF, whitening is needed, murmux3() implementation from from uChaoSys */
+	t = murmux3(t, (rnd->galois_LFSR + rnd->LCG) ^ rnd->xs64_y);
 
 	/* bash compat $RANDOM range: */
 	return t & RAND_BASH_MASK;
