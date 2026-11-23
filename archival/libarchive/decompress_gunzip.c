@@ -1177,10 +1177,16 @@ static int check_header_gzip(STATE_PARAM transformer_state_t *xstate)
 		if (!top_up(PASS_STATE 2))
 			return 0;
 		extra_short = buffer_read_le_u16(PASS_STATE_ONLY);
-		if (!top_up(PASS_STATE extra_short))
-			return 0;
-		/* Ignore extra field */
-		bytebuffer_offset += extra_short;
+		while (extra_short > 0) {
+			unsigned chunk = extra_short;
+			if (chunk > bytebuffer_max)
+				chunk = bytebuffer_max;
+			if (!top_up(PASS_STATE chunk))
+				return 0;
+			/* Ignore extra field */
+			bytebuffer_offset += chunk;
+			extra_short -= chunk;
+		}
 	}
 
 	/* Discard original name and file comment if any */
