@@ -59,11 +59,11 @@ Note that patches numeric indexing is made for chronologic order by lexicographi
 
 ### The fork
 
-This repository has been created for my personal use and side projects. Kept updated for a while by contribution collected around including the `busybox.net` is aim to keep the BusyBox source code in safe (historical copy) and up-to-date, possibly to continue the development, just in case. At the moment, it can be considered a back-up and a supplementary resource.
+This repository has been created for my personal use and side projects. Kept updated for a while by contributions collected around including the `busybox.net`
+is aimed to keep the BusyBox source code in safe (historical copy) and up-to-date, possibly to continue the development, just in case. At the moment, it can be considered
+a back-up and a supplementary resource.
 
-BusyBox from last git.busybox.net master `HEAD`, saved in
-[codeberg.org](https://codeberg.org/robang74/busybox) 
-is providing an US/EU manually synced backup. Relevant branches: 
+BusyBox from last git.busybox.net master `HEAD`, saved in [codeberg.org](https://codeberg.org/robang74/busybox) is providing an US/EU manually synced backup. Relevant branches:
 
 - [b:master](https://github.com/robang74/busybox/tree/master), [b:applets](https://github.com/robang74/busybox/tree/applets), [b:features](https://github.com/robang74/busybox/tree/features), [b:bugfixes](https://github.com/robang74/busybox/tree/bugfixes), [b:devel](https://github.com/robang74/busybox/tree/devel), [b:bbox](https://github.com/robang74/busybox/tree/bboxnet).
 
@@ -80,7 +80,7 @@ This fork contains some changes that did not go "upstream", and the most relevan
 
 - The `$RANDOM` generation which busybox fails to pass the fist stage of PractRand stdin32 test and it is **not** even a good white-noise (minimum viable for uniformity) output.
 - The `gunzip` (or `zcat`) speed which is basically fair, just 1.5x slower than the GNU `gzip` delivered by almost all Linux distributions, while it could be 1.75x faster.
-- The `CRC32` computed via a 4KB static table which improves the speed by 3x times and this improvement has a quite impact on applets that make use of it, like `gzip` et company.
+- The `CRC32` computed via a 4KB static table which improves the speed by 3x times and this improvement has a quite impact on applets that make use of it, like `gzip` et co.
 - The `DES` legacy password is confined into pre-`SuSv3` config section, not so much code but makes a sort of approach difference, expecially after the SSHole vulnerability.
 - New applets like `unbuffer` to unbuffer applications `stdout`/`err`, or `shuf` random non-uniformity fixed, `unxz` with ARM64 and RISC-V BCJ filters, `awk` debug friendly, etc.
 
