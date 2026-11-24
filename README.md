@@ -99,6 +99,8 @@ This fork contains some changes that did not go "upstream", and the most relevan
 - The `DES` legacy password is confined into pre-`SuSv3` config section, not so much code but makes a sort of approach difference, expecially after the SSHole vulnerability.
 - New applets like `unbuffer` to unbuffer applications `stdout`/`err`, or `shuf` random non-uniformity fixed, `unxz` with ARM64 and RISC-V BCJ filters, `awk` debug friendly, etc.
 
+By rule of thumb, the sync of this fork with the "*community*" codebase happens when a relevant distribution like [Ubuntu](https://launchpad.net/ubuntu/+source/busybox), accepts and distributes it. The `devel` branch serves to speed-up the sync, spreading activities over the overall period of time between two releases.
+
 <br>
 
 ### Maintainer
