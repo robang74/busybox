@@ -78,12 +78,26 @@ BusyBox from last git.busybox.net master `HEAD`, saved in
 [codeberg.org](https://codeberg.org/robang74/busybox) 
 is providing an US/EU manually synced backup. Relevant branches: 
 
-- [b:master](https://github.com/robang74/busybox/tree/master), [b:applets](https://github.com/robang74/busybox/tree/applets), [b:features](https://github.com/robang74/busybox/tree/features), [b:bugfixes](https://github.com/robang74/busybox/tree/bugfixes).
+- [b:master](https://github.com/robang74/busybox/tree/master), [b:applets](https://github.com/robang74/busybox/tree/applets), [b:features](https://github.com/robang74/busybox/tree/features), [b:bugfixes](https://github.com/robang74/busybox/tree/bugfixes), [b:devel](https://github.com/robang74/busybox/tree/devel), [b:bbox](https://github.com/robang74/busybox/tree/bboxnet).
 
 These branches include contribs proposed for upstreaming from which cherry-pick and
 in that order merged in [b:uchaosys](https://github.com/robang74/busybox/tree/uchaosys). Which is the branch in which reliable and stable
 contributes are merged and it is dedicated to my personal project
 [p:uchaosys](https://github.com/robang74/uchaosys). I use it, you can use it as well.
+
+#### Repo evolution
+
+The development on `busybox.net` started (2026-09-21) after months of impasse (2026-03-16), mainly for bug fixing and refactoring, typical activities after a maintainer change (despite the e-mail address remaining the same *vda.linux*). Therefore [b:bboxnet](https://github.com/robang74/busybox/tree/bboxnet) contains a copy 1:1 of the "community" development while the [b:devel](https://github.com/robang74/busybox/tree/devel) aims to integrated the fork with codebase.
+
+#### Relevant changes
+
+This fork contains some changes that did not go "upstream", and the most relevant are:
+
+- The `$RANDOM` generation which busybox fails to pass the fist stage of PractRand stdin32 test and it is **not** even a good white-noise (minimum viable for uniformity) output.
+- The `gunzip` (or `zcat`) speed which is basically fair, just 1.5x slower than the GNU `gzip` delivered by almost all Linux distributions, while it could be 1.75x faster.
+- The `CRC32` computed via a 4KB static table which improves the speed by 3x times and this improvement has a quite impact on applets that make use of it, like `gzip` et company.
+- The `DES` legacy password is confined into pre-`SuSv3` config section, not so much code but makes a sort of approach difference, expecially after the SSHole vulnerability.
+- New applets like `unbuffer` to unbuffer applications `stdout`/`err`, or `shuf` random non-uniformity fixed, `unxz` with ARM64 and RISC-V BCJ filters, `awk` debug friendly, etc.
 
 <br>
 
