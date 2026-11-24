@@ -429,12 +429,20 @@ char FAST_FUNC get_header_tar(archive_handle_t *archive_handle)
  skip_ext_hdr:
 	{
 		off_t sz;
-		if ((uoff_t)file_header->size > (((~(uoff_t)0) >> 1) - 511))
+		uoff_t kz;
+		if ((uoff_t)file_header->size > (((~(uoff_t)0) >> 1) - 511)) {
+corrupted_value:
 			bb_simple_error_msg_and_die("corrupted octal value in tar header");
-		bb_error_msg("warning: skipping header '%c'", tar_typeflag);
+		}
 		sz = (file_header->size + 511) & ~(off_t)511;
+		if ((uoff_t)archive_handle->offset + sz > (~(uoff_t)0) >> 1)
+			goto corrupted_value;
+		bb_error_msg("warning: skipping header '%c'", tar_typeflag);
 		archive_handle->offset += sz;
-		sz >>= 9; /* sz /= 512 but w/o contortions for signed div */
+		// eq. sz /= 512 without contortions for signed division but defending
+		// the operation against negative values (arithmetic vs logical shift)
+		kz = (sz < 0) ? -(uoff_t)sz : sz; sz = kz >> 9; // GCC may assert >=0
+		                                                // or it costs 1 byte
 		while (sz--)
 			xread(archive_handle->src_fd, &tar, 512);
 		/* return get_header_tar(archive_handle); */
