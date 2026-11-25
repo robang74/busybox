@@ -78,11 +78,13 @@ int FAST_FUNC rtc_xopen(const char **default_rtc, int flags)
 	}
 }
 
-void FAST_FUNC rtc_read_tm(struct tm *ptm, int fd)
+int FAST_FUNC rtc_read_tm(struct tm *ptm, int fd)
 {
 	memset(ptm, 0, sizeof(*ptm));
-	xioctl(fd, RTC_RD_TIME, ptm);
+	if (ioctl(fd, RTC_RD_TIME, ptm) < 0)
+		return -errno;
 	ptm->tm_isdst = -1; /* "not known" */
+	return 0;
 }
 
 time_t FAST_FUNC rtc_tm2time(struct tm *ptm, int utc)
