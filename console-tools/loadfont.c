@@ -141,8 +141,11 @@ static void do_loadfont(int fd, unsigned char *inbuf, int height, int width, int
 	int charwidth = 32 * ((width+7)/8);
 	int i;
 
-	if (height < 1 || height > 32 || width < 1 || width > 32)
+	if (height < 1 || height > 32 || width < 1 || width > 32
+	 || charsize < 0 || charsize > charwidth
+	) {
 		bb_error_msg_and_die("bad character size %dx%d", height, width);
+	}
 
 	buf = xzalloc(charwidth * ((fontsize < 128) ? 128 : fontsize));
 	for (i = 0; i < fontsize; i++)
