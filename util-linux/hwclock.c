@@ -57,6 +57,17 @@
 #if !SHOW_HWCLOCK_DIFF
 # define read_rtc(pp_rtcname, sys_tv, utc) read_rtc(pp_rtcname, utc)
 #endif
+static void rtc_read_tm_or_die(struct tm *ptm, int fd)
+{
+	int err = rtc_read_tm(ptm, fd);
+	if (err) {
+		if (err == -EINVAL)
+			bb_simple_error_msg_and_die("RTC time is not set");
+		errno = -err;
+		bb_simple_perror_msg_and_die("ioctl(RTC_RD_TIME)");
+	}
+}
+
 static time_t read_rtc(const char **pp_rtcname, struct timeval *sys_tv, int utc)
 {
 	struct tm tm_time;
@@ -64,13 +75,13 @@ static time_t read_rtc(const char **pp_rtcname, struct timeval *sys_tv, int utc)
 
 	fd = rtc_xopen(pp_rtcname, O_RDONLY);
 
-	rtc_read_tm(&tm_time, fd);
+	rtc_read_tm_or_die(&tm_time, fd);
 
 #if SHOW_HWCLOCK_DIFF
 	{
 		int before = tm_time.tm_sec;
 		while (1) {
-			rtc_read_tm(&tm_time, fd);
+			rtc_read_tm_or_die(&tm_time, fd);
 			xgettimeofday(sys_tv);
 			if (before != (int)tm_time.tm_sec)
 				break;
