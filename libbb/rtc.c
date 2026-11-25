@@ -80,10 +80,8 @@ int FAST_FUNC rtc_xopen(const char **default_rtc, int flags)
 
 void FAST_FUNC rtc_read_tm(struct tm *ptm, int fd)
 {
-	if(!ptm) return;
 	memset(ptm, 0, sizeof(*ptm));
-	if (ioctl(fd, RTC_RD_TIME, ptm) < 0)
-		bb_simple_perror_msg_and_die("ioctl(RTC_RD_TIME)");
+	xioctl(fd, RTC_RD_TIME, ptm);
 	ptm->tm_isdst = -1; /* "not known" */
 }
 
