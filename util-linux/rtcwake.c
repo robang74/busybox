@@ -185,7 +185,13 @@ int rtcwake_main(int argc UNUSED_PARAM, char **argv)
 	sys_time = time(NULL);
 	{
 		struct tm tm_time;
-		rtc_read_tm(&tm_time, fd);
+		int err = rtc_read_tm(&tm_time, fd);
+		if (err) {
+			if (err == -EINVAL)
+				bb_simple_error_msg_and_die("RTC time is not set");
+			errno = -err;
+			bb_simple_perror_msg_and_die("ioctl(RTC_RD_TIME)");
+		}
 		rtc_time = rtc_tm2time(&tm_time, utc);
 	}
 
