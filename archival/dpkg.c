@@ -628,8 +628,10 @@ static unsigned fill_package_struct(char *control_buffer)
 	int field_start = 0;
 	int num = -1;
 	int buffer_length = strlen(control_buffer);
+	unsigned unknown;
 
-	new_node->version = search_name_hashtable("unknown");
+	unknown = search_name_hashtable("unknown");
+	new_node->name = new_node->version = unknown;
 	while (field_start < buffer_length) {
 		unsigned field_num;
 
@@ -678,7 +680,7 @@ static unsigned fill_package_struct(char *control_buffer)
 		free(field_value);
 	}
 
-	if (new_node->version == search_name_hashtable("unknown")) {
+	if (new_node->name == unknown || new_node->version == unknown) {
 		free_package(new_node);
 		return -1;
 	}
